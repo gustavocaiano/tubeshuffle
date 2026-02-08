@@ -34,6 +34,8 @@ services:
       - "${APP_PORT:-3000}:3000"
     env_file:
       - .env
+    networks:
+      - nginx-proxy-network
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-youtube_randomizer}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-youtube_randomizer}?schema=public
       REDIS_URL: redis://redis:6379
@@ -50,3 +52,7 @@ services:
 volumes:
   postgres-data:
   redis-data:
+
+networks:
+  nginx-proxy-network:
+    external: true
