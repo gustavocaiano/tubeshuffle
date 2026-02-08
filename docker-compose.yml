@@ -6,6 +6,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-youtube_randomizer}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
       POSTGRES_DB: ${POSTGRES_DB:-youtube_randomizer}
+    env_file:
+      - .env
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
