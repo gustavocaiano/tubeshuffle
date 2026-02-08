@@ -5,7 +5,7 @@ A production-grade YouTube playlist shuffler that fixes YouTube's broken shuffle
 ## Features
 
 ### Free Tier
-- Import up to 3 YouTube playlists
+- Import up to 1 YouTube playlists
 - True random shuffle (Fisher-Yates algorithm)
 - Cloud sync across devices
 - Unlimited playlist size support
