@@ -39,7 +39,6 @@ services:
     networks:
       - nginx-proxy-network
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-youtube_randomizer}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-youtube_randomizer}?schema=public
       REDIS_URL: redis://redis:6379
       # Auth.js/NextAuth in production builds requires explicit host trust when self-hosting.
       AUTH_TRUST_HOST: "true"
