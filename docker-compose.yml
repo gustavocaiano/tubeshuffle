@@ -37,8 +37,6 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     container_name: tubeshuffle
-    ports:
-      - "${APP_PORT:-3000}:3000"
     env_file:
       - .env
     networks:
