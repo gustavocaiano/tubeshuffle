@@ -11,7 +11,7 @@ A production-grade YouTube playlist shuffler that fixes YouTube's broken shuffle
 - Unlimited playlist size support
 - Basic playback controls
 
-### Premium (from 4.99/month or 49.99/year — price in your local currency)
+### Premium (from 4.99/month or 49.99/year)
 - Up to 50 saved playlists
 - Smart Shuffle — avoids same artist/channel back-to-back
 - Discovery Mode — prioritizes less-played videos
