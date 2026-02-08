@@ -17,6 +17,9 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import Link from "next/link";
 
+const maxFreePlaylists = Number(process.env.NEXT_PUBLIC_MAX_FREE_PLAYLISTS ?? 3);
+const maxPremiumPlaylists = Number(process.env.NEXT_PUBLIC_MAX_PREMIUM_PLAYLISTS ?? 50);
+
 const plans = [
   {
     name: "Free",
@@ -24,7 +27,7 @@ const plans = [
     period: " forever",
     description: "Perfect for casual listeners",
     features: [
-      "Up to 3 saved playlists",
+      `Up to ${maxFreePlaylists} saved playlists`,
       "Random shuffle algorithm",
       "Unlimited playlist size",
       "Cloud sync across devices",
@@ -35,12 +38,12 @@ const plans = [
   },
   {
     name: "Premium Monthly",
-    price: "From 4.99",
+    price: "From 3.99",
     period: "/month",
     description: "For power users who want the best shuffle experience",
     note: "Price in your local currency at checkout",
     features: [
-      "Up to 50 saved playlists",
+      `Up to ${maxPremiumPlaylists} saved playlists`,
       "Smart, Discovery & Energy shuffle",
       "Watch history tracking",
       "Exclude watched videos",
@@ -56,7 +59,7 @@ const plans = [
   },
   {
     name: "Premium Yearly",
-    price: "From 49.99",
+    price: "From 39.99",
     period: "/year",
     description: "Save 17% with annual billing",
     note: "Price in your local currency at checkout",

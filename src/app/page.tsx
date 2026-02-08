@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Navbar } from "@/components/layouts/Navbar";
 import { Footer } from "@/components/layouts/Footer";
 import { FaqAccordion } from "@/components/FaqAccordion";
+import { auth } from "@/lib/auth";
 import {
   Shuffle,
   Zap,
@@ -27,6 +28,9 @@ export const metadata: Metadata = {
     canonical: "/",
   },
 };
+
+const maxFreePlaylists = Number(process.env.MAX_FREE_PLAYLISTS ?? 3);
+const maxPremiumPlaylists = Number(process.env.MAX_PREMIUM_PLAYLISTS ?? 50);
 
 const faqs = [
   {
@@ -57,7 +61,7 @@ const faqs = [
   {
     question: "Is TubeShuffler free?",
     answer:
-      "Yes! The free plan lets you save up to 3 playlists with true random shuffle and unlimited playlist size. If you want advanced features like Smart Shuffle, Discovery Mode, watch history tracking, and up to 50 saved playlists, you can upgrade to Premium.",
+      `Yes! The free plan lets you save up to ${maxFreePlaylists} playlists with true random shuffle and unlimited playlist size. If you want advanced features like Smart Shuffle, Discovery Mode, watch history tracking, and up to ${maxPremiumPlaylists} saved playlists, you can upgrade to Premium.`,
   },
 ];
 
@@ -101,7 +105,7 @@ const features = [
 ];
 
 const freeFeatures = [
-  "Up to 3 saved playlists",
+  `Up to ${maxFreePlaylists} saved playlists`,
   "Random shuffle algorithm",
   "Unlimited playlist size",
   "Cloud sync across devices",
@@ -109,7 +113,7 @@ const freeFeatures = [
 ];
 
 const premiumFeatures = [
-  "Up to 50 saved playlists",
+  `Up to ${maxPremiumPlaylists} saved playlists`,
   "Smart, Discovery & Energy shuffle",
   "Watch history tracking",
   "Exclude watched videos",
@@ -120,7 +124,10 @@ const premiumFeatures = [
   "Priority support",
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth();
+  const getStartedHref = session ? "/dashboard" : "/login";
+
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
@@ -142,7 +149,7 @@ export default function HomePage() {
               experience — every single time.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link href="/login">
+              <Link href={getStartedHref}>
                 <Button size="lg" className="min-w-[200px]">
                   Get Started Free
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -218,7 +225,7 @@ export default function HomePage() {
                       </li>
                     ))}
                   </ul>
-                  <Link href="/login" className="mt-6 block">
+                  <Link href={getStartedHref} className="mt-6 block">
                     <Button variant="outline" className="w-full">
                       Get Started
                     </Button>
@@ -234,7 +241,7 @@ export default function HomePage() {
                 <CardHeader>
                   <CardTitle>Premium</CardTitle>
                   <div className="mt-2">
-                    <span className="text-4xl font-bold">From 4.99</span>
+                    <span className="text-4xl font-bold">From 3.99</span>
                     <span className="text-muted-foreground">/month</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
@@ -289,7 +296,7 @@ export default function HomePage() {
               Join thousands of users who have fixed their YouTube shuffle
               experience. It takes less than 30 seconds to get started.
             </p>
-            <Link href="/login" className="mt-6 inline-block">
+            <Link href={getStartedHref} className="mt-6 inline-block">
               <Button size="lg">
                 Start Shuffling — It&apos;s Free
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -318,13 +325,13 @@ export default function HomePage() {
                   "@type": "Offer",
                   price: "0",
                   priceCurrency: "USD",
-                  description: "Free plan with up to 3 playlists",
+                  description: `Free plan with up to ${maxFreePlaylists} playlists`,
                 },
                 {
                   "@type": "Offer",
-                  price: "4.99",
+                  price: "3.99",
                   priceCurrency: "USD",
-                  description: "Premium plan with advanced shuffle and up to 50 playlists",
+                  description: `Premium plan with advanced shuffle and up to ${maxPremiumPlaylists} playlists`,
                 },
               ],
             },

@@ -22,7 +22,7 @@ export function PlaylistQueue() {
   }
 
   return (
-    <ScrollArea className="h-[500px]">
+    <ScrollArea className="h-screen">
       <div className="space-y-1 pr-4">
         {queue.map((video, index) => (
           <button
@@ -48,7 +48,7 @@ export function PlaylistQueue() {
                 </div>
               )}
               {index === currentIndex && isPlaying && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <div className="absolute inset-0 flex iltems-center justify-center bg-black/40">
                   <Play className="h-4 w-4 fill-white text-white" />
                 </div>
               )}

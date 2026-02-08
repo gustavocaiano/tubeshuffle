@@ -35,11 +35,12 @@ interface YouTubePlayer {
   setVolume: (volume: number) => void;
   getCurrentTime: () => number;
   getDuration: () => number;
+  seekTo?: (seconds: number, allowSeekAhead: boolean) => void;
   destroy: () => void;
 }
 
 interface YouTubeEvent {
-  data: number;
+  data?: number;
   target: YouTubePlayer;
 }
 
@@ -51,21 +52,62 @@ interface VideoPlayerProps {
 export function VideoPlayer({ onVideoEnd, onPlayStateChange }: VideoPlayerProps) {
   const playerRef = useRef<YouTubePlayer | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { currentVideo, isPlaying, volume, playNext } = usePlayerStore();
+  const {
+    currentVideo,
+    isPlaying,
+    volume,
+    playNext,
+    playPrevious,
+    setPlaying,
+  } = usePlayerStore();
+  const currentVideoIdRef = useRef<string | null>(null);
+  const onVideoEndRef = useRef(onVideoEnd);
+  const onPlayStateChangeRef = useRef(onPlayStateChange);
+  const playNextRef = useRef(playNext);
+  const volumeRef = useRef(volume);
 
-  const onPlayerStateChange = useCallback(
-    (event: YouTubeEvent) => {
-      if (event.data === window.YT?.PlayerState?.ENDED) {
-        onVideoEnd?.();
-        playNext();
-      } else if (event.data === window.YT?.PlayerState?.PLAYING) {
-        onPlayStateChange?.(true);
-      } else if (event.data === window.YT?.PlayerState?.PAUSED) {
-        onPlayStateChange?.(false);
+  useEffect(() => {
+    onVideoEndRef.current = onVideoEnd;
+  }, [onVideoEnd]);
+
+  useEffect(() => {
+    onPlayStateChangeRef.current = onPlayStateChange;
+  }, [onPlayStateChange]);
+
+  useEffect(() => {
+    playNextRef.current = playNext;
+  }, [playNext]);
+
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
+  const onPlayerStateChange = useCallback((event: YouTubeEvent) => {
+    if (event.data === window.YT?.PlayerState?.ENDED) {
+      onVideoEndRef.current?.();
+      playNextRef.current();
+    } else if (event.data === window.YT?.PlayerState?.PLAYING) {
+      onPlayStateChangeRef.current?.(true);
+    } else if (event.data === window.YT?.PlayerState?.PAUSED) {
+      onPlayStateChangeRef.current?.(false);
+    }
+  }, []);
+
+  const handlePreviousAction = useCallback(() => {
+    const player = playerRef.current;
+    if (player?.seekTo) {
+      const currentTime = player.getCurrentTime();
+      if (Number.isFinite(currentTime) && currentTime > 5) {
+        player.seekTo(0, true);
+        return;
       }
-    },
-    [onVideoEnd, onPlayStateChange, playNext]
-  );
+    }
+    playPrevious();
+  }, [playPrevious]);
+
+  const handleNextAction = useCallback(() => {
+    playNext();
+  }, [playNext]);
 
   // Load YouTube IFrame API
   useEffect(() => {
@@ -82,8 +124,10 @@ export function VideoPlayer({ onVideoEnd, onPlayStateChange }: VideoPlayerProps)
 
     const initPlayer = () => {
       if (playerRef.current) {
-        playerRef.current.loadVideoById(currentVideo.youtubeId);
-        playerRef.current.setVolume(volume);
+        if (currentVideoIdRef.current !== currentVideo.youtubeId) {
+          playerRef.current.loadVideoById(currentVideo.youtubeId);
+          currentVideoIdRef.current = currentVideo.youtubeId;
+        }
         return;
       }
 
@@ -98,9 +142,13 @@ export function VideoPlayer({ onVideoEnd, onPlayStateChange }: VideoPlayerProps)
           playsinline: 1,
         },
         events: {
+          onReady: (event: YouTubeEvent) => {
+            event.target.setVolume(volumeRef.current);
+          },
           onStateChange: onPlayerStateChange,
         },
       });
+      currentVideoIdRef.current = currentVideo.youtubeId;
     };
 
     if (window.YT?.Player) {
@@ -108,7 +156,7 @@ export function VideoPlayer({ onVideoEnd, onPlayStateChange }: VideoPlayerProps)
     } else {
       window.onYouTubeIframeAPIReady = initPlayer;
     }
-  }, [currentVideo, onPlayerStateChange, volume]);
+  }, [currentVideo?.youtubeId, onPlayerStateChange]);
 
   // Sync play/pause state
   useEffect(() => {
@@ -126,6 +174,83 @@ export function VideoPlayer({ onVideoEnd, onPlayStateChange }: VideoPlayerProps)
       playerRef.current.setVolume(volume);
     }
   }, [volume]);
+
+  // Media Session actions (system media keys)
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.mediaSession) return;
+    const mediaSession = navigator.mediaSession;
+    const setHandler = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+      try {
+        mediaSession.setActionHandler(action, handler);
+      } catch {
+        // Some browsers don't support all actions.
+      }
+    };
+
+    setHandler("play", () => setPlaying(true));
+    setHandler("pause", () => setPlaying(false));
+    setHandler("previoustrack", handlePreviousAction);
+    setHandler("nexttrack", handleNextAction);
+    setHandler("seekbackward", handlePreviousAction);
+    setHandler("seekforward", handleNextAction);
+
+    return () => {
+      setHandler("play", null);
+      setHandler("pause", null);
+      setHandler("previoustrack", null);
+      setHandler("nexttrack", null);
+      setHandler("seekbackward", null);
+      setHandler("seekforward", null);
+    };
+  }, [setPlaying, handlePreviousAction, handleNextAction]);
+
+  // Media Session metadata
+  useEffect(() => {
+    if (!currentVideo || typeof navigator === "undefined" || !navigator.mediaSession) {
+      return;
+    }
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentVideo.title,
+      artist: currentVideo.channelTitle,
+      artwork: currentVideo.thumbnail ? [{ src: currentVideo.thumbnail }] : [],
+    });
+  }, [currentVideo]);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.mediaSession) return;
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+  }, [isPlaying]);
+
+  // Keyboard shortcuts for media control
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input/textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      switch (e.key.toLowerCase()) {
+        case 'k': // Play/pause
+        case ' ': // Spacebar also toggles play/pause
+          e.preventDefault();
+          setPlaying(!isPlaying);
+          break;
+        case 'j': // Previous (or restart if >5s)
+          e.preventDefault();
+          handlePreviousAction();
+          break;
+        case 'l': // Next
+          e.preventDefault();
+          handleNextAction();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [isPlaying, setPlaying, handlePreviousAction, handleNextAction]);
 
   if (!currentVideo) {
     return (

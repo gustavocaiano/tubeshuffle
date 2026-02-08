@@ -121,6 +121,11 @@ export const usePlayerStore = create<PlayerState>()(
     {
       name: "player-state",
       partialize: (state) => ({
+        queue: state.queue,
+        currentIndex: state.currentIndex,
+        currentVideo: state.currentVideo,
+        playlistId: state.playlistId,
+        playlistTitle: state.playlistTitle,
         volume: state.volume,
       }),
     }

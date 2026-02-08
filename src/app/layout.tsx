@@ -49,6 +49,9 @@ export const metadata: Metadata = {
     description:
       "YouTube shuffle broken? TubeShuffler fixes it with true random playback. Import your playlists and never hear the same songs first again.",
   },
+  icons: {
+    icon: "/favicon.svg",
+  },
   robots: {
     index: true,
     follow: true,

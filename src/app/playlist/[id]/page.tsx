@@ -92,11 +92,15 @@ export default function PlaylistPage() {
   useEffect(() => {
     if (playlistQuery.data && playlistQuery.data.videos.length > 0) {
       const playlist = playlistQuery.data;
-      // Only auto-shuffle if not already playing this playlist
-      const currentPlaylistId = usePlayerStore.getState().playlistId;
-      if (currentPlaylistId !== playlist.id) {
-        handleShuffle("RANDOM");
+      const { playlistId: currentPlaylistId, queue } = usePlayerStore.getState();
+      
+      // Don't auto-shuffle if we're already playing this playlist with a queue
+      if (currentPlaylistId === playlist.id && queue.length > 0) {
+        return;
       }
+      
+      // Auto-shuffle only on first visit or when switching playlists
+      handleShuffle("RANDOM");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlistQuery.data?.id]);
