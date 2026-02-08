@@ -1,0 +1,201 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id            String           @id @default(cuid())
+  email         String           @unique
+  name          String?
+  image         String?
+  emailVerified DateTime?
+
+  // Subscription status
+  subscription     SubscriptionTier @default(FREE)
+  stripeCustomerId String?          @unique
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  playlists     Playlist[]
+  subscriptions Subscription[]
+
+  @@index([email])
+  @@index([stripeCustomerId])
+}
+
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+}
+
+// NextAuth models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// SUBSCRIPTION & BILLING
+// ============================================
+
+model Subscription {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  stripeSubscriptionId String @unique
+  stripePriceId        String
+  status               String // active, canceled, past_due, etc.
+
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([stripeSubscriptionId])
+}
+
+// ============================================
+// PLAYLISTS & VIDEOS
+// ============================================
+
+model Playlist {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // YouTube data
+  youtubeId    String
+  title        String
+  description  String? @db.Text
+  thumbnail    String?
+  channelTitle String?
+  videoCount   Int     @default(0)
+
+  // Metadata
+  isPublic    Boolean  @default(true)
+  lastFetched DateTime @default(now())
+
+  // User settings
+  shufflePreset  ShufflePreset @default(RANDOM)
+  excludeWatched Boolean       @default(false) // Premium feature
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  videos      Video[]
+  playHistory PlayHistory[]
+
+  @@unique([userId, youtubeId])
+  @@index([userId])
+  @@index([youtubeId])
+}
+
+enum ShufflePreset {
+  RANDOM    // Pure random
+  SMART     // Avoid same artist back-to-back (Premium)
+  DISCOVERY // Prioritize less-played videos (Premium)
+  ENERGY    // Alternate high/low energy (Premium)
+}
+
+model Video {
+  id         String   @id @default(cuid())
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  // YouTube data
+  youtubeId    String
+  title        String
+  channelTitle String
+  thumbnail    String
+  duration     Int // seconds
+  position     Int // position in original playlist
+
+  // Metadata (optional, for premium features)
+  viewCount Int?
+  likeCount Int?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  // Relations
+  playHistory PlayHistory[]
+
+  @@unique([playlistId, youtubeId])
+  @@index([playlistId])
+  @@index([youtubeId])
+}
+
+// ============================================
+// ANALYTICS & HISTORY
+// ============================================
+
+model PlayHistory {
+  id         String   @id @default(cuid())
+  userId     String
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  videoId    String
+  video      Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  // Play data
+  watchedAt      DateTime @default(now())
+  watchedSeconds Int      @default(0)
+  completed      Boolean  @default(false)
+
+  @@index([userId])
+  @@index([playlistId])
+  @@index([videoId])
+  @@index([watchedAt])
+}
