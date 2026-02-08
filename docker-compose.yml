@@ -2,6 +2,8 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    networks:
+      - nginx-proxy-network
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-youtube_randomizer}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
@@ -19,6 +21,8 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    networks:
+      - nginx-proxy-network
     volumes:
       - redis-data:/data
     healthcheck:
