@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXTAUTH_URL ?? "https://tubeshuffler.com"
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://tubeshuffler.com"
   ),
   title: {
     default: "TubeShuffler — Fix YouTube's Broken Shuffle",

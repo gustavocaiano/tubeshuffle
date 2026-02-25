@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -17,14 +16,11 @@ import {
   SkipForward,
   Play,
   Pause,
-  Volume2,
-  Lock,
 } from "lucide-react";
 import { usePlayerStore } from "@/stores/player-store";
 import type { ShufflePreset } from "@/types/playlist";
 
 interface ShuffleControlsProps {
-  isPremium: boolean;
   currentPreset: ShufflePreset;
   excludeWatched: boolean;
   onShuffle: (preset: ShufflePreset) => void;
@@ -33,7 +29,6 @@ interface ShuffleControlsProps {
 }
 
 export function ShuffleControls({
-  isPremium,
   currentPreset,
   excludeWatched,
   onShuffle,
@@ -91,21 +86,9 @@ export function ShuffleControls({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="RANDOM">Random</SelectItem>
-              <SelectItem value="SMART" disabled={!isPremium}>
-                <span className="flex items-center gap-1">
-                  Smart {!isPremium && <Lock className="h-3 w-3" />}
-                </span>
-              </SelectItem>
-              <SelectItem value="DISCOVERY" disabled={!isPremium}>
-                <span className="flex items-center gap-1">
-                  Discovery {!isPremium && <Lock className="h-3 w-3" />}
-                </span>
-              </SelectItem>
-              <SelectItem value="ENERGY" disabled={!isPremium}>
-                <span className="flex items-center gap-1">
-                  Energy {!isPremium && <Lock className="h-3 w-3" />}
-                </span>
-              </SelectItem>
+              <SelectItem value="SMART">Smart</SelectItem>
+              <SelectItem value="DISCOVERY">Discovery</SelectItem>
+              <SelectItem value="ENERGY">Energy</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -119,23 +102,14 @@ export function ShuffleControls({
           {isShuffling ? "Shuffling..." : "Re-shuffle"}
         </Button>
 
-        {/* Exclude Watched (Premium) */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="exclude-watched" className="text-sm">
-              Exclude watched
-            </Label>
-            {!isPremium && (
-              <Badge variant="outline" className="text-xs">
-                Premium
-              </Badge>
-            )}
-          </div>
+          <Label htmlFor="exclude-watched" className="text-sm">
+            Exclude watched
+          </Label>
           <Switch
             id="exclude-watched"
             checked={excludeWatched}
             onCheckedChange={onExcludeWatchedChange}
-            disabled={!isPremium}
           />
         </div>
       </div>

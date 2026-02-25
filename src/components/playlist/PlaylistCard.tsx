@@ -12,17 +12,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Music, MoreVertical, Trash2, RefreshCw, Shuffle } from "lucide-react";
+import type { LocalPlaylist } from "@/types/playlist";
 
 interface PlaylistCardProps {
-  playlist: {
-    id: string;
-    title: string;
-    thumbnail: string | null;
-    channelTitle: string | null;
-    videoCount: number;
-    shufflePreset: string;
-    _count: { videos: number };
-  };
+  playlist: LocalPlaylist;
   onDelete: (id: string) => void;
   onSync: (id: string) => void;
 }
@@ -46,7 +39,7 @@ export function PlaylistCard({ playlist, onDelete, onSync }: PlaylistCardProps) 
         )}
         <div className="absolute bottom-2 right-2">
           <Badge variant="secondary" className="bg-black/70 text-white">
-            {playlist._count.videos} videos
+            {playlist.videoCount} videos
           </Badge>
         </div>
       </div>

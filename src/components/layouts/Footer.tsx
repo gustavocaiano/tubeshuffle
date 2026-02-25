@@ -13,11 +13,8 @@ export function Footer() {
         </div>
 
         <nav className="flex gap-6 text-sm text-muted-foreground">
-          <Link href="/pricing" className="hover:text-foreground transition-colors">
-            Pricing
-          </Link>
-          <Link href="/login" className="hover:text-foreground transition-colors">
-            Sign in
+          <Link href="/dashboard" className="hover:text-foreground transition-colors">
+            Open app
           </Link>
         </nav>
 

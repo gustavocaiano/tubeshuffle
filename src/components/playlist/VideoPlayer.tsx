@@ -156,7 +156,7 @@ export function VideoPlayer({ onVideoEnd, onPlayStateChange }: VideoPlayerProps)
     } else {
       window.onYouTubeIframeAPIReady = initPlayer;
     }
-  }, [currentVideo?.youtubeId, onPlayerStateChange]);
+  }, [currentVideo, onPlayerStateChange]);
 
   // Sync play/pause state
   useEffect(() => {

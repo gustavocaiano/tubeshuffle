@@ -12,15 +12,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Crown, CheckCircle2, XCircle } from "lucide-react";
-import { trpc } from "@/lib/trpc";
+import { Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { playlistRepository } from "@/stores/playlist-store";
 import { toast } from "sonner";
 
 interface BatchImportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  isPremium: boolean;
   onSuccess?: () => void;
 }
 
@@ -33,14 +31,11 @@ interface ImportResult {
 export function BatchImportModal({
   open,
   onOpenChange,
-  isPremium,
   onSuccess,
 }: BatchImportModalProps) {
   const [urls, setUrls] = useState("");
   const [results, setResults] = useState<ImportResult[]>([]);
   const [isImporting, setIsImporting] = useState(false);
-
-  const importMutation = trpc.playlist.import.useMutation();
 
   const handleSubmit = async () => {
     const urlList = urls
@@ -62,7 +57,7 @@ export function BatchImportModal({
       setResults([...importResults]);
 
       try {
-        await importMutation.mutateAsync({ url: importResults[i].url });
+        await playlistRepository.importPlaylistFromUrl(importResults[i].url);
         importResults[i].status = "success";
         importResults[i].message = "Imported successfully";
       } catch (error) {
@@ -92,28 +87,6 @@ export function BatchImportModal({
       onOpenChange(false);
     }
   };
-
-  if (!isPremium) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              Batch Import
-              <Badge>
-                <Crown className="mr-1 h-3 w-3" />
-                Premium
-              </Badge>
-            </DialogTitle>
-            <DialogDescription>
-              Batch import is a Premium feature. Upgrade to import multiple
-              playlists at once.
-            </DialogDescription>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
-    );
-  }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>

@@ -7,9 +7,8 @@ Thank you for your interest in contributing to TubeShuffler!
 1. Fork and clone the repository
 2. Install dependencies: `npm install`
 3. Copy `.env.example` to `.env` and fill in the values
-4. Set up a local PostgreSQL database
-5. Run migrations: `npx prisma migrate dev`
-6. Start the dev server: `npm run dev`
+4. Set `YOUTUBE_API_KEY` (recommended proxy mode)
+5. Start the dev server: `npm run dev`
 
 ## Code Style
 
@@ -46,26 +45,14 @@ Write tests for:
 ```
 Frontend (Next.js App Router)
     ↓
-tRPC Client (type-safe)
+Local services/repositories
     ↓
-tRPC Server (routers + middleware)
-    ↓
-Service Layer (business logic)
-    ↓
-Data Layer (Prisma + Redis)
+Browser storage (IndexedDB)
 ```
 
-- **Pages** call tRPC procedures via React Query hooks
-- **tRPC routers** handle auth, validation, and feature gates
-- **Services** contain business logic (YouTube API, shuffle algorithms)
-- **Prisma** handles database operations
-- **Redis** caches YouTube API responses
-
-## Feature Gates
-
-Premium features must be gated in BOTH:
-1. **Frontend** — show upgrade prompts, disable controls
-2. **Backend** — tRPC middleware checks `user.subscription`
+- **Pages** call local repository/services via React Query hooks
+- **Storage** is browser-local (IndexedDB)
+- **API route** `/api/youtube/playlist` is optional proxy for YouTube key protection
 
 ## Environment Variables
 

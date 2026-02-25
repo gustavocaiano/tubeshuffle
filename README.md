@@ -1,159 +1,73 @@
 # TubeShuffler
 
-A production-grade YouTube playlist shuffler that fixes YouTube's broken shuffle algorithm. Import your playlists, get truly random playback with smart shuffle algorithms, and never hear the same songs first again.
+TubeShuffler is a free, open YouTube playlist shuffler.
 
-## Features
+It runs as a Next.js app and stores imported playlists in your browser (IndexedDB), so there is no database, account system, or Redis required.
 
-### Free Tier
-- Import up to 1 YouTube playlists
-- True random shuffle (Fisher-Yates algorithm)
-- Cloud sync across devices
-- Unlimited playlist size support
-- Basic playback controls
+## What it does
 
-### Premium (from 3.99/month or 39.99/year)
-- Up to 50 saved playlists
-- Smart Shuffle — avoids same artist/channel back-to-back
-- Discovery Mode — prioritizes less-played videos
-- Watch history tracking
-- Exclude watched videos from shuffle
-- Playlist analytics (most played, completion rate)
-- Batch import (multiple playlists at once)
-- Custom filters (duration, channel)
-- Auto-cleanup of deleted/unavailable videos
+- Import a YouTube playlist URL
+- Shuffle with multiple modes (Random, Smart, Discovery, Energy)
+- Play videos with a persistent queue
+- Save playlists locally in the browser
 
-## Tech Stack
+## Stack
 
-- **Frontend:** Next.js 14+ (App Router), TypeScript, Tailwind CSS, shadcn/ui
-- **API:** tRPC (type-safe client-server communication)
-- **Database:** PostgreSQL + Prisma ORM
-- **Auth:** NextAuth.js v5 (Google OAuth)
-- **Payments:** Stripe (subscriptions)
-- **Cache:** Redis (via Docker container)
-- **State:** Zustand (player state), TanStack Query (server state)
-- **Testing:** Vitest
+- Next.js (App Router) + TypeScript
+- React Query + Zustand
+- Tailwind + shadcn/ui
+- Browser IndexedDB for persistence
+- Optional Vercel API route for YouTube key proxying
 
-## Quick Start
+## Local development
 
-### Prerequisites
-- Docker and Docker Compose ([install guide](https://docs.docker.com/engine/install/))
-- Google Cloud Console project (for OAuth + YouTube API)
-
-### 1. Clone and install
+1. Install dependencies:
 
 ```bash
-git clone <your-repo-url>
-cd youtube-randomizer
+npm install
 ```
 
-### 2. Set up environment variables
+2. Copy environment template:
 
 ```bash
 cp .env.example .env
 ```
 
-Fill in your `.env` file with:
-- `AUTH_SECRET` — Generate with `openssl rand -base64 32`
-- `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` — From Google Cloud Console
-- `YOUTUBE_API_KEY` — From Google Cloud Console (YouTube Data API v3)
-- Stripe keys (optional, for payments)
+3. Set `YOUTUBE_API_KEY` (recommended proxy mode).
 
-Database and Redis are provided by Docker Compose automatically.
-
-### 3. Start with Docker Compose
+4. Start dev server:
 
 ```bash
-docker compose up -d --build
-```
-
-### 4. Run database migrations
-
-```bash
-docker compose exec app npx prisma migrate deploy
-```
-
-### 5. Open the app
-
-Visit [http://localhost:3000](http://localhost:3000)
-
-### Local development (without Docker)
-
-You can also run only the infrastructure containers and the app locally:
-
-```bash
-# Start only postgres and redis
-docker compose up -d postgres redis
-
-# Install dependencies and run the dev server
-npm install
-npx prisma migrate dev
 npm run dev
 ```
 
-## Project Structure
+Open `http://localhost:3000`.
 
-```
-src/
-├── app/                    # Next.js App Router pages
-│   ├── page.tsx            # Landing page
-│   ├── dashboard/          # User dashboard
-│   ├── playlist/[id]/      # Playlist view + player
-│   ├── pricing/            # Pricing page
-│   ├── (auth)/login/       # Login page
-│   └── api/                # API routes (auth, tRPC, webhooks)
-├── components/
-│   ├── ui/                 # shadcn/ui components
-│   ├── playlist/           # Playlist-specific components
-│   ├── layouts/            # Navbar, Footer
-│   └── providers.tsx       # App providers (session, tRPC, query)
-├── lib/                    # Shared utilities
-│   ├── auth.ts             # NextAuth configuration
-│   ├── db.ts               # Prisma client
-│   ├── redis.ts            # Redis client + cache helper
-│   ├── stripe.ts           # Stripe client
-│   ├── trpc.ts             # tRPC React client
-│   ├── env.ts              # Validated environment variables
-│   └── utils.ts            # Helper functions
-├── server/
-│   ├── trpc/               # tRPC server setup
-│   │   ├── routers/        # API routers (playlist, user, subscription)
-│   │   ├── trpc.ts         # tRPC initialization + middleware
-│   │   ├── context.ts      # Request context
-│   │   └── router.ts       # Root router
-│   └── services/           # Business logic
-│       ├── youtube-service.ts
-│       ├── shuffle-service.ts
-│       ├── playlist-service.ts
-│       └── rate-limiter.ts
-├── stores/                 # Zustand stores
-│   ├── player-store.ts
-│   └── playlist-store.ts
-└── types/                  # TypeScript types
-```
+## YouTube API key modes
 
-## Scripts
+### Proxy mode (recommended)
 
-```bash
-npm run dev         # Start development server
-npm run build       # Production build
-npm run start       # Start production server
-npm run lint        # Run ESLint
-npm run test        # Run tests (Vitest)
-npm run test:watch  # Run tests in watch mode
-```
+- Set `NEXT_PUBLIC_YOUTUBE_API_MODE=proxy`
+- Set server-only `YOUTUBE_API_KEY`
+- Client calls `/api/youtube/playlist`, key is not exposed in browser bundle
 
-## API Documentation
+### Browser mode
 
-See [API.md](./API.md) for full tRPC API documentation.
+- Set `NEXT_PUBLIC_YOUTUBE_API_MODE=browser`
+- Set `NEXT_PUBLIC_YOUTUBE_API_KEY`
+- Restrict the key by HTTP referrer and API scope in Google Cloud Console
 
-## Deployment
+## Deploy to Vercel (free tier)
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for deployment instructions.
+Set env vars in Vercel:
 
-## Contributing
+- `NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app`
+- `NEXT_PUBLIC_YOUTUBE_API_MODE=proxy`
+- `YOUTUBE_API_KEY=...`
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for development guidelines.
+Then deploy normally from your Git provider.
 
-## License
+## Notes
 
-MIT
+- Data is local-only; clearing browser storage removes imported playlists.
+- There is no cross-device sync by design.
