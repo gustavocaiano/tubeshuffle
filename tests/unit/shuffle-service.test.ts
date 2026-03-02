@@ -4,10 +4,31 @@ import {
   smartShuffle,
   discoveryShuffle,
   shuffleVideos,
-} from "@/server/services/shuffle-service";
-import type { Video, PlayHistory } from "@prisma/client";
+  type ShuffleVideoItem,
+  type ShufflePlayHistoryItem,
+} from "@/lib/shuffle/shuffle-service";
 
-function createVideo(overrides: Partial<Video> = {}): Video {
+type TestVideo = ShuffleVideoItem & {
+  playlistId: string;
+  youtubeId: string;
+  thumbnail: string;
+  duration: number;
+  position: number;
+  viewCount: number | null;
+  likeCount: number | null;
+  createdAt: Date;
+};
+
+type TestPlayHistory = ShufflePlayHistoryItem & {
+  id: string;
+  userId: string;
+  playlistId: string;
+  watchedAt: Date;
+  watchedSeconds: number;
+  completed: boolean;
+};
+
+function createVideo(overrides: Partial<TestVideo> = {}): TestVideo {
   return {
     id: `video-${Math.random().toString(36).slice(2, 9)}`,
     playlistId: "playlist-1",
@@ -27,7 +48,7 @@ function createVideo(overrides: Partial<Video> = {}): Video {
 function createPlayHistory(
   videoId: string,
   count: number
-): PlayHistory[] {
+): TestPlayHistory[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `ph-${i}-${Math.random().toString(36).slice(2, 9)}`,
     userId: "user-1",

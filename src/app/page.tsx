@@ -6,13 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Navbar } from "@/components/layouts/Navbar";
 import { Footer } from "@/components/layouts/Footer";
 import { FaqAccordion } from "@/components/FaqAccordion";
-import { auth } from "@/lib/auth";
 import {
   Shuffle,
   Zap,
   Shield,
   BarChart3,
-  Check,
   ArrowRight,
   Music,
   Sparkles,
@@ -28,9 +26,6 @@ export const metadata: Metadata = {
     canonical: "/",
   },
 };
-
-const maxFreePlaylists = Number(process.env.MAX_FREE_PLAYLISTS ?? 3);
-const maxPremiumPlaylists = Number(process.env.MAX_PREMIUM_PLAYLISTS ?? 50);
 
 const faqs = [
   {
@@ -61,7 +56,7 @@ const faqs = [
   {
     question: "Is TubeShuffler free?",
     answer:
-      `Yes! The free plan lets you save up to ${maxFreePlaylists} playlists with true random shuffle and unlimited playlist size. If you want advanced features like Smart Shuffle, Discovery Mode, watch history tracking, and up to ${maxPremiumPlaylists} saved playlists, you can upgrade to Premium.`,
+      "Yes. TubeShuffler is now fully free and open. Your playlists are saved in your browser, so there are no accounts, subscriptions, or server storage costs.",
   },
 ];
 
@@ -104,29 +99,8 @@ const features = [
   },
 ];
 
-const freeFeatures = [
-  `Up to ${maxFreePlaylists} saved playlists`,
-  "Random shuffle algorithm",
-  "Unlimited playlist size",
-  "Cloud sync across devices",
-  "Basic playback controls",
-];
-
-const premiumFeatures = [
-  `Up to ${maxPremiumPlaylists} saved playlists`,
-  "Smart, Discovery & Energy shuffle",
-  "Watch history tracking",
-  "Exclude watched videos",
-  "Playlist analytics",
-  "Batch import",
-  "Custom filters (duration, channel)",
-  "Auto-cleanup deleted videos",
-  "Priority support",
-];
-
-export default async function HomePage() {
-  const session = await auth();
-  const getStartedHref = session ? "/dashboard" : "/login";
+export default function HomePage() {
+  const getStartedHref = "/dashboard";
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -153,11 +127,6 @@ export default async function HomePage() {
                 <Button size="lg" className="min-w-[200px]">
                   Get Started Free
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <Link href="/pricing">
-                <Button variant="outline" size="lg" className="min-w-[200px]">
-                  View Pricing
                 </Button>
               </Link>
             </div>
@@ -194,75 +163,6 @@ export default async function HomePage() {
                 </CardContent>
               </Card>
             ))}
-          </div>
-        </section>
-
-        {/* Pricing Section */}
-        <section className="border-t bg-muted/30 py-20">
-          <div className="container mx-auto px-4">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold">Simple, transparent pricing</h2>
-              <p className="mt-3 text-muted-foreground">
-                Start free. Upgrade when you need more.
-              </p>
-            </div>
-            <div className="mx-auto mt-12 grid max-w-4xl gap-8 md:grid-cols-2">
-              {/* Free Plan */}
-              <Card className="relative">
-                <CardHeader>
-                  <CardTitle>Free</CardTitle>
-                  <div className="mt-2">
-                    <span className="text-4xl font-bold">Free</span>
-                    <span className="text-muted-foreground"> forever</span>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3">
-                    {freeFeatures.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2 text-sm">
-                        <Check className="h-4 w-4 text-primary" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href={getStartedHref} className="mt-6 block">
-                    <Button variant="outline" className="w-full">
-                      Get Started
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-
-              {/* Premium Plan */}
-              <Card className="relative border-primary shadow-lg">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge>Most Popular</Badge>
-                </div>
-                <CardHeader>
-                  <CardTitle>Premium</CardTitle>
-                  <div className="mt-2">
-                    <span className="text-4xl font-bold">From 3.99</span>
-                    <span className="text-muted-foreground">/month</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    or yearly (save 17%) &middot; Price in your local currency at checkout
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3">
-                    {premiumFeatures.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2 text-sm">
-                        <Check className="h-4 w-4 text-primary" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href="/pricing" className="mt-6 block">
-                    <Button className="w-full">Upgrade to Premium</Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            </div>
           </div>
         </section>
 
@@ -320,20 +220,12 @@ export default async function HomePage() {
                 "Fix YouTube's broken shuffle. Import your playlists and get truly random playback with smart shuffle algorithms.",
               applicationCategory: "MultimediaApplication",
               operatingSystem: "Any",
-              offers: [
-                {
-                  "@type": "Offer",
-                  price: "0",
-                  priceCurrency: "USD",
-                  description: `Free plan with up to ${maxFreePlaylists} playlists`,
-                },
-                {
-                  "@type": "Offer",
-                  price: "3.99",
-                  priceCurrency: "USD",
-                  description: `Premium plan with advanced shuffle and up to ${maxPremiumPlaylists} playlists`,
-                },
-              ],
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "USD",
+                description: "Fully free and open YouTube playlist shuffler",
+              },
             },
             {
               "@context": "https://schema.org",

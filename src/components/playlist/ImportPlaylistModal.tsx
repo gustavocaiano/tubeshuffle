@@ -13,7 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2, Link as LinkIcon } from "lucide-react";
-import { trpc } from "@/lib/trpc";
+import { useMutation } from "@tanstack/react-query";
+import { playlistRepository } from "@/stores/playlist-store";
 import { toast } from "sonner";
 
 interface ImportPlaylistModalProps {
@@ -29,14 +30,18 @@ export function ImportPlaylistModal({
 }: ImportPlaylistModalProps) {
   const [url, setUrl] = useState("");
 
-  const importMutation = trpc.playlist.import.useMutation({
+  const importMutation = useMutation({
+    mutationFn: (playlistUrl: string) =>
+      playlistRepository.importPlaylistFromUrl(playlistUrl),
     onSuccess: (data) => {
-      toast.success(`Imported "${data.title}" with ${data.videos.length} videos`);
+      toast.success(
+        `Imported "${data.playlist.title}" with ${data.videos.length} videos`
+      );
       setUrl("");
       onOpenChange(false);
       onSuccess?.();
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error(error.message);
     },
   });
@@ -44,7 +49,7 @@ export function ImportPlaylistModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
-    importMutation.mutate({ url: url.trim() });
+    importMutation.mutate(url.trim());
   };
 
   return (

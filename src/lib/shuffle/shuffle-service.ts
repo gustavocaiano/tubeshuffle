@@ -1,5 +1,14 @@
-import type { Video, PlayHistory } from "@prisma/client";
 import type { ShufflePreset } from "@/types/playlist";
+
+export interface ShuffleVideoItem {
+  id: string;
+  title: string;
+  channelTitle: string;
+}
+
+export interface ShufflePlayHistoryItem {
+  videoId: string;
+}
 
 /**
  * Fisher-Yates shuffle — pure random.
@@ -16,19 +25,17 @@ function fisherYatesShuffle<T>(array: T[]): T[] {
 /**
  * Random shuffle — simple Fisher-Yates.
  */
-export function randomShuffle(videos: Video[]): Video[] {
+export function randomShuffle<T extends ShuffleVideoItem>(videos: T[]): T[] {
   return fisherYatesShuffle(videos);
 }
 
 /**
  * Smart shuffle — avoid same artist/channel back-to-back.
- * Premium feature.
  */
-export function smartShuffle(videos: Video[]): Video[] {
+export function smartShuffle<T extends ShuffleVideoItem>(videos: T[]): T[] {
   const shuffled = fisherYatesShuffle(videos);
 
   const extractArtist = (title: string) => {
-    // Try "Artist - Song" pattern
     const dashSplit = title.split("-");
     if (dashSplit.length >= 2) return dashSplit[0].trim().toLowerCase();
     return title.toLowerCase();
@@ -39,7 +46,6 @@ export function smartShuffle(videos: Video[]): Video[] {
     const nextArtist = extractArtist(shuffled[i + 1].title);
 
     if (currentArtist === nextArtist && i + 2 < shuffled.length) {
-      // Find next video with different artist
       for (let j = i + 2; j < shuffled.length; j++) {
         const candidateArtist = extractArtist(shuffled[j].title);
         if (candidateArtist !== currentArtist) {
@@ -50,7 +56,6 @@ export function smartShuffle(videos: Video[]): Video[] {
     }
   }
 
-  // Also try to separate by channel
   for (let i = 0; i < shuffled.length - 1; i++) {
     if (
       shuffled[i].channelTitle === shuffled[i + 1].channelTitle &&
@@ -70,18 +75,16 @@ export function smartShuffle(videos: Video[]): Video[] {
 
 /**
  * Discovery shuffle — prioritize videos with fewer plays.
- * Premium feature.
  */
-export function discoveryShuffle(
-  videos: Video[],
-  playHistory: PlayHistory[]
-): Video[] {
+export function discoveryShuffle<
+  T extends ShuffleVideoItem,
+  H extends ShufflePlayHistoryItem,
+>(videos: T[], playHistory: H[]): T[] {
   const playCountMap = new Map<string, number>();
   for (const ph of playHistory) {
     playCountMap.set(ph.videoId, (playCountMap.get(ph.videoId) ?? 0) + 1);
   }
 
-  // Weight videos inversely by play count
   const weighted = videos.map((video) => ({
     video,
     weight: 1 / ((playCountMap.get(video.id) ?? 0) + 1),
@@ -120,19 +123,16 @@ function weightedShuffle<T>(items: { video: T; weight: number }[]): T[] {
 /**
  * Main shuffle dispatcher.
  */
-export function shuffleVideos(
-  videos: Video[],
-  preset: ShufflePreset,
-  playHistory: PlayHistory[] = []
-): Video[] {
+export function shuffleVideos<
+  T extends ShuffleVideoItem,
+  H extends ShufflePlayHistoryItem,
+>(videos: T[], preset: ShufflePreset, playHistory: H[] = []): T[] {
   switch (preset) {
     case "SMART":
       return smartShuffle(videos);
     case "DISCOVERY":
       return discoveryShuffle(videos, playHistory);
     case "ENERGY":
-      // Energy mode falls back to smart shuffle for now
-      // (full implementation needs external music API)
       return smartShuffle(videos);
     case "RANDOM":
     default:

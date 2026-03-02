@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter, useParams } from "next/navigation";
-import { trpc } from "@/lib/trpc";
+import { useParams } from "next/navigation";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { usePlayerStore } from "@/stores/player-store";
+import { playlistRepository } from "@/stores/playlist-store";
 import { Navbar } from "@/components/layouts/Navbar";
 import { VideoPlayer } from "@/components/playlist/VideoPlayer";
 import { ShuffleControls } from "@/components/playlist/ShuffleControls";
@@ -16,37 +16,46 @@ import { ArrowLeft, ExternalLink, Music } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import type { ShufflePreset } from "@/types/playlist";
+import { shuffleVideos } from "@/lib/shuffle/shuffle-service";
 
 export default function PlaylistPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
   const params = useParams();
   const playlistId = params.id as string;
 
   const [shufflePreset, setShufflePreset] = useState<ShufflePreset>("RANDOM");
   const [excludeWatched, setExcludeWatched] = useState(false);
 
-  const { setQueue, currentVideo } = usePlayerStore();
+  const { setQueue, currentVideo, queue } = usePlayerStore();
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    }
-  }, [status, router]);
-
-  const profileQuery = trpc.user.getProfile.useQuery(undefined, {
-    enabled: !!session,
+  const playlistQuery = useQuery({
+    queryKey: ["playlist", playlistId],
+    queryFn: () => playlistRepository.getPlaylist(playlistId),
+    enabled: Boolean(playlistId),
   });
 
-  const playlistQuery = trpc.playlist.get.useQuery(
-    { id: playlistId },
-    { enabled: !!session && !!playlistId }
-  );
+  const shuffleMutation = useMutation({
+    mutationFn: async ({
+      preset,
+      shouldExcludeWatched,
+    }: {
+      preset: ShufflePreset;
+      shouldExcludeWatched: boolean;
+    }) => {
+      const data = playlistQuery.data;
+      if (!data) return [];
 
-  const shuffleMutation = trpc.playlist.shuffle.useMutation({
+      let videosToShuffle = data.videos;
+
+      if (shouldExcludeWatched) {
+        const watchedIds = await playlistRepository.getCompletedVideoIds(playlistId);
+        videosToShuffle = videosToShuffle.filter((video) => !watchedIds.has(video.id));
+      }
+
+      return shuffleVideos(videosToShuffle, preset, []);
+    },
     onSuccess: (shuffledVideos) => {
-      const playlist = playlistQuery.data;
-      if (playlist && shuffledVideos.length > 0) {
+      const bundle = playlistQuery.data;
+      if (bundle && shuffledVideos.length > 0) {
         const queueVideos = shuffledVideos.map((v) => ({
           id: v.id,
           youtubeId: v.youtubeId,
@@ -55,27 +64,28 @@ export default function PlaylistPage() {
           thumbnail: v.thumbnail,
           duration: v.duration,
         }));
-        setQueue(queueVideos, playlist.id, playlist.title);
+        setQueue(queueVideos, bundle.playlist.id, bundle.playlist.title);
         toast.success(`Shuffled ${shuffledVideos.length} videos`);
+      } else if (bundle && shuffledVideos.length === 0) {
+        toast.error("No videos available with the current filters.");
       }
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error(error.message);
     },
   });
 
-  const recordPlayMutation = trpc.playlist.recordPlay.useMutation();
+  const recordPlayMutation = useMutation({
+    mutationFn: (input: { playlistId: string; videoId: string; completed: boolean }) =>
+      playlistRepository.recordPlay({ ...input, watchedSeconds: 0 }),
+  });
 
   const handleShuffle = useCallback(
     (preset: ShufflePreset) => {
       setShufflePreset(preset);
-      shuffleMutation.mutate({
-        playlistId,
-        preset,
-        excludeWatched,
-      });
+      shuffleMutation.mutate({ preset, shouldExcludeWatched: excludeWatched });
     },
-    [playlistId, excludeWatched, shuffleMutation]
+    [excludeWatched, shuffleMutation]
   );
 
   const handleVideoEnd = useCallback(() => {
@@ -91,26 +101,21 @@ export default function PlaylistPage() {
   // Auto-shuffle on first load
   useEffect(() => {
     if (playlistQuery.data && playlistQuery.data.videos.length > 0) {
-      const playlist = playlistQuery.data;
+      const playlist = playlistQuery.data.playlist;
       const { playlistId: currentPlaylistId, queue } = usePlayerStore.getState();
-      
+
       // Don't auto-shuffle if we're already playing this playlist with a queue
       if (currentPlaylistId === playlist.id && queue.length > 0) {
         return;
       }
-      
+
       // Auto-shuffle only on first visit or when switching playlists
       handleShuffle("RANDOM");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playlistQuery.data?.id]);
+  }, [playlistQuery.data?.playlist.id]);
 
-  if (status === "loading" || status === "unauthenticated") {
-    return null;
-  }
-
-  const playlist = playlistQuery.data;
-  const isPremium = profileQuery.data?.subscription === "PREMIUM";
+  const playlist = playlistQuery.data?.playlist;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -140,7 +145,7 @@ export default function PlaylistPage() {
                     <span>{playlist.channelTitle}</span>
                   )}
                   <span>·</span>
-                  <span>{playlist.videos.length} videos</span>
+                  <span>{playlistQuery.data?.videos.length ?? 0} videos</span>
                   <a
                     href={`https://youtube.com/playlist?list=${playlist.youtubeId}`}
                     target="_blank"
@@ -168,7 +173,7 @@ export default function PlaylistPage() {
                 <Skeleton className="h-[500px] rounded-xl" />
               </div>
             </div>
-          ) : playlist && playlist.videos.length > 0 ? (
+          ) : playlist && (playlistQuery.data?.videos.length ?? 0) > 0 ? (
             <div className="grid gap-6 lg:grid-cols-3">
               {/* Player + Controls */}
               <div className="space-y-4 lg:col-span-2">
@@ -188,7 +193,6 @@ export default function PlaylistPage() {
                 )}
 
                 <ShuffleControls
-                  isPremium={isPremium}
                   currentPreset={shufflePreset}
                   excludeWatched={excludeWatched}
                   onShuffle={handleShuffle}
@@ -201,9 +205,7 @@ export default function PlaylistPage() {
               <div className="rounded-xl border p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="font-semibold">Queue</h2>
-                  <Badge variant="secondary">
-                    {usePlayerStore.getState().queue.length} videos
-                  </Badge>
+                  <Badge variant="secondary">{queue.length} videos</Badge>
                 </div>
                 <PlaylistQueue />
               </div>

@@ -1,78 +1,55 @@
 "use client";
 
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { trpc } from "@/lib/trpc";
-import { usePlaylistStore } from "@/stores/playlist-store";
-import { Navbar } from "@/components/layouts/Navbar";
+import dynamic from "next/dynamic";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { playlistRepository } from "@/stores/playlist-store";
 import { PlaylistCard } from "@/components/playlist/PlaylistCard";
 import { ImportPlaylistModal } from "@/components/playlist/ImportPlaylistModal";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Plus,
-  Shuffle,
-  Music,
-  Crown,
-  AlertCircle,
-} from "lucide-react";
+import { Plus, Music } from "lucide-react";
 import { toast } from "sonner";
-import Link from "next/link";
+
+const Navbar = dynamic(
+  () => import("@/components/layouts/Navbar").then((module) => module.Navbar),
+  { ssr: false }
+);
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const { importModalOpen, setImportModalOpen } = usePlaylistStore();
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    }
-  }, [status, router]);
-
-  const profileQuery = trpc.user.getProfile.useQuery(undefined, {
-    enabled: !!session,
+  const playlistsQuery = useQuery({
+    queryKey: ["playlists"],
+    queryFn: () => playlistRepository.listPlaylists(),
   });
 
-  const playlistsQuery = trpc.playlist.list.useQuery(undefined, {
-    enabled: !!session,
-  });
-
-  const deleteMutation = trpc.playlist.delete.useMutation({
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => playlistRepository.deletePlaylist(id),
     onSuccess: () => {
       toast.success("Playlist deleted");
-      playlistsQuery.refetch();
-      profileQuery.refetch();
+      queryClient.invalidateQueries({ queryKey: ["playlists"] });
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(error.message),
   });
 
-  const syncMutation = trpc.playlist.sync.useMutation({
+  const syncMutation = useMutation({
+    mutationFn: (id: string) => playlistRepository.syncPlaylist(id),
     onSuccess: () => {
       toast.success("Playlist synced with YouTube");
-      playlistsQuery.refetch();
+      queryClient.invalidateQueries({ queryKey: ["playlists"] });
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(error.message),
   });
 
-  if (status === "loading" || status === "unauthenticated") {
-    return null;
-  }
-
-  const profile = profileQuery.data;
   const playlists = playlistsQuery.data ?? [];
-  const isAtLimit =
-    profile && profile.playlistCount >= profile.maxPlaylists;
-  const isPremium = profile?.subscription === "PREMIUM";
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -85,54 +62,18 @@ export default function DashboardPage() {
             <div>
               <h1 className="text-3xl font-bold">My Playlists</h1>
               <p className="mt-1 text-muted-foreground">
-                {profile ? (
-                  <>
-                    {profile.playlistCount} / {profile.maxPlaylists} playlists
-                    used
-                    {isPremium && (
-                      <Badge variant="default" className="ml-2">
-                        <Crown className="mr-1 h-3 w-3" />
-                        Premium
-                      </Badge>
-                    )}
-                  </>
-                ) : (
+                {playlistsQuery.isLoading ? (
                   <Skeleton className="inline-block h-4 w-32" />
+                ) : (
+                  `${playlists.length} playlists saved locally`
                 )}
               </p>
             </div>
-            <Button
-              onClick={() => setImportModalOpen(true)}
-              disabled={!!isAtLimit}
-            >
+            <Button onClick={() => setImportModalOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Import Playlist
             </Button>
           </div>
-
-          {/* Upgrade Banner (for free users at limit) */}
-          {isAtLimit && !isPremium && (
-            <Card className="mt-6 border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
-              <CardContent className="flex items-center gap-4 p-4">
-                <AlertCircle className="h-5 w-5 text-amber-600" />
-                <div className="flex-1">
-                  <p className="font-medium text-amber-800 dark:text-amber-200">
-                    You&apos;ve reached the free playlist limit
-                  </p>
-                  <p className="text-sm text-amber-700 dark:text-amber-300">
-                    Upgrade to Premium to save up to 50 playlists and unlock
-                    advanced shuffle modes.
-                  </p>
-                </div>
-                <Link href="/pricing">
-                  <Button size="sm">
-                    <Crown className="mr-2 h-4 w-4" />
-                    Upgrade
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Playlists Grid */}
           {playlistsQuery.isLoading ? (
@@ -174,8 +115,8 @@ export default function DashboardPage() {
                 <PlaylistCard
                   key={playlist.id}
                   playlist={playlist}
-                  onDelete={(id) => deleteMutation.mutate({ id })}
-                  onSync={(id) => syncMutation.mutate({ id })}
+                  onDelete={(id) => deleteMutation.mutate(id)}
+                  onSync={(id) => syncMutation.mutate(id)}
                 />
               ))}
             </div>
@@ -187,8 +128,7 @@ export default function DashboardPage() {
         open={importModalOpen}
         onOpenChange={setImportModalOpen}
         onSuccess={() => {
-          playlistsQuery.refetch();
-          profileQuery.refetch();
+          queryClient.invalidateQueries({ queryKey: ["playlists"] });
         }}
       />
     </div>
