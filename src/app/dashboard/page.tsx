@@ -61,13 +61,13 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-3xl font-bold">My Playlists</h1>
-              <p className="mt-1 text-muted-foreground">
+              <div className="mt-1 text-muted-foreground">
                 {playlistsQuery.isLoading ? (
                   <Skeleton className="inline-block h-4 w-32" />
                 ) : (
                   `${playlists.length} playlists saved locally`
                 )}
-              </p>
+              </div>
             </div>
             <Button onClick={() => setImportModalOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
