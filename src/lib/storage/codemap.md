@@ -6,12 +6,12 @@ Browser IndexedDB persistence layer. Stores playlists, videos, play history, and
 
 ## Design
 
-- Database: `tubeshuffler_local`, version `1`.
+- Database: `tubeshuffle_local`, version `1`.
 - Object stores: `playlists`, `videos`, `playHistory`, `meta`.
 - Indexes: playlist `youtubeId`/`updatedAt`; video `playlistId`/`youtubeId`/`playlistPosition`; play-history `playlistId`/`videoId`/`watchedAt`.
 - `index.ts` wraps IndexedDB request/transaction callbacks into promises.
 - `browserStorage` exports an ORM-like facade for initialization, metadata, playlist CRUD, and play events.
-- `storage-migrations.ts` records schema version and legacy-localStorage migration flags.
+- `storage-migrations.ts` records schema version, legacy-localStorage migration flags, and one-time legacy IndexedDB copy-forward into the current `tubeshuffle_local` database when needed.
 
 ## Flow
 

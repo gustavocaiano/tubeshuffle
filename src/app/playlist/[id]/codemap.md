@@ -10,7 +10,7 @@ Core player route at `/playlist/:id`, where `:id` is the local playlist UUID sto
 - Auto-shuffle guard avoids replacing an existing queue for the same playlist.
 - `shuffleVideos()` provides the simplified `RANDOM`/Normal and `SMART` presets.
 - Persists Focus Mode and No Artwork UI preferences through `useUiPreferencesStore`; Focus Mode overlays the rendered video with an audio-style screen while the YouTube iframe remains present/rendered underneath.
-- Renders an ambient now-playing deck, shortcut help, and enhanced queue controls.
+- Renders an ambient now-playing deck, shortcut help, and enhanced queue controls in a queue card that fills the available player column height.
 - `excludeWatched` uses persisted completed play events to filter videos before shuffling.
 - YouTube playback is delegated to `VideoPlayer`; queue rendering to `PlaylistQueue`; controls to `ShuffleControls`.
 

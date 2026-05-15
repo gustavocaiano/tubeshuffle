@@ -75,6 +75,7 @@ export function VideoPlayer({
   const onPlayStateChangeRef = useRef(onPlayStateChange);
   const playNextRef = useRef(playNext);
   const volumeRef = useRef(volume);
+  const isPlayingRef = useRef(isPlaying);
 
   useEffect(() => {
     onVideoEndRef.current = onVideoEnd;
@@ -91,6 +92,10 @@ export function VideoPlayer({
   useEffect(() => {
     volumeRef.current = volume;
   }, [volume]);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   const onPlayerStateChange = useCallback(
     (event: YouTubeEvent) => {
@@ -142,6 +147,11 @@ export function VideoPlayer({
         if (currentVideoIdRef.current !== currentVideo.youtubeId) {
           playerRef.current.loadVideoById(currentVideo.youtubeId);
           currentVideoIdRef.current = currentVideo.youtubeId;
+          if (isPlayingRef.current) {
+            playerRef.current.playVideo();
+          } else {
+            playerRef.current.pauseVideo();
+          }
         }
         return;
       }
@@ -151,7 +161,7 @@ export function VideoPlayer({
         width: "100%",
         videoId: currentVideo.youtubeId,
         playerVars: {
-          autoplay: 1,
+          autoplay: isPlayingRef.current ? 1 : 0,
           modestbranding: 1,
           rel: 0,
           playsinline: 1,
@@ -160,6 +170,11 @@ export function VideoPlayer({
         events: {
           onReady: (event: YouTubeEvent) => {
             event.target.setVolume(volumeRef.current);
+            if (isPlayingRef.current) {
+              event.target.playVideo();
+            } else {
+              event.target.pauseVideo();
+            }
           },
           onStateChange: onPlayerStateChange,
         },

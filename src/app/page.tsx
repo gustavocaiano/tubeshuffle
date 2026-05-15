@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "TubeShuffler — A Better YouTube Playlist Shuffle",
+  title: "TubeShuffle — A Better YouTube Playlist Shuffle",
   description:
     "Import a public YouTube playlist, shuffle it honestly, and keep your library local in the browser. No account, no cloud library, no subscription.",
   alternates: {
@@ -34,7 +34,7 @@ const faqs = [
   {
     question: "Why does YouTube shuffle play the same songs?",
     answer:
-      "Large YouTube playlists can feel repetitive because the player often works from a loaded window of items instead of giving every video the same chance. TubeShuffler imports the available playlist items first, then creates the playback queue locally.",
+      "Large YouTube playlists can feel repetitive because the player often works from a loaded window of items instead of giving every video the same chance. TubeShuffle imports the available playlist items first, then creates the playback queue locally.",
   },
   {
     question: "What is Normal Shuffle?",
@@ -47,7 +47,7 @@ const faqs = [
       "Smart Shuffle starts with a random queue, then spaces out repeated artists and channels where possible. It is intentionally simple and explainable, not an AI mood classifier.",
   },
   {
-    question: "Does TubeShuffler store my playlists on a server?",
+    question: "Does TubeShuffle store my playlists on a server?",
     answer:
       "No. Imported playlists, queue state, and preferences are stored in your browser with IndexedDB and local storage. Clearing browser data removes them.",
   },
@@ -59,7 +59,7 @@ const faqs = [
   {
     question: "Does it work with private playlists or Liked Videos?",
     answer:
-      "TubeShuffler has no Google login, so it works with public playlists that the YouTube API can read and embed. Private account-only collections are not imported.",
+      "TubeShuffle has no Google login, so it works with public playlists that the YouTube API can read and embed. Private account-only collections are not imported.",
   },
 ];
 
@@ -68,7 +68,7 @@ const bentoFeatures = [
     icon: ShieldCheck,
     title: "Local-first by default",
     description:
-      "Your imported playlists live in this browser, not in a TubeShuffler account or hosted database.",
+      "Your imported playlists live in this browser, not in a TubeShuffle account or hosted database.",
     className: "md:col-span-2",
     visual: "privacy",
   },
@@ -417,7 +417,7 @@ export default function HomePage() {
                 Normal when you want random. Smart when you want breathing room.
               </h2>
               <p className="mt-5 text-white/60">
-                TubeShuffler keeps the modes simple: one mathematically fair
+                TubeShuffle keeps the modes simple: one mathematically fair
                 random queue, one explainable de-clustering pass. No fake mood
                 labels, no black-box promises.
               </p>
@@ -489,8 +489,8 @@ export default function HomePage() {
             {
               "@context": "https://schema.org",
               "@type": "WebApplication",
-              name: "TubeShuffler",
-              url: "https://tubeshuffler.com",
+              name: "TubeShuffle",
+              url: "https://tubeshuffle.com",
               description:
                 "Local-first YouTube playlist shuffler with Normal and Smart queue modes.",
               applicationCategory: "MultimediaApplication",

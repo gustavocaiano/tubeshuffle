@@ -1,8 +1,8 @@
-# Repository Atlas: TubeShuffler
+# Repository Atlas: TubeShuffle
 
 ## Project Responsibility
 
-TubeShuffler is a local-first YouTube playlist shuffler built with Next.js App Router, React, Zustand, TanStack Query, Tailwind, and shadcn/Radix primitives. Users import public YouTube playlists, store them in browser IndexedDB, shuffle videos with multiple presets, and play them through the YouTube IFrame API without accounts or a backend database.
+TubeShuffle is a local-first YouTube playlist shuffler built with Next.js App Router, React, Zustand, TanStack Query, Tailwind, and shadcn/Radix primitives. Users import public YouTube playlists, store them in browser IndexedDB, shuffle videos with multiple presets, and play them through the YouTube IFrame API without accounts or a backend database.
 
 ## System Entry Points
 
@@ -42,7 +42,7 @@ User action
 
 Primary state stores:
 
-- **IndexedDB** (`tubeshuffler_local`): durable local playlists, videos, play history, migration metadata.
+- **IndexedDB** (`tubeshuffle_local`): durable local playlists, videos, play history, migration metadata.
 - **Zustand persisted state** (`player-state`): current queue, current index/video, playlist context, volume.
 - **TanStack Query**: client cache for playlist lists and individual playlist bundles.
 

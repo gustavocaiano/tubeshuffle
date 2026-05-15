@@ -106,7 +106,7 @@ export const usePlayerStore = create<PlayerState>()(
       },
 
       playPrevious: () => {
-        const { queue, currentIndex } = get();
+        const { queue, currentIndex, currentVideo } = get();
         const prevIndex = currentIndex - 1;
         if (prevIndex >= 0) {
           set({
@@ -114,6 +114,8 @@ export const usePlayerStore = create<PlayerState>()(
             currentVideo: queue[prevIndex],
             isPlaying: true,
           });
+        } else if (currentVideo) {
+          set({ isPlaying: true });
         }
       },
 

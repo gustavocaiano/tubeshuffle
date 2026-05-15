@@ -26,9 +26,10 @@ import {
 
 interface PlaylistQueueProps {
   compact?: boolean;
+  fill?: boolean;
 }
 
-export function PlaylistQueue({ compact = false }: PlaylistQueueProps) {
+export function PlaylistQueue({ compact = false, fill = false }: PlaylistQueueProps) {
   const {
     queue,
     currentIndex,
@@ -52,7 +53,12 @@ export function PlaylistQueue({ compact = false }: PlaylistQueueProps) {
 
   if (queue.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
+      <div
+        className={cn(
+          "flex flex-col items-center justify-center py-12 text-center",
+          fill && "min-h-0 flex-1"
+        )}
+      >
         <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
           <Music className="h-6 w-6 text-white/45" />
         </div>
@@ -64,11 +70,15 @@ export function PlaylistQueue({ compact = false }: PlaylistQueueProps) {
     );
   }
 
+  const scrollAreaClassName = fill
+    ? "min-h-0 flex-1"
+    : compact
+      ? "h-[28rem]"
+      : "h-[calc(100vh-16rem)] min-h-[360px]";
+
   return (
     <ScrollArea
-      className={cn(
-        compact ? "h-[28rem]" : "h-[calc(100vh-16rem)] min-h-[360px]"
-      )}
+      className={scrollAreaClassName}
       onWheelCapture={() => {
         lastManualScrollRef.current = Date.now();
       }}

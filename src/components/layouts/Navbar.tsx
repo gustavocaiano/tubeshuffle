@@ -12,7 +12,7 @@ export function Navbar() {
           <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/15 bg-white/10 shadow-lg shadow-black/20">
             <Shuffle className="h-4 w-4 text-white" />
           </div>
-          <span className="text-lg font-semibold tracking-tight">TubeShuffler</span>
+          <span className="text-lg font-semibold tracking-tight">TubeShuffle</span>
         </Link>
 
         <nav className="flex items-center gap-4">

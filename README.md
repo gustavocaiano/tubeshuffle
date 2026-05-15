@@ -1,13 +1,13 @@
-# TubeShuffler
+# TubeShuffle
 
-TubeShuffler is a free, open YouTube playlist shuffler.
+TubeShuffle is a free, open YouTube playlist shuffler.
 
 It runs as a Next.js app and stores imported playlists in your browser (IndexedDB), so there is no database, account system, or Redis required.
 
 ## What it does
 
 - Import a YouTube playlist URL
-- Shuffle with multiple modes (Random, Smart, Discovery, Energy)
+- Shuffle with Normal and Smart modes
 - Play videos with a persistent queue
 - Save playlists locally in the browser
 

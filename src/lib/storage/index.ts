@@ -14,6 +14,7 @@ import {
   ensureStorageMigrationMeta,
   getStorageMigrationMeta,
   markMigratedFromLegacy,
+  migrateLegacyIndexedDb,
   type StorageMigrationMeta,
 } from "@/lib/storage/storage-migrations";
 
@@ -60,6 +61,11 @@ export async function initializeStorage(): Promise<IDBDatabase> {
   }
 
   const db = await dbPromise;
+  try {
+    await migrateLegacyIndexedDb(db);
+  } catch (error) {
+    console.warn("Legacy IndexedDB migration skipped:", error);
+  }
   await ensureStorageMigrationMeta(db);
   return db;
 }

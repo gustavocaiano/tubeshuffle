@@ -15,14 +15,14 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? "https://tubeshuffler.com"
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://tubeshuffle.com"
   ),
   title: {
-    default: "TubeShuffler — Fix YouTube's Broken Shuffle",
-    template: "%s | TubeShuffler",
+    default: "TubeShuffle — Fix YouTube's Broken Shuffle",
+    template: "%s | TubeShuffle",
   },
   description:
-    "YouTube shuffle broken? TubeShuffler fixes it. Import your playlists and get truly random playback with smart shuffle algorithms. No more hearing the same songs first.",
+    "YouTube shuffle broken? TubeShuffle fixes it. Import your playlists and get truly random playback with smart shuffle algorithms. No more hearing the same songs first.",
   keywords: [
     "YouTube shuffle broken",
     "YouTube shuffle not random",
@@ -33,21 +33,21 @@ export const metadata: Metadata = {
     "YouTube shuffle fix",
     "random YouTube playlist",
     "shuffle YouTube playlist",
-    "TubeShuffler",
+    "TubeShuffle",
   ],
   openGraph: {
     type: "website",
     locale: "en_US",
-    siteName: "TubeShuffler",
-    title: "TubeShuffler — Fix YouTube's Broken Shuffle",
+    siteName: "TubeShuffle",
+    title: "TubeShuffle — Fix YouTube's Broken Shuffle",
     description:
-      "YouTube shuffle broken? TubeShuffler fixes it with true random playback. Import your playlists and never hear the same songs first again.",
+      "YouTube shuffle broken? TubeShuffle fixes it with true random playback. Import your playlists and never hear the same songs first again.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "TubeShuffler — Fix YouTube's Broken Shuffle",
+    title: "TubeShuffle — Fix YouTube's Broken Shuffle",
     description:
-      "YouTube shuffle broken? TubeShuffler fixes it with true random playback. Import your playlists and never hear the same songs first again.",
+      "YouTube shuffle broken? TubeShuffle fixes it with true random playback. Import your playlists and never hear the same songs first again.",
   },
   icons: {
     icon: "/favicon.svg",

@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Application source root. Organizes TubeShuffler into Next.js route handlers/pages (`app/`), UI components (`components/`), domain utilities/services/storage/shuffle logic (`lib/`), reactive stores (`stores/`), and shared type contracts (`types/`).
+Application source root. Organizes TubeShuffle into Next.js route handlers/pages (`app/`), UI components (`components/`), domain utilities/services/storage/shuffle logic (`lib/`), reactive stores (`stores/`), and shared type contracts (`types/`).
 
 ## Design
 

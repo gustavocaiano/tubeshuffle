@@ -17,7 +17,7 @@ Reactive state and repository layer. Provides the playlist repository facade use
 ### `player-store.ts`
 
 - Zustand store with `persist` middleware under localStorage key `player-state`.
-- Holds queue, current index/video, `isPlaying`, volume, local playlist context, and playback actions.
+- Holds queue, current index/video, `isPlaying`, volume, local playlist context, and playback actions; next/previous/explicit track actions set playback active for the target track.
 - `partialize` persists queue/current video/playlist context/volume, but not transient `isPlaying`.
 - Clamps volume between 0 and 100.
 

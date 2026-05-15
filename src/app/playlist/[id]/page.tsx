@@ -409,8 +409,8 @@ export default function PlaylistPage() {
                 />
               </div>
 
-              <div className="rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-black/30 backdrop-blur-xl">
-                <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex min-h-[420px] min-w-0 flex-col rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-black/30 backdrop-blur-xl">
+                <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
                   <div>
                     <h2 className="font-semibold">Queue</h2>
                     {queue.length > 0 && currentIndex >= 0 && (
@@ -423,7 +423,7 @@ export default function PlaylistPage() {
                     {queue.length} videos
                   </Badge>
                 </div>
-                <PlaylistQueue compact={focusMode} />
+                <PlaylistQueue compact={focusMode} fill />
               </div>
             </div>
           ) : playlist ? (

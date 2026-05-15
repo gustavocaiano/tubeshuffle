@@ -9,7 +9,7 @@ export function Footer() {
           <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-white/15 bg-white/10">
             <Shuffle className="h-3 w-3 text-white" />
           </div>
-          <span className="text-sm font-medium">TubeShuffler</span>
+          <span className="text-sm font-medium">TubeShuffle</span>
         </div>
 
         <nav className="flex gap-6 text-sm text-white/55">
@@ -19,7 +19,7 @@ export function Footer() {
         </nav>
 
         <p className="text-sm text-white/45">
-          &copy; {new Date().getFullYear()} TubeShuffler. All rights reserved.
+          &copy; {new Date().getFullYear()} TubeShuffle. All rights reserved.
         </p>
       </div>
     </footer>

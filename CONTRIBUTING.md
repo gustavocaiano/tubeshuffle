@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for your interest in contributing to TubeShuffler!
+Thank you for your interest in contributing to TubeShuffle!
 
 ## Development Setup
 

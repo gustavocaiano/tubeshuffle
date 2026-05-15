@@ -34,7 +34,7 @@
 - Introduce a browser data module (IndexedDB preferred over localStorage for playlist/video volume and better quota behavior).
 - Keep lightweight UI/session settings in localStorage (e.g., last-selected playlist ID, UI toggles); keep playlist/video records in IndexedDB.
 - Add schema versioning and migration guard:
-  - `DB_NAME=tubeshuffler_local`, `DB_VERSION=1` initially.
+  - `DB_NAME=tubeshuffle_local`, `DB_VERSION=1` initially.
   - Object stores: `playlists`, `playHistory` (optional but useful for discovery/exclude watched), and `meta`.
   - `meta` contains `schemaVersion`, `migratedFromLegacy` boolean.
 - Add one-time migration step from any legacy local state keys if present (non-blocking; if migration fails, app still starts with empty library).

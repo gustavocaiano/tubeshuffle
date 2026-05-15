@@ -2,7 +2,7 @@
 
 ## Request
 
-Plan improvements for TubeShuffler covering:
+Plan improvements for TubeShuffle covering:
 
 - Better UI prettiness and usability across the app.
 - Simplify shuffle methods because some current modes are not useful.

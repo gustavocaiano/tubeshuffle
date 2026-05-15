@@ -1,4 +1,4 @@
-export const DB_NAME = "tubeshuffler_local";
+export const DB_NAME = "tubeshuffle_local";
 export const DB_VERSION = 1;
 
 export const STORE_PLAYLISTS = "playlists";

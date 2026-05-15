@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Feature UI for TubeShuffler's core playlist experience: importing playlists, displaying saved playlist cards, controlling shuffle/playback, rendering the queue, and embedding the YouTube player.
+Feature UI for TubeShuffle's core playlist experience: importing playlists, displaying saved playlist cards, controlling shuffle/playback, rendering the queue, and embedding the YouTube player.
 
 ## Design
 
@@ -11,8 +11,8 @@ Feature UI for TubeShuffler's core playlist experience: importing playlists, dis
 - **Dark ambient media UI**: playlist cards, import dialogs, shuffle controls, keyboard shortcuts, and queue actions use glassy dark surfaces matching the landing page.
 - **YouTube IFrame bridge**: `VideoPlayer` dynamically loads `https://www.youtube.com/iframe_api`, creates `YT.Player`, and syncs state to Zustand.
 - **UI preference store**: player-facing components consume `useUiPreferencesStore` for Focus Mode and No Artwork behavior.
-- **Queue management**: `PlaylistQueue` supports active-track auto-scroll, play-next, move up/down, and remove actions through `usePlayerStore` queue helpers.
-- **Media Session integration**: playback metadata and play/pause/previous/next handlers map to OS/media keys.
+- **Queue management**: `PlaylistQueue` supports active-track auto-scroll, optional fill-height layout, play-next, move up/down, and remove actions through `usePlayerStore` queue helpers.
+- **Media Session integration**: playback metadata and play/pause/previous/next handlers map to OS/media keys; skip actions force playback on the selected track.
 - **Keyboard shortcuts**: `K`/space toggles playback, `J` restarts/previous, `L` goes next; input/textarea targets are ignored.
 
 ## Flow
