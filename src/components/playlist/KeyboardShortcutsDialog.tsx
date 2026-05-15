@@ -17,6 +17,7 @@ const shortcuts = [
   { keys: ["J"], action: "Previous track, or restart after five seconds" },
   { keys: ["L"], action: "Next track" },
   { keys: ["?"], action: "Open this shortcut guide" },
+  { keys: ["Esc"], action: "Exit Stage player" },
 ];
 
 function isTypingTarget(target: EventTarget | null) {

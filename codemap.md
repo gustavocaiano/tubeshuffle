@@ -25,7 +25,7 @@ TubeShuffle is a local-first YouTube playlist shuffler built with Next.js App Ro
 | --- | --- |
 | `/` | Dark ambient landing page with hero player mock, anti-SaaS value props, bento features, shuffle explanation, and FAQ. |
 | `/dashboard` | Dark ambient playlist library for saved IndexedDB playlists; supports import, sync, delete, and open playlist. |
-| `/playlist/:id` | Dark ambient player shell that loads one local playlist, auto-shuffles on first visit, plays embedded YouTube videos, shows queue, supports keyboard/media controls, Focus/No Artwork preferences, shuffle modes, and exclude-watched filtering. |
+| `/playlist/:id` | Dark ambient player shell that loads one local playlist, auto-shuffles on first visit, plays embedded YouTube videos, shows a viewport-height queue, supports keyboard/media controls, Focus/No Artwork/Stage preferences, shuffle modes, and exclude-watched filtering. |
 | `GET /api/youtube/playlist?playlistId=...` | Fetches playlist metadata/items/details from YouTube, filters unavailable videos, and returns `YouTubePlaylistData`. |
 
 ## Core Architecture
@@ -73,6 +73,6 @@ Primary state stores:
 
 - App has no auth, no server database, and no cross-device sync by design.
 - Shuffle UI/types now expose only `RANDOM`/Normal and `SMART`; previous `DISCOVERY`/`ENERGY` modes were removed from the app surface.
-- Player UI now includes persisted Focus Mode and No Artwork preferences; Focus Mode covers the rendered video with an audio-style overlay while keeping the YouTube iframe present/rendered underneath.
+- Player UI now includes persisted Focus Mode, No Artwork, and Stage preferences; Focus/Stage overlays cover the rendered video area or app window while keeping the YouTube iframe present/rendered underneath.
 - `BatchImportModal` exists but is not currently mounted by dashboard routes.
 - Deleting a playlist cascades playlists/videos but does not currently remove matching play-history rows.

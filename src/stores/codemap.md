@@ -45,4 +45,5 @@ Playback
 
 - `playlistRepository` is consumed by dashboard, playlist page, import modals, and playlist cards.
 - `player-store` is consumed by `VideoPlayer`, `ShuffleControls`, `PlaylistQueue`, and playlist page.
+- `ui-preferences-store` persists Focus Mode, No Artwork, and Stage full-window player preferences.
 - Depends on `browserStorage`, YouTube service provider, `extractPlaylistId`, and playlist domain types.

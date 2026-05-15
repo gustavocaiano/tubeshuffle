@@ -11,9 +11,10 @@ Feature UI for TubeShuffle's core playlist experience: importing playlists, disp
 - **Dark ambient media UI**: playlist cards, import dialogs, shuffle controls, keyboard shortcuts, and queue actions use glassy dark surfaces matching the landing page.
 - **YouTube IFrame bridge**: `VideoPlayer` dynamically loads `https://www.youtube.com/iframe_api`, creates `YT.Player`, and syncs state to Zustand.
 - **UI preference store**: player-facing components consume `useUiPreferencesStore` for Focus Mode and No Artwork behavior.
+- **Stage player mode**: playlist page can switch to a fixed full-window player overlay with hover-only left/center/right transport zones while keeping the embedded YouTube player mounted underneath.
 - **Queue management**: `PlaylistQueue` supports active-track auto-scroll, optional fill-height layout, play-next, move up/down, and remove actions through `usePlayerStore` queue helpers.
 - **Media Session integration**: playback metadata and play/pause/previous/next handlers map to OS/media keys; skip actions force playback on the selected track.
-- **Keyboard shortcuts**: `K`/space toggles playback, `J` restarts/previous, `L` goes next; input/textarea targets are ignored.
+- **Keyboard shortcuts**: `K`/space toggles playback, `J` restarts/previous, `L` goes next, `Esc` exits Stage player; input/textarea targets are ignored.
 
 ## Flow
 

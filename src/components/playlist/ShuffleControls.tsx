@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import {
   Headphones,
   ImageOff,
+  Maximize2,
   Pause,
   Play,
   Shuffle,
@@ -55,8 +56,10 @@ export function ShuffleControls({
   const {
     hideThumbnails,
     focusMode,
+    fullWindowMode,
     setHideThumbnails,
     setFocusMode,
+    setFullWindowMode,
   } = useUiPreferencesStore();
 
   return (
@@ -137,7 +140,7 @@ export function ShuffleControls({
           {isShuffling ? "Shuffling..." : "Re-shuffle"}
         </Button>
 
-        <div className="grid gap-3 border-t border-white/10 pt-3 sm:grid-cols-3">
+        <div className="grid gap-3 border-t border-white/10 pt-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.055] px-3 py-2 ring-1 ring-white/10">
             <Label htmlFor="exclude-watched" className="text-sm">
               Exclude watched
@@ -178,12 +181,27 @@ export function ShuffleControls({
               onCheckedChange={setHideThumbnails}
             />
           </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.055] px-3 py-2 ring-1 ring-white/10">
+            <Label
+              htmlFor="full-window-mode"
+              className="inline-flex items-center gap-2 text-sm"
+            >
+              <Maximize2 className="h-4 w-4" />
+              Stage
+            </Label>
+            <Switch
+              id="full-window-mode"
+              checked={fullWindowMode}
+              onCheckedChange={setFullWindowMode}
+            />
+          </div>
         </div>
 
         <div className="flex flex-col gap-2 rounded-xl bg-white/[0.04] p-3 text-xs text-white/45 ring-1 ring-white/10 sm:flex-row sm:items-center sm:justify-between">
           <span>
-            Focus covers the rendered video with a calm audio screen while
-            keeping the YouTube player active underneath.
+            Focus calms the video card. Stage turns the window into an immersive
+            player with hover controls.
           </span>
           <KeyboardShortcutsDialog />
         </div>

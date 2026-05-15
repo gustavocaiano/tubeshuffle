@@ -5,7 +5,18 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink, Headphones, ImageOff, Music } from "lucide-react";
+import {
+  ArrowLeft,
+  ExternalLink,
+  Headphones,
+  ImageOff,
+  Minimize2,
+  Music,
+  Pause,
+  Play,
+  SkipBack,
+  SkipForward,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Navbar } from "@/components/layouts/Navbar";
 import { VideoPlayer } from "@/components/playlist/VideoPlayer";
@@ -27,6 +38,128 @@ interface NowPlayingCardProps {
   focusMode: boolean;
   currentIndex: number;
   queueLength: number;
+}
+
+interface FullWindowPlayerProps {
+  currentVideo: VideoItem | null;
+  hideThumbnails: boolean;
+  currentIndex: number;
+  queueLength: number;
+  onClose: () => void;
+}
+
+function FullWindowPlayer({
+  currentVideo,
+  hideThumbnails,
+  currentIndex,
+  queueLength,
+  onClose,
+}: FullWindowPlayerProps) {
+  const { isPlaying, togglePlay, playNext, playPrevious } = usePlayerStore();
+  const showArtwork = Boolean(currentVideo?.thumbnail && !hideThumbnails);
+
+  return (
+    <div className="group/full-player fixed inset-0 z-[100] overflow-hidden bg-[#080807] text-white">
+      {showArtwork ? (
+        <div
+          className="pointer-events-none absolute inset-[-12%] bg-cover bg-center opacity-35 blur-[120px] saturate-150"
+          style={{ backgroundImage: `url(${currentVideo?.thumbnail})` }}
+        />
+      ) : (
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_12%,rgba(255,255,255,0.16),transparent_34%),radial-gradient(circle_at_12%_78%,rgba(245,158,11,0.14),transparent_30%),radial-gradient(circle_at_88%_70%,rgba(255,255,255,0.08),transparent_32%)]" />
+      )}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-[#080807]/45 to-black/80" />
+
+      <div className="pointer-events-none relative z-10 flex h-screen flex-col items-center justify-center px-6 text-center">
+        <div className="mb-8 flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em] text-white/45 backdrop-blur-xl">
+          Stage player
+          {queueLength > 0 && currentIndex >= 0 ? (
+            <span className="normal-case tracking-normal text-white/35">
+              {currentIndex + 1} / {queueLength}
+            </span>
+          ) : null}
+        </div>
+
+        {showArtwork ? (
+          <div className="relative h-64 w-64 overflow-hidden rounded-[2rem] border border-white/10 bg-white/10 shadow-2xl shadow-black/60 sm:h-80 sm:w-80 lg:h-96 lg:w-96">
+            <Image
+              src={currentVideo!.thumbnail}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 256px, (max-width: 1024px) 320px, 384px"
+              priority
+            />
+          </div>
+        ) : (
+          <div className="flex h-64 w-64 items-center justify-center rounded-[2rem] border border-white/10 bg-white/[0.07] shadow-2xl shadow-black/60 backdrop-blur-xl sm:h-80 sm:w-80 lg:h-96 lg:w-96">
+            <Music className="h-20 w-20 text-white/45" />
+          </div>
+        )}
+
+        <div className="mt-10 max-w-5xl space-y-3">
+          <h1 className="line-clamp-2 text-4xl font-black tracking-tight drop-shadow-2xl sm:text-6xl lg:text-7xl">
+            {currentVideo?.title ?? "Shuffle to start listening"}
+          </h1>
+          <p className="text-lg font-medium text-white/60 sm:text-2xl">
+            {currentVideo?.channelTitle ?? "Your full-window player is ready"}
+          </p>
+        </div>
+      </div>
+
+      <div className="absolute inset-0 z-20 grid grid-cols-3">
+        <button
+          type="button"
+          onClick={playPrevious}
+          className="group/zone flex cursor-pointer items-center justify-start pl-6 outline-none transition-colors hover:bg-gradient-to-r hover:from-black/25 hover:to-transparent focus-visible:bg-gradient-to-r focus-visible:from-black/25 focus-visible:to-transparent sm:pl-16"
+          aria-label="Previous track"
+        >
+          <span className="flex h-20 w-20 scale-75 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white opacity-0 shadow-2xl shadow-black/40 backdrop-blur-xl transition-all duration-300 group-hover/zone:scale-100 group-hover/zone:opacity-100 group-focus-visible/zone:scale-100 group-focus-visible/zone:opacity-100 sm:h-24 sm:w-24">
+            <SkipBack className="h-10 w-10 sm:h-12 sm:w-12" />
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="group/zone flex cursor-pointer items-center justify-center outline-none transition-colors hover:bg-black/10 focus-visible:bg-black/10"
+          aria-label={isPlaying ? "Pause" : "Play"}
+        >
+          <span className="flex h-24 w-24 scale-75 items-center justify-center rounded-full border border-white/15 bg-white/15 text-white opacity-0 shadow-2xl shadow-black/50 backdrop-blur-xl transition-all duration-300 group-hover/zone:scale-100 group-hover/zone:opacity-100 group-focus-visible/zone:scale-100 group-focus-visible/zone:opacity-100 sm:h-32 sm:w-32">
+            {isPlaying ? (
+              <Pause className="h-12 w-12 sm:h-16 sm:w-16" />
+            ) : (
+              <Play className="h-12 w-12 sm:h-16 sm:w-16" />
+            )}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={playNext}
+          className="group/zone flex cursor-pointer items-center justify-end pr-6 outline-none transition-colors hover:bg-gradient-to-l hover:from-black/25 hover:to-transparent focus-visible:bg-gradient-to-l focus-visible:from-black/25 focus-visible:to-transparent sm:pr-16"
+          aria-label="Next track"
+        >
+          <span className="flex h-20 w-20 scale-75 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white opacity-0 shadow-2xl shadow-black/40 backdrop-blur-xl transition-all duration-300 group-hover/zone:scale-100 group-hover/zone:opacity-100 group-focus-visible/zone:scale-100 group-focus-visible/zone:opacity-100 sm:h-24 sm:w-24">
+            <SkipForward className="h-10 w-10 sm:h-12 sm:w-12" />
+          </span>
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-5 top-5 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white opacity-0 shadow-2xl shadow-black/40 backdrop-blur-xl transition-all hover:bg-white/15 hover:opacity-100 focus-visible:opacity-100 group-hover/full-player:opacity-100"
+        aria-label="Exit stage player"
+      >
+        <Minimize2 className="h-5 w-5" />
+      </button>
+
+      <p className="pointer-events-none absolute bottom-5 left-1/2 z-30 -translate-x-1/2 text-xs text-white/35 opacity-0 transition-opacity group-hover/full-player:opacity-100">
+        Hover left/right/center to control · Esc to exit
+      </p>
+    </div>
+  );
 }
 
 function FocusPlayerOverlay({
@@ -179,7 +312,8 @@ export default function PlaylistPage() {
   const [excludeWatched, setExcludeWatched] = useState(false);
 
   const { setQueue, currentVideo, queue, currentIndex } = usePlayerStore();
-  const { focusMode, hideThumbnails } = useUiPreferencesStore();
+  const { focusMode, hideThumbnails, fullWindowMode, setFullWindowMode } =
+    useUiPreferencesStore();
 
   const playlistQuery = useQuery({
     queryKey: ["playlist", playlistId],
@@ -267,12 +401,42 @@ export default function PlaylistPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlistQuery.data?.playlist.id]);
 
+  useEffect(() => {
+    if (!fullWindowMode) return;
+
+    const previousOverflow = document.body.style.overflow;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setFullWindowMode(false);
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [fullWindowMode, setFullWindowMode]);
+
   const playlist = playlistQuery.data?.playlist;
   const showAmbientThumbnail = Boolean(currentVideo?.thumbnail && !hideThumbnails);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#080807] text-white">
       <Navbar />
+
+      {fullWindowMode ? (
+        <FullWindowPlayer
+          currentVideo={currentVideo}
+          hideThumbnails={hideThumbnails}
+          currentIndex={currentIndex}
+          queueLength={queue.length}
+          onClose={() => setFullWindowMode(false)}
+        />
+      ) : null}
 
       <main className="relative flex-1 overflow-hidden">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-[620px] overflow-hidden opacity-90">
@@ -409,7 +573,7 @@ export default function PlaylistPage() {
                 />
               </div>
 
-              <div className="flex min-h-[420px] min-w-0 flex-col rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-black/30 backdrop-blur-xl">
+              <div className="flex h-[calc(100vh-7rem)] min-h-[360px] min-w-0 flex-col rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-black/30 backdrop-blur-xl lg:sticky lg:top-20">
                 <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
                   <div>
                     <h2 className="font-semibold">Queue</h2>
