@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, type ReactNode } from "react";
 import { usePlayerStore } from "@/stores/player-store";
+import { cn } from "@/lib/utils";
 
 // YouTube IFrame API types
 declare global {
@@ -47,9 +48,18 @@ interface YouTubeEvent {
 interface VideoPlayerProps {
   onVideoEnd?: () => void;
   onPlayStateChange?: (playing: boolean) => void;
+  compact?: boolean;
+  className?: string;
+  overlay?: ReactNode;
 }
 
-export function VideoPlayer({ onVideoEnd, onPlayStateChange }: VideoPlayerProps) {
+export function VideoPlayer({
+  onVideoEnd,
+  onPlayStateChange,
+  compact = false,
+  className,
+  overlay,
+}: VideoPlayerProps) {
   const playerRef = useRef<YouTubePlayer | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const {
@@ -82,16 +92,21 @@ export function VideoPlayer({ onVideoEnd, onPlayStateChange }: VideoPlayerProps)
     volumeRef.current = volume;
   }, [volume]);
 
-  const onPlayerStateChange = useCallback((event: YouTubeEvent) => {
-    if (event.data === window.YT?.PlayerState?.ENDED) {
-      onVideoEndRef.current?.();
-      playNextRef.current();
-    } else if (event.data === window.YT?.PlayerState?.PLAYING) {
-      onPlayStateChangeRef.current?.(true);
-    } else if (event.data === window.YT?.PlayerState?.PAUSED) {
-      onPlayStateChangeRef.current?.(false);
-    }
-  }, []);
+  const onPlayerStateChange = useCallback(
+    (event: YouTubeEvent) => {
+      if (event.data === window.YT?.PlayerState?.ENDED) {
+        onVideoEndRef.current?.();
+        playNextRef.current();
+      } else if (event.data === window.YT?.PlayerState?.PLAYING) {
+        setPlaying(true);
+        onPlayStateChangeRef.current?.(true);
+      } else if (event.data === window.YT?.PlayerState?.PAUSED) {
+        setPlaying(false);
+        onPlayStateChangeRef.current?.(false);
+      }
+    },
+    [setPlaying]
+  );
 
   const handlePreviousAction = useCallback(() => {
     const player = playerRef.current;
@@ -140,6 +155,7 @@ export function VideoPlayer({ onVideoEnd, onPlayStateChange }: VideoPlayerProps)
           modestbranding: 1,
           rel: 0,
           playsinline: 1,
+          origin: window.location.origin,
         },
         events: {
           onReady: (event: YouTubeEvent) => {
@@ -157,6 +173,14 @@ export function VideoPlayer({ onVideoEnd, onPlayStateChange }: VideoPlayerProps)
       window.onYouTubeIframeAPIReady = initPlayer;
     }
   }, [currentVideo, onPlayerStateChange]);
+
+  useEffect(() => {
+    return () => {
+      playerRef.current?.destroy();
+      playerRef.current = null;
+      currentVideoIdRef.current = null;
+    };
+  }, []);
 
   // Sync play/pause state
   useEffect(() => {
@@ -227,35 +251,41 @@ export function VideoPlayer({ onVideoEnd, onPlayStateChange }: VideoPlayerProps)
     const handleKeyPress = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input/textarea
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
         return;
       }
 
       switch (e.key.toLowerCase()) {
-        case 'k': // Play/pause
-        case ' ': // Spacebar also toggles play/pause
+        case "k": // Play/pause
+        case " ": // Spacebar also toggles play/pause
           e.preventDefault();
           setPlaying(!isPlaying);
           break;
-        case 'j': // Previous (or restart if >5s)
+        case "j": // Previous (or restart if >5s)
           e.preventDefault();
           handlePreviousAction();
           break;
-        case 'l': // Next
+        case "l": // Next
           e.preventDefault();
           handleNextAction();
           break;
       }
     };
 
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
   }, [isPlaying, setPlaying, handlePreviousAction, handleNextAction]);
 
   if (!currentVideo) {
     return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-xl bg-muted">
-        <p className="text-muted-foreground">
+      <div
+        className={cn(
+          "flex aspect-video w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.045] text-white",
+          compact && "min-h-[200px]",
+          className
+        )}
+      >
+        <p className="text-white/45">
           Select a video or shuffle to start playing
         </p>
       </div>
@@ -263,8 +293,18 @@ export function VideoPlayer({ onVideoEnd, onPlayStateChange }: VideoPlayerProps)
   }
 
   return (
-    <div ref={containerRef} className="aspect-video w-full overflow-hidden rounded-xl bg-black">
-      <div id="youtube-player" className="h-full w-full" />
+    <div
+      ref={containerRef}
+      className={cn(
+        "relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl shadow-black/20",
+        compact && "min-h-[200px]",
+        className
+      )}
+    >
+      <div id="youtube-player" className="relative z-0 h-full w-full" />
+      {overlay ? (
+        <div className="absolute inset-0 z-10">{overlay}</div>
+      ) : null}
     </div>
   );
 }

@@ -6,10 +6,6 @@ export interface ShuffleVideoItem {
   channelTitle: string;
 }
 
-export interface ShufflePlayHistoryItem {
-  videoId: string;
-}
-
 /**
  * Fisher-Yates shuffle — pure random.
  */
@@ -74,65 +70,14 @@ export function smartShuffle<T extends ShuffleVideoItem>(videos: T[]): T[] {
 }
 
 /**
- * Discovery shuffle — prioritize videos with fewer plays.
- */
-export function discoveryShuffle<
-  T extends ShuffleVideoItem,
-  H extends ShufflePlayHistoryItem,
->(videos: T[], playHistory: H[]): T[] {
-  const playCountMap = new Map<string, number>();
-  for (const ph of playHistory) {
-    playCountMap.set(ph.videoId, (playCountMap.get(ph.videoId) ?? 0) + 1);
-  }
-
-  const weighted = videos.map((video) => ({
-    video,
-    weight: 1 / ((playCountMap.get(video.id) ?? 0) + 1),
-  }));
-
-  return weightedShuffle(weighted);
-}
-
-/**
- * Weighted random shuffle using cumulative weights.
- */
-function weightedShuffle<T>(items: { video: T; weight: number }[]): T[] {
-  const result: T[] = [];
-  const remaining = [...items];
-
-  while (remaining.length > 0) {
-    const totalWeight = remaining.reduce((sum, item) => sum + item.weight, 0);
-    let random = Math.random() * totalWeight;
-
-    let selectedIndex = 0;
-    for (let i = 0; i < remaining.length; i++) {
-      random -= remaining[i].weight;
-      if (random <= 0) {
-        selectedIndex = i;
-        break;
-      }
-    }
-
-    result.push(remaining[selectedIndex].video);
-    remaining.splice(selectedIndex, 1);
-  }
-
-  return result;
-}
-
-/**
  * Main shuffle dispatcher.
  */
-export function shuffleVideos<
-  T extends ShuffleVideoItem,
-  H extends ShufflePlayHistoryItem,
->(videos: T[], preset: ShufflePreset, playHistory: H[] = []): T[] {
+export function shuffleVideos<T extends ShuffleVideoItem>(
+  videos: T[],
+  preset: ShufflePreset
+): T[] {
   switch (preset) {
     case "SMART":
-      return smartShuffle(videos);
-    case "DISCOVERY":
-      return discoveryShuffle(videos, playHistory);
-    case "ENERGY":
       return smartShuffle(videos);
     case "RANDOM":
     default:

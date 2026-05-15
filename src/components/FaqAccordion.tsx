@@ -20,7 +20,7 @@ export function FaqAccordion({ faqs }: { faqs: FaqItem[] }) {
           <AccordionTrigger className="text-left text-base">
             {faq.question}
           </AccordionTrigger>
-          <AccordionContent className="text-muted-foreground">
+          <AccordionContent className="text-white/55">
             {faq.answer}
           </AccordionContent>
         </AccordionItem>

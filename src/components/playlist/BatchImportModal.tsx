@@ -90,10 +90,10 @@ export function BatchImportModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="border-white/10 bg-[#11100e]/95 text-white shadow-2xl shadow-black/40 backdrop-blur-xl sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Batch Import Playlists</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-white/55">
             Paste multiple YouTube playlist URLs, one per line.
           </DialogDescription>
         </DialogHeader>
@@ -107,6 +107,7 @@ export function BatchImportModal({
               value={urls}
               onChange={(e) => setUrls(e.target.value)}
               rows={5}
+              className="border-white/10 bg-black/20 text-white placeholder:text-white/40 focus-visible:ring-1 focus-visible:ring-white/20 focus-visible:ring-offset-0"
               disabled={isImporting}
             />
           </div>
@@ -114,29 +115,29 @@ export function BatchImportModal({
           {results.length > 0 && (
             <div className="space-y-2">
               <Label>Import Progress</Label>
-              <div className="max-h-40 space-y-1 overflow-y-auto rounded border p-2">
+              <div className="max-h-40 space-y-1 overflow-y-auto rounded-2xl border border-white/10 bg-black/20 p-2">
                 {results.map((result, index) => (
                   <div
                     key={index}
                     className="flex items-center gap-2 text-sm"
                   >
                     {result.status === "pending" && (
-                      <div className="h-4 w-4 rounded-full border-2" />
+                      <div className="h-4 w-4 rounded-full border-2 border-white/20" />
                     )}
                     {result.status === "importing" && (
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <Loader2 className="h-4 w-4 animate-spin text-white" />
                     )}
                     {result.status === "success" && (
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <CheckCircle2 className="h-4 w-4 text-emerald-300" />
                     )}
                     {result.status === "error" && (
-                      <XCircle className="h-4 w-4 text-destructive" />
+                      <XCircle className="h-4 w-4 text-red-300" />
                     )}
                     <span className="min-w-0 flex-1 truncate">
                       {result.url}
                     </span>
                     {result.message && (
-                      <span className="shrink-0 text-xs text-muted-foreground">
+                      <span className="shrink-0 text-xs text-white/45">
                         {result.message}
                       </span>
                     )}
@@ -150,6 +151,7 @@ export function BatchImportModal({
         <DialogFooter>
           <Button
             variant="outline"
+            className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
             onClick={handleClose}
             disabled={isImporting}
           >
@@ -157,6 +159,7 @@ export function BatchImportModal({
           </Button>
           <Button
             onClick={handleSubmit}
+            className="bg-white text-black hover:bg-white/90"
             disabled={!urls.trim() || isImporting}
           >
             {isImporting ? (

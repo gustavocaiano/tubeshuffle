@@ -2,10 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   randomShuffle,
   smartShuffle,
-  discoveryShuffle,
   shuffleVideos,
   type ShuffleVideoItem,
-  type ShufflePlayHistoryItem,
 } from "@/lib/shuffle/shuffle-service";
 
 type TestVideo = ShuffleVideoItem & {
@@ -17,15 +15,6 @@ type TestVideo = ShuffleVideoItem & {
   viewCount: number | null;
   likeCount: number | null;
   createdAt: Date;
-};
-
-type TestPlayHistory = ShufflePlayHistoryItem & {
-  id: string;
-  userId: string;
-  playlistId: string;
-  watchedAt: Date;
-  watchedSeconds: number;
-  completed: boolean;
 };
 
 function createVideo(overrides: Partial<TestVideo> = {}): TestVideo {
@@ -43,21 +32,6 @@ function createVideo(overrides: Partial<TestVideo> = {}): TestVideo {
     createdAt: new Date(),
     ...overrides,
   };
-}
-
-function createPlayHistory(
-  videoId: string,
-  count: number
-): TestPlayHistory[] {
-  return Array.from({ length: count }, (_, i) => ({
-    id: `ph-${i}-${Math.random().toString(36).slice(2, 9)}`,
-    userId: "user-1",
-    playlistId: "playlist-1",
-    videoId,
-    watchedAt: new Date(),
-    watchedSeconds: 240,
-    completed: true,
-  }));
 }
 
 describe("Shuffle Service", () => {
@@ -134,29 +108,6 @@ describe("Shuffle Service", () => {
     });
   });
 
-  describe("discoveryShuffle", () => {
-    it("should prioritize less-played videos", () => {
-      const lessPlayed = createVideo({ id: "less-played", title: "Rare" });
-      const morePlayed = createVideo({ id: "more-played", title: "Popular" });
-      const videos = [lessPlayed, morePlayed];
-
-      const history = [
-        ...createPlayHistory("more-played", 10),
-        ...createPlayHistory("less-played", 1),
-      ];
-
-      // Run many times and check that less-played appears first more often
-      let lessPlayedFirst = 0;
-      for (let i = 0; i < 100; i++) {
-        const shuffled = discoveryShuffle(videos, history);
-        if (shuffled[0].id === "less-played") lessPlayedFirst++;
-      }
-
-      // Less-played should be first more than 50% of the time
-      expect(lessPlayedFirst).toBeGreaterThan(50);
-    });
-  });
-
   describe("shuffleVideos dispatcher", () => {
     it("should dispatch to randomShuffle for RANDOM preset", () => {
       const videos = Array.from({ length: 10 }, (_, i) =>
@@ -174,12 +125,15 @@ describe("Shuffle Service", () => {
       expect(shuffled).toHaveLength(10);
     });
 
-    it("should dispatch to discoveryShuffle for DISCOVERY preset", () => {
-      const videos = Array.from({ length: 10 }, (_, i) =>
+    it("should only expose random and smart presets", () => {
+      const presets = ["RANDOM", "SMART"] as const;
+      const videos = Array.from({ length: 5 }, (_, i) =>
         createVideo({ position: i })
       );
-      const shuffled = shuffleVideos(videos, "DISCOVERY", []);
-      expect(shuffled).toHaveLength(10);
+
+      for (const preset of presets) {
+        expect(shuffleVideos(videos, preset)).toHaveLength(5);
+      }
     });
   });
 });
