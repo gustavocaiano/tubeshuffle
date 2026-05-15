@@ -1,27 +1,30 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Navbar } from "@/components/layouts/Navbar";
 import { Footer } from "@/components/layouts/Footer";
 import { FaqAccordion } from "@/components/FaqAccordion";
 import {
-  Shuffle,
-  Zap,
-  Shield,
-  BarChart3,
   ArrowRight,
-  Music,
-  Sparkles,
-  Users,
+  CheckCircle2,
+  CircleOff,
+  Database,
+  Headphones,
   HelpCircle,
+  ListMusic,
+  LockKeyhole,
+  Music2,
+  Play,
+  ShieldCheck,
+  Shuffle,
+  Sparkles,
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "TubeShuffler — Fix YouTube's Broken Shuffle",
+  title: "TubeShuffler — A Better YouTube Playlist Shuffle",
   description:
-    "Why does YouTube shuffle play the same songs? Because it's not truly random. TubeShuffler uses real randomization algorithms so every video has an equal chance of playing. Fix your YouTube shuffle today.",
+    "Import a public YouTube playlist, shuffle it honestly, and keep your library local in the browser. No account, no cloud library, no subscription.",
   alternates: {
     canonical: "/",
   },
@@ -31,73 +34,252 @@ const faqs = [
   {
     question: "Why does YouTube shuffle play the same songs?",
     answer:
-      "YouTube's shuffle algorithm isn't truly random. It uses a weighted system that favors recently added, popular, or frequently played videos. This means the first 20-30 videos in your playlist get disproportionately more plays. TubeShuffler uses a Fisher-Yates shuffle — a mathematically proven algorithm that gives every single video an equal probability of being picked.",
+      "Large YouTube playlists can feel repetitive because the player often works from a loaded window of items instead of giving every video the same chance. TubeShuffler imports the available playlist items first, then creates the playback queue locally.",
   },
   {
-    question: "Is YouTube shuffle truly random?",
+    question: "What is Normal Shuffle?",
     answer:
-      "No. YouTube's shuffle is pseudo-random at best and biased at worst. Multiple studies and user reports confirm that YouTube's shuffle tends to repeat the same subset of videos, especially in large playlists. TubeShuffler solves this by importing your entire playlist and applying real randomization on our side, completely bypassing YouTube's algorithm.",
+      "Normal Shuffle uses Fisher-Yates randomization: every imported video has an equal chance to land anywhere in the queue.",
   },
   {
-    question: "How do I fix YouTube's broken shuffle?",
+    question: "What is Smart Shuffle?",
     answer:
-      "The easiest fix is to use TubeShuffler. Just paste your YouTube playlist URL, and we'll import all your videos and shuffle them with a truly random algorithm. You can also try Smart Shuffle (avoids same artist back-to-back) or Discovery Mode (prioritizes videos you haven't heard in a while). Sign up for free — no credit card required.",
+      "Smart Shuffle starts with a random queue, then spaces out repeated artists and channels where possible. It is intentionally simple and explainable, not an AI mood classifier.",
   },
   {
-    question: "Why does YouTube shuffle not work properly for large playlists?",
+    question: "Does TubeShuffler store my playlists on a server?",
     answer:
-      "YouTube's shuffle struggles with large playlists because it only loads a portion of the playlist at a time (usually 200 videos). This means if your playlist has 1,000+ videos, shuffle can only pick from a small window. TubeShuffler loads your entire playlist — even thousands of videos — and shuffles across all of them equally.",
+      "No. Imported playlists, queue state, and preferences are stored in your browser with IndexedDB and local storage. Clearing browser data removes them.",
   },
   {
-    question: "Does TubeShuffler work with any YouTube playlist?",
+    question: "Can it play YouTube audio only?",
     answer:
-      "Yes! TubeShuffler works with any public or unlisted YouTube playlist. Just paste the playlist URL or ID, and we'll import it. We support playlists of any size, including those with thousands of videos. Your Liked Videos playlist is also supported if you connect your Google account.",
+      "YouTube playback still uses the official embedded player. Focus mode covers the rendered video with a calm audio-style interface, while keeping the YouTube iframe present for compliant playback.",
   },
   {
-    question: "Is TubeShuffler free?",
+    question: "Does it work with private playlists or Liked Videos?",
     answer:
-      "Yes. TubeShuffler is now fully free and open. Your playlists are saved in your browser, so there are no accounts, subscriptions, or server storage costs.",
+      "TubeShuffler has no Google login, so it works with public playlists that the YouTube API can read and embed. Private account-only collections are not imported.",
   },
 ];
 
-const features = [
+const bentoFeatures = [
   {
-    icon: Shuffle,
-    title: "True Random Shuffle",
+    icon: ShieldCheck,
+    title: "Local-first by default",
     description:
-      "No more hearing the same songs first. Our Fisher-Yates algorithm ensures every video has an equal chance of playing.",
+      "Your imported playlists live in this browser, not in a TubeShuffler account or hosted database.",
+    className: "md:col-span-2",
+    visual: "privacy",
   },
   {
     icon: Sparkles,
-    title: "Smart Shuffle",
+    title: "Two shuffle modes",
     description:
-      "Avoid hearing the same artist back-to-back. Our smart algorithm spaces out videos by channel and artist.",
+      "Normal for pure random. Smart for fewer back-to-back repeats. No vague energy modes.",
+    className: "",
+    visual: "modes",
   },
   {
-    icon: BarChart3,
-    title: "Discovery Mode",
+    icon: Headphones,
+    title: "Audio focus",
     description:
-      "Rediscover forgotten gems. Videos you've played less get higher priority in the queue.",
+      "Cover the video render with a calm listening screen when you want less visual noise.",
+    className: "",
+    visual: "focus",
   },
   {
-    icon: Shield,
-    title: "Synced Everywhere",
+    icon: ListMusic,
+    title: "Queue you can fix",
     description:
-      "Your playlists and preferences are saved to the cloud. Access them from any device, anytime.",
-  },
-  {
-    icon: Zap,
-    title: "Lightning Fast",
-    description:
-      "Aggressive caching means your playlists load instantly. No waiting, no buffering delays.",
-  },
-  {
-    icon: Users,
-    title: "No YouTube Limits",
-    description:
-      "Import playlists with thousands of videos. We handle the pagination so you don't have to.",
+      "Jump to a track, move it up, play it next, or remove it without rebuilding the whole queue.",
+    className: "md:col-span-2",
+    visual: "queue",
   },
 ];
+
+const antiSaas = [
+  "No account wall",
+  "No subscription prompt",
+  "No cloud playlist database",
+  "No fake AI shuffle labels",
+];
+
+const steps = [
+  {
+    label: "Paste",
+    title: "Drop in a playlist URL",
+    description: "Public YouTube playlist links or IDs are enough.",
+  },
+  {
+    label: "Import",
+    title: "Save it locally",
+    description: "Metadata and videos are stored in your browser.",
+  },
+  {
+    label: "Listen",
+    title: "Shuffle without the loop",
+    description: "Use Normal or Smart and adjust the queue as you go.",
+  },
+];
+
+function HeroPlayerMock() {
+  const queue = [
+    { title: "Midnight Tape — Side A", meta: "03:42" },
+    { title: "Rain on Neon Glass", meta: "04:18" },
+    { title: "Cab Ride Interlude", meta: "02:55" },
+  ];
+
+  return (
+    <div className="relative mx-auto mt-14 max-w-5xl">
+      <div className="absolute -inset-6 rounded-[3rem] bg-white/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-white/[0.07] p-4 shadow-2xl shadow-black/50 backdrop-blur-xl md:p-5">
+        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="relative min-h-[330px] overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#12110f] p-6">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_35%_20%,rgba(255,255,255,0.16),transparent_28%),radial-gradient(circle_at_70%_80%,rgba(245,158,11,0.22),transparent_30%)]" />
+            <div className="relative flex h-full flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <Badge className="border-white/15 bg-white/10 text-white hover:bg-white/10">
+                  Audio focus
+                </Badge>
+                <div className="flex gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-red-400" />
+                  <span className="h-2 w-2 rounded-full bg-amber-300" />
+                  <span className="h-2 w-2 rounded-full bg-emerald-300" />
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                <div className="flex h-24 w-24 items-center justify-center rounded-[1.75rem] border border-white/10 bg-white/10 shadow-2xl shadow-black/40">
+                  <Headphones className="h-10 w-10 text-white" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">
+                    Now shuffling
+                  </p>
+                  <h3 className="mt-2 text-3xl font-black tracking-tight text-white md:text-5xl">
+                    A queue that stops repeating itself.
+                  </h3>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black">
+                    <Play className="ml-0.5 h-5 w-5 fill-current" />
+                  </div>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full w-2/3 rounded-full bg-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">Upcoming queue</p>
+                <p className="text-xs text-white/50">3 of 128 imported videos</p>
+              </div>
+              <Shuffle className="h-5 w-5 text-white/60" />
+            </div>
+            <div className="space-y-2">
+              {queue.map((item, index) => (
+                <div
+                  key={item.title}
+                  className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-3 transition-colors hover:bg-white/[0.09]"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-sm font-bold text-white">
+                    {index + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-white">
+                      {item.title}
+                    </p>
+                    <p className="text-xs text-white/45">{item.meta}</p>
+                  </div>
+                  <div className="h-7 w-1 rounded-full bg-white/20 transition-colors group-hover:bg-white" />
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-white/60">
+              <div className="rounded-2xl bg-white/[0.06] p-3">
+                <p className="text-lg font-black text-white">Normal</p>
+                <p>Pure random</p>
+              </div>
+              <div className="rounded-2xl bg-white/[0.06] p-3">
+                <p className="text-lg font-black text-white">Smart</p>
+                <p>Less clustering</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BentoVisual({ visual }: { visual: string }) {
+  if (visual === "queue") {
+    return (
+      <div className="mt-6 space-y-2">
+        {["Play next", "Move up", "Remove"].map((action, index) => (
+          <div
+            key={action}
+            className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.05] p-3"
+          >
+            <span className="text-sm text-white/80">{action}</span>
+            <span className="rounded-full bg-white/10 px-2 py-1 font-mono text-xs text-white/50">
+              0{index + 1}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (visual === "privacy") {
+    return (
+      <div className="mt-8 grid grid-cols-3 gap-3 text-center">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
+          <Database className="mx-auto h-6 w-6 text-emerald-300" />
+          <p className="mt-2 text-xs text-white/55">Browser DB</p>
+        </div>
+        <div className="flex items-center justify-center">
+          <CircleOff className="h-7 w-7 text-white/35" />
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
+          <LockKeyhole className="mx-auto h-6 w-6 text-amber-200" />
+          <p className="mt-2 text-xs text-white/55">No account</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (visual === "focus") {
+    return (
+      <div className="mt-8 rounded-3xl border border-white/10 bg-[#0d0d0b] p-4">
+        <div className="flex items-center gap-3 rounded-2xl bg-white/[0.06] p-3">
+          <Headphones className="h-8 w-8 text-white" />
+          <div>
+            <p className="text-sm font-semibold text-white">Video covered</p>
+            <p className="text-xs text-white/45">Audio-style interface</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-8 flex h-28 items-end gap-2">
+      {[64, 36, 82, 48, 70].map((height, index) => (
+        <div
+          key={index}
+          className="w-full rounded-t-2xl bg-white/15 transition-all duration-500 group-hover:bg-white/30"
+          style={{ height: `${height}%` }}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function HomePage() {
   const getStartedHref = "/dashboard";
@@ -106,99 +288,193 @@ export default function HomePage() {
     <div className="flex min-h-screen flex-col">
       <Navbar />
 
-      <main className="flex-1">
-        {/* Hero Section */}
-        <section className="relative overflow-hidden border-b">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/5" />
-          <div className="container relative mx-auto px-4 py-24 text-center md:py-32">
-            <Badge variant="secondary" className="mb-4">
-              Fix YouTube&apos;s broken shuffle
-            </Badge>
-            <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight md:text-6xl">
-              Your playlists, <span className="text-primary">truly</span> shuffled
-            </h1>
-            <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground">
-              YouTube&apos;s shuffle plays the same videos first every time. TubeShuffler
-              uses real randomization algorithms to give you a fresh listening
-              experience — every single time.
-            </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link href={getStartedHref}>
-                <Button size="lg" className="min-w-[200px]">
-                  Get Started Free
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
+      <main className="flex-1 overflow-hidden bg-[#080807] text-white">
+        <section className="relative border-b border-white/10">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.16),transparent_26rem),radial-gradient(circle_at_20%_30%,rgba(245,158,11,0.16),transparent_28rem),linear-gradient(180deg,rgba(255,255,255,0.04),transparent)]" />
+          <div className="container relative mx-auto px-4 py-20 md:py-28">
+            <div className="mx-auto max-w-4xl text-center">
+              <Badge className="mb-6 border-white/15 bg-white/10 px-4 py-1.5 text-white hover:bg-white/10">
+                Local-first YouTube playlist shuffling
+              </Badge>
+              <h1 className="text-balance text-5xl font-black tracking-[-0.07em] text-white md:text-7xl lg:text-8xl">
+                Stop hearing the same first twenty songs.
+              </h1>
+              <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-8 text-white/65 md:text-xl">
+                Import a public YouTube playlist, shuffle the entire available
+                queue locally, and listen in a calmer player built for long
+                sessions.
+              </p>
+              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <Link href={getStartedHref}>
+                  <Button
+                    size="lg"
+                    className="min-w-[220px] rounded-full bg-white text-black hover:bg-white/90"
+                  >
+                    Open the app
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <a href="#how-it-works">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="rounded-full border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                  >
+                    See how it works
+                  </Button>
+                </a>
+              </div>
+              <p className="mt-4 text-sm text-white/45">
+                Free. No login. Saved in your browser.
+              </p>
             </div>
-            <p className="mt-4 text-sm text-muted-foreground">
-              Free forever. No credit card required.
-            </p>
+
+            <HeroPlayerMock />
           </div>
         </section>
 
-        {/* Features Grid */}
-        <section className="container mx-auto px-4 py-20">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold">
-              Everything you need for the perfect shuffle
-            </h2>
-            <p className="mt-3 text-muted-foreground">
-              Built for music lovers who are tired of YouTube&apos;s repetitive
-              shuffle.
-            </p>
-          </div>
-          <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature) => (
-              <Card key={feature.title} className="border-0 shadow-sm">
-                <CardHeader>
-                  <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <feature.icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <CardTitle className="text-lg">{feature.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    {feature.description}
-                  </p>
-                </CardContent>
-              </Card>
+        <section className="border-b border-white/10 py-8">
+          <div className="container mx-auto grid gap-3 px-4 sm:grid-cols-2 lg:grid-cols-4">
+            {antiSaas.map((item) => (
+              <div
+                key={item}
+                className="flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 py-3 font-mono text-sm text-white/65"
+              >
+                <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                {item}
+              </div>
             ))}
           </div>
         </section>
 
-        {/* FAQ Section */}
-        <section className="border-t py-20">
-          <div className="container mx-auto px-4">
-            <div className="mx-auto max-w-3xl">
-              <div className="mb-12 text-center">
-                <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <HelpCircle className="h-5 w-5 text-primary" />
+        <section className="container mx-auto px-4 py-20 md:py-28">
+          <div className="mb-12 max-w-3xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-white/35">
+              Built like a music tool
+            </p>
+            <h2 className="mt-4 text-4xl font-black tracking-tight md:text-6xl">
+              Less SaaS dashboard. More listening room.
+            </h2>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {bentoFeatures.map((feature) => (
+              <div
+                key={feature.title}
+                className={`group min-h-[280px] rounded-[2rem] border border-white/10 bg-white/[0.045] p-6 shadow-2xl shadow-black/20 transition-all duration-500 hover:-translate-y-1 hover:border-white/25 hover:bg-white/[0.07] ${feature.className}`}
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white transition-transform duration-500 group-hover:scale-110">
+                  <feature.icon className="h-6 w-6" />
                 </div>
-                <h2 className="text-3xl font-bold">
-                  Frequently asked questions
-                </h2>
-                <p className="mt-3 text-muted-foreground">
-                  Everything you need to know about YouTube shuffle and how
-                  TubeShuffler fixes it.
+                <h3 className="mt-6 text-2xl font-black tracking-tight text-white">
+                  {feature.title}
+                </h3>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-white/60">
+                  {feature.description}
+                </p>
+                <BentoVisual visual={feature.visual} />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="how-it-works" className="border-y border-white/10 bg-white/[0.03] py-20">
+          <div className="container mx-auto px-4">
+            <div className="mx-auto max-w-3xl text-center">
+              <Badge className="border-white/15 bg-white/10 text-white hover:bg-white/10">
+                Three steps
+              </Badge>
+              <h2 className="mt-5 text-4xl font-black tracking-tight md:text-5xl">
+                From YouTube URL to better queue.
+              </h2>
+            </div>
+            <div className="mt-12 grid gap-4 md:grid-cols-3">
+              {steps.map((step) => (
+                <div
+                  key={step.label}
+                  className="rounded-[2rem] border border-white/10 bg-[#11100e] p-6"
+                >
+                  <div className="mb-8 inline-flex rounded-full bg-white text-black px-3 py-1 font-mono text-xs font-bold">
+                    {step.label}
+                  </div>
+                  <h3 className="text-2xl font-black tracking-tight">{step.title}</h3>
+                  <p className="mt-3 text-sm leading-6 text-white/60">
+                    {step.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="container mx-auto px-4 py-20 md:py-28">
+          <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-white/35">
+                Honest controls
+              </p>
+              <h2 className="mt-4 text-4xl font-black tracking-tight md:text-5xl">
+                Normal when you want random. Smart when you want breathing room.
+              </h2>
+              <p className="mt-5 text-white/60">
+                TubeShuffler keeps the modes simple: one mathematically fair
+                random queue, one explainable de-clustering pass. No fake mood
+                labels, no black-box promises.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-[2rem] border border-white/10 bg-white/[0.05] p-6">
+                <Shuffle className="h-8 w-8 text-white" />
+                <h3 className="mt-6 text-3xl font-black">Normal</h3>
+                <p className="mt-2 text-sm text-white/60">
+                  Fisher-Yates randomization across the imported queue.
                 </p>
               </div>
+              <div className="rounded-[2rem] border border-white/10 bg-white/[0.05] p-6">
+                <Sparkles className="h-8 w-8 text-amber-200" />
+                <h3 className="mt-6 text-3xl font-black">Smart</h3>
+                <p className="mt-2 text-sm text-white/60">
+                  Reduces adjacent repeats from the same artist or channel.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border-y border-white/10 bg-[#11100e] py-20">
+          <div className="container mx-auto px-4">
+            <div className="mx-auto max-w-3xl text-center">
+              <HelpCircle className="mx-auto mb-5 h-9 w-9 text-white/55" />
+              <h2 className="text-4xl font-black tracking-tight md:text-5xl">
+                Questions before you shuffle?
+              </h2>
+              <p className="mt-4 text-white/55">
+                The important details: where data lives, what the modes do, and
+                what YouTube embeds allow.
+              </p>
+            </div>
+            <div className="mx-auto mt-10 max-w-3xl rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 md:p-6">
               <FaqAccordion faqs={faqs} />
             </div>
           </div>
         </section>
 
-        {/* CTA Section */}
-        <section className="container mx-auto px-4 py-20 text-center">
-          <div className="mx-auto max-w-xl">
-            <Music className="mx-auto mb-4 h-12 w-12 text-primary" />
-            <h2 className="text-3xl font-bold">Ready to truly shuffle?</h2>
-            <p className="mt-3 text-muted-foreground">
-              Join thousands of users who have fixed their YouTube shuffle
-              experience. It takes less than 30 seconds to get started.
+        <section className="container mx-auto px-4 py-20 text-center md:py-28">
+          <div className="mx-auto max-w-2xl rounded-[2.5rem] border border-white/10 bg-white/[0.06] p-8 shadow-2xl shadow-black/30 md:p-12">
+            <Music2 className="mx-auto mb-5 h-12 w-12 text-white" />
+            <h2 className="text-4xl font-black tracking-tight md:text-5xl">
+              Bring one playlist. Leave with a better queue.
+            </h2>
+            <p className="mt-4 text-white/60">
+              Open the dashboard, import a public playlist, and shuffle it from
+              your browser library.
             </p>
-            <Link href={getStartedHref} className="mt-6 inline-block">
-              <Button size="lg">
-                Start Shuffling — It&apos;s Free
+            <Link href={getStartedHref} className="mt-8 inline-block">
+              <Button
+                size="lg"
+                className="rounded-full bg-white text-black hover:bg-white/90"
+              >
+                Start shuffling
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
@@ -206,7 +482,6 @@ export default function HomePage() {
         </section>
       </main>
 
-      {/* JSON-LD Structured Data */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -217,14 +492,14 @@ export default function HomePage() {
               name: "TubeShuffler",
               url: "https://tubeshuffler.com",
               description:
-                "Fix YouTube's broken shuffle. Import your playlists and get truly random playback with smart shuffle algorithms.",
+                "Local-first YouTube playlist shuffler with Normal and Smart queue modes.",
               applicationCategory: "MultimediaApplication",
               operatingSystem: "Any",
               offers: {
                 "@type": "Offer",
                 price: "0",
                 priceCurrency: "USD",
-                description: "Fully free and open YouTube playlist shuffler",
+                description: "Free local-first YouTube playlist shuffler",
               },
             },
             {

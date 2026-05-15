@@ -58,7 +58,7 @@ export type LocalPlayEventInput = Omit<LocalPlayEvent, "id" | "watchedAt"> & {
   watchedAt?: string;
 };
 
-export type ShufflePreset = "RANDOM" | "SMART" | "DISCOVERY" | "ENERGY";
+export type ShufflePreset = "RANDOM" | "SMART";
 
 export interface ShuffledVideo {
   id: string;

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-interface VideoItem {
+export interface VideoItem {
   id: string;
   youtubeId: string;
   title: string;
@@ -32,7 +32,29 @@ interface PlayerState {
   togglePlay: () => void;
   setPlaying: (playing: boolean) => void;
   setVolume: (volume: number) => void;
+  removeFromQueue: (index: number) => void;
+  moveQueueItem: (fromIndex: number, toIndex: number) => void;
+  playNextFromQueue: (index: number) => void;
   clearQueue: () => void;
+}
+
+function moveItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+  const next = [...items];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
+}
+
+function getMovedCurrentIndex(
+  currentIndex: number,
+  fromIndex: number,
+  toIndex: number
+) {
+  if (currentIndex < 0) return currentIndex;
+  if (fromIndex === currentIndex) return toIndex;
+  if (fromIndex < currentIndex && toIndex >= currentIndex) return currentIndex - 1;
+  if (fromIndex > currentIndex && toIndex <= currentIndex) return currentIndex + 1;
+  return currentIndex;
 }
 
 export const usePlayerStore = create<PlayerState>()(
@@ -105,6 +127,76 @@ export const usePlayerStore = create<PlayerState>()(
 
       setVolume: (volume) => {
         set({ volume: Math.max(0, Math.min(100, volume)) });
+      },
+
+      removeFromQueue: (index) => {
+        const { queue, currentIndex, isPlaying } = get();
+        if (index < 0 || index >= queue.length) return;
+
+        const nextQueue = queue.filter((_, itemIndex) => itemIndex !== index);
+
+        if (nextQueue.length === 0) {
+          set({
+            queue: [],
+            currentIndex: -1,
+            currentVideo: null,
+            isPlaying: false,
+          });
+          return;
+        }
+
+        let nextIndex = currentIndex;
+        if (index === currentIndex) {
+          nextIndex = Math.min(index, nextQueue.length - 1);
+        } else if (index < currentIndex) {
+          nextIndex = currentIndex - 1;
+        }
+
+        set({
+          queue: nextQueue,
+          currentIndex: nextIndex,
+          currentVideo: nextQueue[nextIndex] ?? null,
+          isPlaying: nextQueue[nextIndex] ? isPlaying : false,
+        });
+      },
+
+      moveQueueItem: (fromIndex, toIndex) => {
+        const { queue, currentIndex } = get();
+        if (
+          fromIndex < 0 ||
+          fromIndex >= queue.length ||
+          toIndex < 0 ||
+          toIndex >= queue.length ||
+          fromIndex === toIndex
+        ) {
+          return;
+        }
+
+        const nextQueue = moveItem(queue, fromIndex, toIndex);
+        const nextCurrentIndex = getMovedCurrentIndex(
+          currentIndex,
+          fromIndex,
+          toIndex
+        );
+
+        set({
+          queue: nextQueue,
+          currentIndex: nextCurrentIndex,
+          currentVideo: nextQueue[nextCurrentIndex] ?? null,
+        });
+      },
+
+      playNextFromQueue: (index) => {
+        const { queue, currentIndex, playVideo, moveQueueItem } = get();
+        if (index < 0 || index >= queue.length || index === currentIndex) return;
+        if (currentIndex < 0) {
+          playVideo(index);
+          return;
+        }
+
+        const targetIndex = index < currentIndex ? currentIndex : currentIndex + 1;
+        if (targetIndex >= queue.length) return;
+        moveQueueItem(index, targetIndex);
       },
 
       clearQueue: () => {

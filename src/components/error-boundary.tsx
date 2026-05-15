@@ -36,15 +36,15 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <Card className="mx-auto max-w-md">
+        <Card className="mx-auto max-w-md rounded-[2rem] border-white/10 bg-white/[0.055] text-white shadow-2xl shadow-black/30 backdrop-blur-xl">
           <CardContent className="flex flex-col items-center py-12 text-center">
-            <AlertTriangle className="mb-4 h-12 w-12 text-destructive" />
+            <AlertTriangle className="mb-4 h-12 w-12 text-red-300" />
             <h2 className="text-xl font-semibold">Something went wrong</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="mt-2 text-sm text-white/55">
               {this.state.error?.message ?? "An unexpected error occurred."}
             </p>
             <Button
-              className="mt-6"
+              className="mt-6 rounded-full bg-white text-black hover:bg-white/90"
               onClick={() => this.setState({ hasError: false, error: null })}
             >
               <RefreshCw className="mr-2 h-4 w-4" />
