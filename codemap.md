@@ -73,7 +73,7 @@ Primary state stores:
 
 - App has no auth, no server database, and no cross-device sync by design.
 - Shuffle UI/types expose `RANDOM`/Normal and `SMART`; Smart is now a metadata-inferred energy-flow shuffle rather than artist/channel spacing.
-- Playlist pages include daily YouTube suggestion discovery: five cached suggestions per playlist/browser/day via the server-side YouTube API proxy, with one local re-suggest per day.
-- Player UI now includes persisted Focus Mode, No Artwork, and Stage preferences; Focus/Stage overlays cover the rendered video area or app window while keeping the YouTube iframe present/rendered underneath.
+- Playlist pages include daily YouTube suggestion discovery: five cached suggestions per playlist/browser/day via the server-side YouTube API proxy, with one local refresh per day.
+- Player UI now includes persisted Focus Mode, No Artwork, and Stage preferences for simplified playback presentation.
 - `BatchImportModal` exists but is not currently mounted by dashboard routes.
 - Deleting a playlist cascades playlists/videos but does not currently remove matching play-history rows.

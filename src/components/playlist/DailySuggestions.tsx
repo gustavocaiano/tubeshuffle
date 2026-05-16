@@ -5,15 +5,12 @@ import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
-  CalendarDays,
   ExternalLink,
   Loader2,
   Music,
   Play,
   RefreshCcw,
-  Sparkles,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { classifyEnergyTrack } from "@/lib/shuffle/energy-classifier";
 import {
@@ -240,31 +237,12 @@ export function DailySuggestions({
   return (
     <section ref={sentinelRef} className="relative mt-8 overflow-hidden rounded-[2rem] border border-white/10 bg-[#10100e]/80 p-5 text-white shadow-2xl shadow-black/30 backdrop-blur-xl md:p-6">
       <div className="pointer-events-none absolute inset-x-8 h-24 rounded-full bg-amber-300/10 blur-3xl" />
-      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Badge className="rounded-full border-amber-200/25 bg-amber-200/10 text-amber-100 hover:bg-amber-200/10">
-              <Sparkles className="mr-1 h-3 w-3" />
-              Daily suggestions
-            </Badge>
-            <span className="text-xs text-white/40">5 per playlist · 1 re-suggest/day</span>
-          </div>
-          <h2 className="text-2xl font-black tracking-tight md:text-3xl">
-            Five fresh finds for today.
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55">
-            Generated from this playlist&apos;s metadata and vibe. You can re-roll
-            the set once per day; repeat visits reuse your local cache.
-          </p>
+          <h2 className="text-2xl font-black tracking-tight md:text-3xl">Daily Suggestions</h2>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-white/45">
-          {suggestionsQuery.data ? (
-            <span className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 ring-1 ring-white/10">
-              <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-              {suggestionsQuery.data.source === "cache" ? "Loaded from today's cache" : `~${suggestionsQuery.data.quotaCost} quota units`}
-            </span>
-          ) : null}
           {suggestions.length > 0 ? (
             <Button
               type="button"
@@ -278,7 +256,7 @@ export function DailySuggestions({
               ) : (
                 <RefreshCcw className="mr-2 h-4 w-4" />
               )}
-              {resuggestUsed ? "Re-suggest used today" : "Re-suggest"}
+              {resuggestUsed ? "Done" : "Again"}
             </Button>
           ) : null}
           {!shouldLoad ? (
@@ -287,7 +265,7 @@ export function DailySuggestions({
               onClick={() => setShouldLoad(true)}
               className="rounded-full bg-white text-black hover:bg-white/90"
             >
-              Load today&apos;s suggestions
+              Show
             </Button>
           ) : null}
         </div>
@@ -295,14 +273,14 @@ export function DailySuggestions({
 
       {resuggestMutation.isError ? (
         <p className="relative mt-4 rounded-2xl border border-amber-200/15 bg-amber-200/[0.06] px-4 py-3 text-sm text-amber-100">
-          Couldn&apos;t re-suggest: {resuggestMutation.error.message}
+          Couldn&apos;t refresh suggestions.
         </p>
       ) : null}
 
       {suggestionsQuery.isLoading ? (
         <div className="relative mt-6 flex min-h-44 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.045]">
           <Loader2 className="mr-2 h-5 w-5 animate-spin text-white/55" />
-          <span className="text-sm text-white/55">Finding songs that fit this playlist…</span>
+          <span className="text-sm text-white/55">Loading suggestions…</span>
         </div>
       ) : suggestionsQuery.isError ? (
         <div className="relative mt-6 rounded-3xl border border-amber-200/15 bg-amber-200/[0.06] p-5">
@@ -310,10 +288,8 @@ export function DailySuggestions({
             <div className="flex gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-200" />
               <div>
-                <p className="font-semibold text-amber-100">Suggestions could not load.</p>
-                <p className="mt-1 text-sm text-white/55">
-                  {suggestionsQuery.error.message}. You can still open a YouTube search from this playlist.
-                </p>
+                <p className="font-semibold text-amber-100">Suggestions unavailable.</p>
+                <p className="mt-1 text-sm text-white/55">Try a YouTube search instead.</p>
               </div>
             </div>
             <a href={fallbackUrl} target="_blank" rel="noopener noreferrer">
@@ -360,9 +336,6 @@ export function DailySuggestions({
                   {suggestion.title}
                 </h3>
                 <p className="mt-2 truncate text-xs text-white/45">{suggestion.channelTitle}</p>
-                <p className="mt-3 line-clamp-2 text-xs leading-5 text-white/45">
-                  {suggestion.reason}
-                </p>
 
                 <div className="mt-auto grid gap-2 pt-4">
                   <Button
@@ -401,10 +374,8 @@ export function DailySuggestions({
       ) : shouldLoad && suggestionsQuery.isSuccess ? (
         <div className="relative mt-6 flex flex-col items-center justify-center rounded-3xl border border-white/10 bg-white/[0.045] p-8 text-center">
           <Music className="mb-3 h-8 w-8 text-white/45" />
-          <p className="font-semibold">No strong suggestions today.</p>
-          <p className="mt-1 max-w-md text-sm text-white/50">
-            YouTube did not return enough new embeddable music for this playlist. Try a search instead.
-          </p>
+          <p className="font-semibold">No suggestions today.</p>
+          <p className="mt-1 max-w-md text-sm text-white/50">Try a YouTube search instead.</p>
           <a href={fallbackUrl} target="_blank" rel="noopener noreferrer" className="mt-4">
             <Button className="rounded-full bg-white text-black hover:bg-white/90">
               Search on YouTube
@@ -414,7 +385,7 @@ export function DailySuggestions({
         </div>
       ) : (
         <div className={cn("relative mt-6 rounded-3xl border border-dashed border-white/10 bg-white/[0.035] p-6 text-sm text-white/45", !shouldLoad && "text-center")}>
-          Scroll a little further or load manually to generate today&apos;s five suggestions.
+          Scroll or tap Show.
         </div>
       )}
     </section>

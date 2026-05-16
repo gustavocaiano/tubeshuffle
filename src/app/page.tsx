@@ -24,7 +24,7 @@ import {
 export const metadata: Metadata = {
   title: "TubeShuffle — A Better YouTube Playlist Shuffle",
   description:
-    "Import a public YouTube playlist, build smoother energy-flow queues, get daily song suggestions, and keep your library local in the browser.",
+    "Import a public YouTube playlist, build smoother energy-flow queues, and get daily song suggestions for long listening sessions.",
   alternates: {
     canonical: "/",
   },
@@ -34,51 +34,46 @@ const faqs = [
   {
     question: "Why does YouTube shuffle play the same songs?",
     answer:
-      "Large YouTube playlists can feel repetitive because the player often works from a loaded window of items instead of giving every video the same chance. TubeShuffle imports the available playlist items first, then creates the playback queue locally.",
+      "Large YouTube playlists can feel repetitive because the player often works from a loaded window of items instead of giving every video the same chance. TubeShuffle builds a fresh queue from the whole playlist before you listen.",
   },
   {
     question: "What is Normal Shuffle?",
     answer:
-      "Normal Shuffle uses Fisher-Yates randomization: every imported video has an equal chance to land anywhere in the queue.",
+      "Normal Shuffle gives every video an equal chance to land anywhere in the queue.",
   },
   {
     question: "What is Smart Shuffle?",
     answer:
-      "Smart Shuffle infers rough energy and mood from YouTube metadata, titles, tags, duration, and playlist context. It then builds a queue that moves through similar energies with smoother transitions. It does not claim real BPM or direct audio analysis.",
+      "Smart Shuffle builds a queue that moves through similar energies with smoother transitions, so the playlist feels more like a set than a pile of tracks.",
   },
   {
     question: "What are Daily Suggestions?",
     answer:
-      "Each playlist can show five fresh YouTube suggestions per browser day. The first load uses a server-side YouTube search, then TubeShuffle caches that set locally for the rest of the day.",
-  },
-  {
-    question: "Does Smart Shuffle use real BPM?",
-    answer:
-      "No. YouTube's public API does not provide BPM or audio energy. TubeShuffle uses explainable metadata signals and keeps the copy honest about that limitation.",
+      "Each playlist gets five fresh finds each day, shaped around the music already in that playlist.",
   },
   {
     question: "Does TubeShuffle store my playlists on a server?",
     answer:
-      "No. Imported playlists, queue state, and preferences are stored in your browser with IndexedDB and local storage. Clearing browser data removes them.",
+      "No account or TubeShuffle cloud library is required. Your library stays with your device.",
   },
   {
     question: "Can it play YouTube audio only?",
     answer:
-      "YouTube playback still uses the official embedded player. Focus mode covers the rendered video with a calm audio-style interface, while keeping the YouTube iframe present for compliant playback.",
+      "Focus mode gives you a calmer player, but TubeShuffle still plays through YouTube.",
   },
   {
     question: "Does it work with private playlists or Liked Videos?",
     answer:
-      "TubeShuffle has no Google login, so it works with public playlists that the YouTube API can read and embed. Private account-only collections are not imported.",
+      "TubeShuffle has no Google login, so it works with public playlists. Private account-only collections are not imported.",
   },
 ];
 
 const bentoFeatures = [
   {
     icon: ShieldCheck,
-    title: "Local-first by default",
+    title: "No account needed",
     description:
-      "Your imported playlists live in this browser, not in a TubeShuffle account or hosted database.",
+      "Paste a playlist and start listening without creating another music account.",
     className: "md:col-span-2",
     visual: "privacy",
   },
@@ -94,7 +89,7 @@ const bentoFeatures = [
     icon: Music2,
     title: "Daily suggestions",
     description:
-      "Five fresh YouTube finds per playlist each day, cached in this browser after the first search.",
+      "Five fresh YouTube finds for each playlist, refreshed daily.",
     className: "",
     visual: "suggestions",
   },
@@ -120,7 +115,7 @@ const antiSaas = [
   "No account wall",
   "No subscription prompt",
   "No cloud playlist database",
-  "No fake BPM claims",
+  "No fake music magic",
 ];
 
 const steps = [
@@ -131,8 +126,8 @@ const steps = [
   },
   {
     label: "Import",
-    title: "Save it locally",
-    description: "Metadata and videos are stored in your browser.",
+    title: "Bring the tracks in",
+    description: "TubeShuffle loads the available songs into a queue you control.",
   },
   {
     label: "Listen",
@@ -173,10 +168,10 @@ function HeroPlayerMock() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">
-                    Now shuffling
+                    Playing
                   </p>
                   <h3 className="mt-2 text-3xl font-black tracking-tight text-white md:text-5xl">
-                    A queue that moves in waves.
+                    A better queue.
                   </h3>
                 </div>
                 <div className="flex items-center gap-3">
@@ -263,7 +258,7 @@ function BentoVisual({ visual }: { visual: string }) {
       <div className="mt-8 grid grid-cols-3 gap-3 text-center">
         <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
           <Database className="mx-auto h-6 w-6 text-emerald-300" />
-          <p className="mt-2 text-xs text-white/55">Browser DB</p>
+          <p className="mt-2 text-xs text-white/55">Your library</p>
         </div>
         <div className="flex items-center justify-center">
           <CircleOff className="h-7 w-7 text-white/35" />
@@ -303,7 +298,7 @@ function BentoVisual({ visual }: { visual: string }) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-white">{title}</p>
-              <p className="text-xs text-white/45">Cached for today</p>
+              <p className="text-xs text-white/45">Fresh for today</p>
             </div>
           </div>
         ))}
@@ -337,14 +332,14 @@ export default function HomePage() {
           <div className="container relative mx-auto px-4 py-20 md:py-28">
             <div className="mx-auto max-w-4xl text-center">
               <Badge className="mb-6 border-white/15 bg-white/10 px-4 py-1.5 text-white hover:bg-white/10">
-                Local-first YouTube playlist shuffling
+                Better YouTube playlist listening
               </Badge>
               <h1 className="text-balance text-5xl font-black tracking-[-0.07em] text-white md:text-7xl lg:text-8xl">
                 Stop hearing the same first twenty songs.
               </h1>
               <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-8 text-white/65 md:text-xl">
                 Import a public YouTube playlist, shuffle the entire available
-                queue locally, move through smoother energy arcs, and find five
+                queue, move through smoother energy arcs, and find five
                 fresh suggestions for each playlist every day.
               </p>
               <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -368,7 +363,7 @@ export default function HomePage() {
                 </a>
               </div>
               <p className="mt-4 text-sm text-white/45">
-                Free. No login. Saved in your browser.
+                Free. No login. Built for long sessions.
               </p>
             </div>
 
@@ -460,9 +455,9 @@ export default function HomePage() {
                 Normal when you want chance. Smart when you want a wave.
               </h2>
               <p className="mt-5 text-white/60">
-                TubeShuffle keeps the promise clear: one mathematically fair
-                random queue, one metadata-inferred energy flow, and daily
-                suggestions that are cached locally after the first YouTube search.
+                TubeShuffle keeps the choices simple: pure random when you want
+                chaos, Smart when you want flow, and Daily when you want fresh
+                music to explore.
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
@@ -470,21 +465,21 @@ export default function HomePage() {
                 <Shuffle className="h-8 w-8 text-white" />
                 <h3 className="mt-6 text-3xl font-black">Normal</h3>
                 <p className="mt-2 text-sm text-white/60">
-                  Fisher-Yates randomization across the imported queue.
+                  A clean random queue.
                 </p>
               </div>
               <div className="rounded-[2rem] border border-white/10 bg-white/[0.05] p-6">
                 <Sparkles className="h-8 w-8 text-amber-200" />
                 <h3 className="mt-6 text-3xl font-black">Smart</h3>
                 <p className="mt-2 text-sm text-white/60">
-                  Moves through inferred energies instead of spacing artists.
+                  Moves through similar energies.
                 </p>
               </div>
               <div className="rounded-[2rem] border border-white/10 bg-white/[0.05] p-6">
                 <Music2 className="h-8 w-8 text-emerald-200" />
                 <h3 className="mt-6 text-3xl font-black">Daily</h3>
                 <p className="mt-2 text-sm text-white/60">
-                  Five suggested YouTube videos per playlist, per browser day.
+                  Five fresh YouTube finds for each playlist every day.
                 </p>
               </div>
             </div>
@@ -499,8 +494,8 @@ export default function HomePage() {
                 Questions before you shuffle?
               </h2>
               <p className="mt-4 text-white/55">
-                The important details: where data lives, what the modes do, and
-                what YouTube embeds allow.
+                The useful details: what the modes do, how listening works, and
+                what kind of playlists fit best.
               </p>
             </div>
             <div className="mx-auto mt-10 max-w-3xl rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 md:p-6">
@@ -516,8 +511,8 @@ export default function HomePage() {
               Bring one playlist. Leave with a better queue.
             </h2>
             <p className="mt-4 text-white/60">
-              Open the dashboard, import a public playlist, and shuffle it from
-              your browser library.
+              Open the dashboard, import a public playlist, and turn it into a
+              better listening session.
             </p>
             <Link href={getStartedHref} className="mt-8 inline-block">
               <Button
@@ -549,7 +544,7 @@ export default function HomePage() {
                 "@type": "Offer",
                 price: "0",
                 priceCurrency: "USD",
-                description: "Free local-first YouTube playlist shuffler",
+                description: "Free YouTube playlist shuffler",
               },
             },
             {

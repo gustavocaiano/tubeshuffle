@@ -30,17 +30,14 @@ interface ShuffleControlsProps {
 const modes: Array<{
   value: ShufflePreset;
   label: string;
-  description: string;
 }> = [
   {
     value: "RANDOM",
     label: "Normal",
-    description: "Pure random order",
   },
   {
     value: "SMART",
     label: "Smart",
-    description: "Follows an energy flow",
   },
 ];
 
@@ -104,7 +101,6 @@ export function ShuffleControls({
         <div>
           <div className="mb-2 flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold">Shuffle mode</h3>
-            <span className="text-xs text-white/45">2 queue flows</span>
           </div>
           <div className="grid grid-cols-2 gap-1 rounded-2xl bg-black/30 p-1 ring-1 ring-white/10">
             {modes.map((mode) => {
@@ -124,7 +120,6 @@ export function ShuffleControls({
                   aria-pressed={active}
                 >
                   <span className="block text-sm font-semibold">{mode.label}</span>
-                  <span className="block text-xs">{mode.description}</span>
                 </button>
               );
             })}
@@ -137,13 +132,13 @@ export function ShuffleControls({
           className="w-full rounded-full bg-white text-black hover:bg-white/90"
         >
           <Shuffle className="mr-2 h-4 w-4" />
-          {isShuffling ? "Shuffling..." : "Re-shuffle"}
+          {isShuffling ? "Shuffling..." : "Shuffle"}
         </Button>
 
         <div className="grid gap-3 border-t border-white/10 pt-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.055] px-3 py-2 ring-1 ring-white/10">
             <Label htmlFor="exclude-watched" className="text-sm">
-              Exclude watched
+              Skip watched
             </Label>
             <Switch
               id="exclude-watched"
@@ -198,11 +193,7 @@ export function ShuffleControls({
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 rounded-xl bg-white/[0.04] p-3 text-xs text-white/45 ring-1 ring-white/10 sm:flex-row sm:items-center sm:justify-between">
-          <span>
-            Focus calms the video card. Stage turns the window into an immersive
-            player with hover controls.
-          </span>
+        <div className="flex justify-center rounded-xl bg-white/[0.04] p-3 ring-1 ring-white/10">
           <KeyboardShortcutsDialog />
         </div>
       </div>

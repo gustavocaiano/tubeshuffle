@@ -73,7 +73,7 @@ function FullWindowPlayer({
 
       <div className="pointer-events-none relative z-10 flex h-screen flex-col items-center justify-center px-6 text-center">
         <div className="mb-8 flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.28em] text-white/45 backdrop-blur-xl">
-          Stage player
+          Stage
           {queueLength > 0 && currentIndex >= 0 ? (
             <span className="normal-case tracking-normal text-white/35">
               {currentIndex + 1} / {queueLength}
@@ -157,7 +157,7 @@ function FullWindowPlayer({
       </button>
 
       <p className="pointer-events-none absolute bottom-5 left-1/2 z-30 -translate-x-1/2 text-xs text-white/35 opacity-0 transition-opacity group-hover/full-player:opacity-100">
-        Hover left/right/center to control · Esc to exit
+        Hover to control · Esc to exit
       </p>
     </div>
   );
@@ -175,7 +175,7 @@ function FocusPlayerOverlay({
       <div className="relative mx-auto flex max-w-3xl flex-col items-center gap-4">
         <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-3 py-1 text-xs font-medium text-white/55 shadow-sm">
           <Headphones className="h-3.5 w-3.5" />
-          Audio focus · YouTube player active behind this screen
+          Focus
         </div>
 
         {currentVideo?.thumbnail && !hideThumbnails ? (
@@ -209,76 +209,6 @@ function FocusPlayerOverlay({
             </p>
           ) : null}
         </div>
-
-        <p className="max-w-xl text-xs text-white/45 sm:text-sm">
-          The rendered video is covered in Focus mode, while the YouTube iframe
-          stays present for compliant playback control.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function createWaveformBars(seed: string, count = 64): number[] {
-  let hash = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    hash ^= seed.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-
-  return Array.from({ length: count }, (_, index) => {
-    hash ^= index + 1;
-    hash = Math.imul(hash, 16777619);
-    const noise = Math.abs(hash % 100) / 100;
-    const wave = Math.sin(index * 0.42) * 0.28 + Math.sin(index * 0.13) * 0.22;
-    return Math.max(16, Math.min(100, Math.round(38 + noise * 44 + wave * 38)));
-  });
-}
-
-function NowPlayingWaveform({
-  currentVideo,
-  currentIndex,
-  queueLength,
-  focusMode,
-}: Omit<NowPlayingCardProps, "hideThumbnails">) {
-  const bars = createWaveformBars(
-    `${currentVideo?.youtubeId ?? currentVideo?.id ?? "empty"}:${currentVideo?.title ?? ""}`,
-    focusMode ? 76 : 58
-  );
-  const progress =
-    queueLength > 1 && currentIndex >= 0
-      ? Math.max(0.08, currentIndex / Math.max(1, queueLength - 1))
-      : 0.18;
-  const activeBars = Math.max(1, Math.round(bars.length * progress));
-
-  return (
-    <div className={cn("mt-4 rounded-2xl border border-white/10 bg-black/20 p-3", focusMode && "p-4")}>
-      <div className="mb-2 flex items-center justify-between gap-3 text-[0.65rem] uppercase tracking-[0.22em] text-white/35">
-        <span>Waveform</span>
-        <span>{queueLength > 0 && currentIndex >= 0 ? `${currentIndex + 1}/${queueLength}` : "visual"}</span>
-      </div>
-      <div
-        className={cn(
-          "flex items-center gap-[3px] overflow-hidden",
-          focusMode ? "h-20" : "h-14"
-        )}
-        aria-label="Decorative playback waveform"
-      >
-        {bars.map((height, index) => {
-          const active = index < activeBars;
-          return (
-            <span
-              key={`${height}-${index}`}
-              className={cn(
-                "w-full min-w-[2px] rounded-full transition-all duration-500",
-                active
-                  ? "bg-gradient-to-t from-amber-400 via-orange-200 to-white shadow-[0_0_12px_rgba(251,191,36,0.22)]"
-                  : "bg-white/15"
-              )}
-              style={{ height: `${height}%` }}
-            />
-          );
-        })}
       </div>
     </div>
   );
@@ -361,18 +291,11 @@ function NowPlayingCard({
           </p>
           {currentVideo.duration > 0 && (
             <p className="mt-3 text-xs uppercase tracking-[0.2em] text-white/40">
-              {formatDuration(currentVideo.duration)} · YouTube playback
+              {formatDuration(currentVideo.duration)}
             </p>
           )}
         </div>
       </div>
-
-      <NowPlayingWaveform
-        currentVideo={currentVideo}
-        focusMode={focusMode}
-        currentIndex={currentIndex}
-        queueLength={queueLength}
-      />
     </div>
   );
 }
@@ -547,13 +470,13 @@ export default function PlaylistPage() {
                   {focusMode && (
                     <Badge className="rounded-full border-white/15 bg-white/10 text-white hover:bg-white/10">
                       <Headphones className="mr-1 h-3 w-3" />
-                      Focus mode
+                      Focus
                     </Badge>
                   )}
                   {hideThumbnails && (
                     <Badge className="rounded-full border-white/15 bg-white/5 text-white/70 hover:bg-white/10">
                       <ImageOff className="mr-1 h-3 w-3" />
-                      No artwork
+                      No art
                     </Badge>
                   )}
                 </div>

@@ -62,8 +62,7 @@ export function KeyboardShortcutsDialog() {
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
           <DialogDescription className="text-white/55">
-            Fast controls work while you are not typing in a form field. Native
-            macOS media keys remain browser and YouTube iframe dependent.
+            Fast controls work while you are not typing in a form field.
           </DialogDescription>
         </DialogHeader>
 

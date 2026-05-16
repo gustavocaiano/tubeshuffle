@@ -64,7 +64,7 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-4 rounded-[2rem] border border-white/10 bg-white/[0.055] p-6 shadow-2xl shadow-black/30 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em] text-white/40">
-                Local library
+                Your library
               </p>
               <h1 className="text-3xl font-black tracking-tight md:text-5xl">
                 My Playlists
@@ -73,7 +73,7 @@ export default function DashboardPage() {
                 {playlistsQuery.isLoading ? (
                   <Skeleton className="inline-block h-4 w-32" />
                 ) : (
-                  `${playlists.length} playlists saved locally`
+                  `${playlists.length} playlists ready to shuffle`
                 )}
               </div>
             </div>
@@ -121,8 +121,8 @@ export default function DashboardPage() {
                 </div>
                 <CardTitle className="text-xl">No playlists yet</CardTitle>
                 <CardDescription className="mt-2 max-w-md text-center text-white/55">
-                  Import your first public YouTube playlist. It stays saved in
-                  this browser for private, local-first shuffling.
+                  Import your first public YouTube playlist and turn it into a
+                  better listening session.
                 </CardDescription>
                 <Button
                   className="mt-6 rounded-full bg-white text-black hover:bg-white/90"
