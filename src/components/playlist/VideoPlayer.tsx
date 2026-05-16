@@ -76,6 +76,7 @@ export function VideoPlayer({
   const playNextRef = useRef(playNext);
   const volumeRef = useRef(volume);
   const isPlayingRef = useRef(isPlaying);
+  const isSkippingRef = useRef(false);
 
   useEffect(() => {
     onVideoEndRef.current = onVideoEnd;
@@ -103,9 +104,11 @@ export function VideoPlayer({
         onVideoEndRef.current?.();
         playNextRef.current();
       } else if (event.data === window.YT?.PlayerState?.PLAYING) {
+        isSkippingRef.current = false;
         setPlaying(true);
         onPlayStateChangeRef.current?.(true);
       } else if (event.data === window.YT?.PlayerState?.PAUSED) {
+        if (isSkippingRef.current) return;
         setPlaying(false);
         onPlayStateChangeRef.current?.(false);
       }
@@ -145,6 +148,7 @@ export function VideoPlayer({
     const initPlayer = () => {
       if (playerRef.current) {
         if (currentVideoIdRef.current !== currentVideo.youtubeId) {
+          isSkippingRef.current = true;
           playerRef.current.loadVideoById(currentVideo.youtubeId);
           currentVideoIdRef.current = currentVideo.youtubeId;
           if (isPlayingRef.current) {
@@ -200,6 +204,7 @@ export function VideoPlayer({
   // Sync play/pause state
   useEffect(() => {
     if (!playerRef.current) return;
+    if (isSkippingRef.current) return;
     if (isPlaying) {
       playerRef.current.playVideo();
     } else {
