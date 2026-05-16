@@ -7,7 +7,7 @@ Pure shuffle strategy module. Reorders video arrays for playback without side ef
 ## Design
 
 - `randomShuffle()` uses Fisher-Yates and is labeled Normal in the UI.
-- `smartShuffle()` starts with Fisher-Yates, then greedily swaps adjacent same-artist and same-channel runs.
+- `smartShuffle()` classifies rough energy/mood from metadata and builds a wave-like queue through nearby energy buckets.
 - `shuffleVideos()` dispatches based on the simplified `ShufflePreset` union.
 
 ## Flow
@@ -15,11 +15,11 @@ Pure shuffle strategy module. Reorders video arrays for playback without side ef
 ```text
 shuffleVideos(videos, preset)
   -> RANDOM: Fisher-Yates
-  -> SMART: Fisher-Yates + adjacent diversity passes
+  -> SMART: metadata-inferred energy flow
 ```
 
 ## Integration
 
 - Consumed by `src/app/playlist/[id]/page.tsx`.
 - Preset type comes from `src/types/playlist.ts`.
-- Current product caveat: Smart is an explainable spacing algorithm, not an AI/mood/energy classifier.
+- Current product caveat: Smart is an explainable metadata-based energy inference, not BPM-perfect audio analysis.

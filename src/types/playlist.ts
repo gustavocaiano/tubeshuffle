@@ -17,6 +17,10 @@ export interface YouTubeVideoData {
   position: number;
   viewCount?: number;
   likeCount?: number;
+  description?: string;
+  tags?: string[];
+  categoryId?: string;
+  publishedAt?: string;
 }
 
 export interface LocalPlaylist {
@@ -42,6 +46,10 @@ export interface LocalVideo {
   position: number;
   viewCount?: number;
   likeCount?: number;
+  description?: string;
+  tags?: string[];
+  categoryId?: string;
+  publishedAt?: string;
 }
 
 export interface LocalPlayEvent {
@@ -68,4 +76,31 @@ export interface ShuffledVideo {
   thumbnail: string;
   duration: number;
   position: number;
+  description?: string;
+  tags?: string[];
+  categoryId?: string;
+  publishedAt?: string;
+}
+
+export interface SuggestedVideo {
+  id: string;
+  youtubeId: string;
+  title: string;
+  channelTitle: string;
+  thumbnail: string;
+  duration: number;
+  url: string;
+  reason: string;
+  query: string;
+  publishedAt?: string;
+  viewCount?: number;
+}
+
+export interface DailySuggestionsResult {
+  playlistId: string;
+  generatedAt: string;
+  dateKey: string;
+  query: string;
+  quotaCost: number;
+  suggestions: SuggestedVideo[];
 }

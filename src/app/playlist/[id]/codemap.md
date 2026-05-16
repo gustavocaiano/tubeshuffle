@@ -8,9 +8,10 @@ Core player route at `/playlist/:id`, where `:id` is the local playlist UUID sto
 
 - Client route using `useParams`, React Query, mutations, local UI state, and Zustand player state.
 - Auto-shuffle guard avoids replacing an existing queue for the same playlist.
-- `shuffleVideos()` provides the simplified `RANDOM`/Normal and `SMART` presets.
+- `shuffleVideos()` provides `RANDOM`/Normal and `SMART` energy-flow presets.
 - Persists Focus Mode, No Artwork, and Stage full-window player preferences through `useUiPreferencesStore`; Focus Mode overlays the rendered video with an audio-style screen while the YouTube iframe remains present/rendered underneath.
 - Renders an ambient now-playing deck, shortcut help, enhanced queue controls in a viewport-height queue card, and a Spotify-style Stage player overlay with hover-only previous/play-next zones.
+- Renders daily playlist suggestions below the player/queue grid; suggestions are cached per browser day and can be played/queued locally.
 - `excludeWatched` uses persisted completed play events to filter videos before shuffling.
 - YouTube playback is delegated to `VideoPlayer`; queue rendering to `PlaylistQueue`; controls to `ShuffleControls`.
 

@@ -40,6 +40,10 @@ async function upsertPlaylistFromYouTubeId(playlistYoutubeId: string): Promise<L
     position: index,
     viewCount: video.viewCount,
     likeCount: video.likeCount,
+    description: video.description,
+    tags: video.tags,
+    categoryId: video.categoryId,
+    publishedAt: video.publishedAt,
   }));
 
   await browserStorage.savePlaylist({ playlist, videos });

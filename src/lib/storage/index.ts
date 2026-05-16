@@ -7,6 +7,7 @@ import type {
 import {
   STORE_PLAYLISTS,
   STORE_PLAY_HISTORY,
+  STORE_META,
   STORE_VIDEOS,
   openBrowserDb,
 } from "@/lib/storage/browser-db";
@@ -21,6 +22,11 @@ import {
 export interface LocalPlaylistBundle {
   playlist: LocalPlaylist;
   videos: LocalVideo[];
+}
+
+interface MetaRecord<T = unknown> {
+  key: string;
+  value: T;
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -78,6 +84,23 @@ export async function getStorageMeta(): Promise<StorageMigrationMeta> {
 export async function setMigratedFromLegacy(): Promise<void> {
   const db = await initializeStorage();
   await markMigratedFromLegacy(db);
+}
+
+export async function getMetaValue<T>(key: string): Promise<T | null> {
+  const db = await initializeStorage();
+  const transaction = db.transaction(STORE_META, "readonly");
+  const store = transaction.objectStore(STORE_META);
+  const record = (await completeRequest(store.get(key))) as MetaRecord<T> | undefined;
+  await completeTransaction(transaction);
+  return record?.value ?? null;
+}
+
+export async function setMetaValue<T>(key: string, value: T): Promise<void> {
+  const db = await initializeStorage();
+  const transaction = db.transaction(STORE_META, "readwrite");
+  const store = transaction.objectStore(STORE_META);
+  store.put({ key, value } satisfies MetaRecord<T>);
+  await completeTransaction(transaction);
 }
 
 export async function listLocalPlaylists(): Promise<LocalPlaylist[]> {
@@ -158,6 +181,8 @@ export async function recordLocalPlayEvent(input: LocalPlayEventInput): Promise<
 export const browserStorage = {
   initialize: initializeStorage,
   getMeta: getStorageMeta,
+  getMetaValue,
+  setMetaValue,
   markLegacyMigrated: setMigratedFromLegacy,
   listPlaylists: listLocalPlaylists,
   getPlaylist: getLocalPlaylist,

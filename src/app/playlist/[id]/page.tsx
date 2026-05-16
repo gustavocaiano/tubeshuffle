@@ -22,6 +22,7 @@ import { Navbar } from "@/components/layouts/Navbar";
 import { VideoPlayer } from "@/components/playlist/VideoPlayer";
 import { ShuffleControls } from "@/components/playlist/ShuffleControls";
 import { PlaylistQueue } from "@/components/playlist/PlaylistQueue";
+import { DailySuggestions } from "@/components/playlist/DailySuggestions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -519,77 +520,85 @@ export default function PlaylistPage() {
               </div>
             </div>
           ) : playlist && (playlistQuery.data?.videos.length ?? 0) > 0 ? (
-            <div
-              className={cn(
-                "grid gap-6",
-                focusMode ? "xl:grid-cols-[minmax(0,1fr)_390px]" : "lg:grid-cols-3"
-              )}
-            >
-              <div className={cn("space-y-4", !focusMode && "lg:col-span-2")}>
-                <div className="rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-black/30 backdrop-blur-xl">
-                  {focusMode ? (
-                    <div className="space-y-4">
-                      <VideoPlayer
-                        compact
-                        onVideoEnd={handleVideoEnd}
-                        className="rounded-2xl"
-                        overlay={
-                          <FocusPlayerOverlay
-                            currentVideo={currentVideo}
-                            hideThumbnails={hideThumbnails}
-                            currentIndex={currentIndex}
-                            queueLength={queue.length}
-                          />
-                        }
-                      />
-                      <NowPlayingCard
-                        currentVideo={currentVideo}
-                        hideThumbnails={hideThumbnails}
-                        focusMode={focusMode}
-                        currentIndex={currentIndex}
-                        queueLength={queue.length}
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <VideoPlayer onVideoEnd={handleVideoEnd} />
-                      <NowPlayingCard
-                        currentVideo={currentVideo}
-                        hideThumbnails={hideThumbnails}
-                        focusMode={focusMode}
-                        currentIndex={currentIndex}
-                        queueLength={queue.length}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <ShuffleControls
-                  currentPreset={shufflePreset}
-                  excludeWatched={excludeWatched}
-                  onShuffle={handleShuffle}
-                  onExcludeWatchedChange={setExcludeWatched}
-                  isShuffling={shuffleMutation.isPending}
-                />
-              </div>
-
-              <div className="flex h-[calc(100vh-7rem)] min-h-[360px] min-w-0 flex-col rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-black/30 backdrop-blur-xl lg:sticky lg:top-20">
-                <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
-                  <div>
-                    <h2 className="font-semibold">Queue</h2>
-                    {queue.length > 0 && currentIndex >= 0 && (
-                      <p className="text-xs text-white/45">
-                        Track {currentIndex + 1} of {queue.length}
-                      </p>
+            <>
+              <div
+                className={cn(
+                  "grid gap-6",
+                  focusMode ? "xl:grid-cols-[minmax(0,1fr)_390px]" : "lg:grid-cols-3"
+                )}
+              >
+                <div className={cn("space-y-4", !focusMode && "lg:col-span-2")}>
+                  <div className="rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-black/30 backdrop-blur-xl">
+                    {focusMode ? (
+                      <div className="space-y-4">
+                        <VideoPlayer
+                          compact
+                          onVideoEnd={handleVideoEnd}
+                          className="rounded-2xl"
+                          overlay={
+                            <FocusPlayerOverlay
+                              currentVideo={currentVideo}
+                              hideThumbnails={hideThumbnails}
+                              currentIndex={currentIndex}
+                              queueLength={queue.length}
+                            />
+                          }
+                        />
+                        <NowPlayingCard
+                          currentVideo={currentVideo}
+                          hideThumbnails={hideThumbnails}
+                          focusMode={focusMode}
+                          currentIndex={currentIndex}
+                          queueLength={queue.length}
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <VideoPlayer onVideoEnd={handleVideoEnd} />
+                        <NowPlayingCard
+                          currentVideo={currentVideo}
+                          hideThumbnails={hideThumbnails}
+                          focusMode={focusMode}
+                          currentIndex={currentIndex}
+                          queueLength={queue.length}
+                        />
+                      </div>
                     )}
                   </div>
-                  <Badge className="rounded-full border-white/15 bg-white/10 text-white hover:bg-white/10">
-                    {queue.length} videos
-                  </Badge>
+
+                  <ShuffleControls
+                    currentPreset={shufflePreset}
+                    excludeWatched={excludeWatched}
+                    onShuffle={handleShuffle}
+                    onExcludeWatchedChange={setExcludeWatched}
+                    isShuffling={shuffleMutation.isPending}
+                  />
                 </div>
-                <PlaylistQueue compact={focusMode} fill />
+
+                <div className="flex h-[calc(100vh-7rem)] min-h-[360px] min-w-0 flex-col rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-black/30 backdrop-blur-xl lg:sticky lg:top-20">
+                  <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
+                    <div>
+                      <h2 className="font-semibold">Queue</h2>
+                      {queue.length > 0 && currentIndex >= 0 && (
+                        <p className="text-xs text-white/45">
+                          Track {currentIndex + 1} of {queue.length}
+                        </p>
+                      )}
+                    </div>
+                    <Badge className="rounded-full border-white/15 bg-white/10 text-white hover:bg-white/10">
+                      {queue.length} videos
+                    </Badge>
+                  </div>
+                  <PlaylistQueue compact={focusMode} fill />
+                </div>
               </div>
-            </div>
+
+              <DailySuggestions
+                playlistId={playlist.id}
+                playlistTitle={playlist.title}
+                videos={playlistQuery.data?.videos ?? []}
+              />
+            </>
           ) : playlist ? (
             <div className="flex flex-col items-center justify-center rounded-[2rem] border border-white/10 bg-white/[0.045] py-20 text-center shadow-2xl shadow-black/30 backdrop-blur">
               <Music className="mb-4 h-12 w-12 text-white/45" />

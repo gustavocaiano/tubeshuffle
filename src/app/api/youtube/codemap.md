@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Namespace for YouTube-related server route handlers. Currently contains `playlist/route.ts` only.
+Namespace for YouTube-related server route handlers. Contains playlist import and daily suggestion endpoints.
 
 ## Design
 
@@ -11,7 +11,7 @@ Namespace for YouTube-related server route handlers. Currently contains `playlis
 
 ## Flow
 
-No handler exists at this segment; request handling starts in `playlist/route.ts`.
+No handler exists at this segment; request handling starts in child route folders such as `playlist/route.ts` and `suggestions/route.ts`.
 
 ## Integration
 

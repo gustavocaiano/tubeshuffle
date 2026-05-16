@@ -35,6 +35,9 @@ interface PlayerState {
   removeFromQueue: (index: number) => void;
   moveQueueItem: (fromIndex: number, toIndex: number) => void;
   playNextFromQueue: (index: number) => void;
+  addToQueue: (video: VideoItem) => void;
+  playNextItem: (video: VideoItem) => void;
+  playNowItem: (video: VideoItem) => void;
   clearQueue: () => void;
 }
 
@@ -199,6 +202,74 @@ export const usePlayerStore = create<PlayerState>()(
         const targetIndex = index < currentIndex ? currentIndex : currentIndex + 1;
         if (targetIndex >= queue.length) return;
         moveQueueItem(index, targetIndex);
+      },
+
+      addToQueue: (video) => {
+        const { queue, playlistId, playlistTitle } = get();
+        const nextQueue = [...queue, video];
+        set({
+          queue: nextQueue,
+          playlistId,
+          playlistTitle,
+          currentIndex: queue.length > 0 ? get().currentIndex : 0,
+          currentVideo: queue.length > 0 ? get().currentVideo : video,
+          isPlaying: queue.length > 0 ? get().isPlaying : true,
+        });
+      },
+
+      playNextItem: (video) => {
+        const { queue, currentIndex, currentVideo, playlistId, playlistTitle } = get();
+
+        if (queue.length === 0 || currentIndex < 0) {
+          set({
+            queue: [video],
+            playlistId,
+            playlistTitle,
+            currentIndex: 0,
+            currentVideo: video,
+            isPlaying: true,
+          });
+          return;
+        }
+
+        const insertIndex = Math.min(currentIndex + 1, queue.length);
+        const nextQueue = [...queue];
+        nextQueue.splice(insertIndex, 0, video);
+        set({
+          queue: nextQueue,
+          playlistId,
+          playlistTitle,
+          currentIndex,
+          currentVideo,
+        });
+      },
+
+      playNowItem: (video) => {
+        const { queue, currentIndex, playlistId, playlistTitle } = get();
+
+        if (queue.length === 0 || currentIndex < 0) {
+          set({
+            queue: [video],
+            playlistId,
+            playlistTitle,
+            currentIndex: 0,
+            currentVideo: video,
+            isPlaying: true,
+          });
+          return;
+        }
+
+        const insertIndex = Math.min(currentIndex + 1, queue.length);
+        const nextQueue = [...queue];
+        nextQueue.splice(insertIndex, 0, video);
+        set({
+          queue: nextQueue,
+          playlistId,
+          playlistTitle,
+          currentIndex: insertIndex,
+          currentVideo: video,
+          isPlaying: true,
+        });
       },
 
       clearQueue: () => {

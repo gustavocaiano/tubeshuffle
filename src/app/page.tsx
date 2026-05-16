@@ -24,7 +24,7 @@ import {
 export const metadata: Metadata = {
   title: "TubeShuffle — A Better YouTube Playlist Shuffle",
   description:
-    "Import a public YouTube playlist, shuffle it honestly, and keep your library local in the browser. No account, no cloud library, no subscription.",
+    "Import a public YouTube playlist, build smoother energy-flow queues, get daily song suggestions, and keep your library local in the browser.",
   alternates: {
     canonical: "/",
   },
@@ -44,7 +44,17 @@ const faqs = [
   {
     question: "What is Smart Shuffle?",
     answer:
-      "Smart Shuffle starts with a random queue, then spaces out repeated artists and channels where possible. It is intentionally simple and explainable, not an AI mood classifier.",
+      "Smart Shuffle infers rough energy and mood from YouTube metadata, titles, tags, duration, and playlist context. It then builds a queue that moves through similar energies with smoother transitions. It does not claim real BPM or direct audio analysis.",
+  },
+  {
+    question: "What are Daily Suggestions?",
+    answer:
+      "Each playlist can show five fresh YouTube suggestions per browser day. The first load uses a server-side YouTube search, then TubeShuffle caches that set locally for the rest of the day.",
+  },
+  {
+    question: "Does Smart Shuffle use real BPM?",
+    answer:
+      "No. YouTube's public API does not provide BPM or audio energy. TubeShuffle uses explainable metadata signals and keeps the copy honest about that limitation.",
   },
   {
     question: "Does TubeShuffle store my playlists on a server?",
@@ -74,11 +84,19 @@ const bentoFeatures = [
   },
   {
     icon: Sparkles,
-    title: "Two shuffle modes",
+    title: "Smart energy flow",
     description:
-      "Normal for pure random. Smart for fewer back-to-back repeats. No vague energy modes.",
+      "Normal stays pure random. Smart groups nearby moods and moves the queue through smoother energy waves.",
     className: "",
     visual: "modes",
+  },
+  {
+    icon: Music2,
+    title: "Daily suggestions",
+    description:
+      "Five fresh YouTube finds per playlist each day, cached in this browser after the first search.",
+    className: "",
+    visual: "suggestions",
   },
   {
     icon: Headphones,
@@ -102,7 +120,7 @@ const antiSaas = [
   "No account wall",
   "No subscription prompt",
   "No cloud playlist database",
-  "No fake AI shuffle labels",
+  "No fake BPM claims",
 ];
 
 const steps = [
@@ -118,8 +136,8 @@ const steps = [
   },
   {
     label: "Listen",
-    title: "Shuffle without the loop",
-    description: "Use Normal or Smart and adjust the queue as you go.",
+    title: "Shuffle with a flow",
+    description: "Use Normal, Smart energy flow, or scroll for daily suggestions.",
   },
 ];
 
@@ -158,7 +176,7 @@ function HeroPlayerMock() {
                     Now shuffling
                   </p>
                   <h3 className="mt-2 text-3xl font-black tracking-tight text-white md:text-5xl">
-                    A queue that stops repeating itself.
+                    A queue that moves in waves.
                   </h3>
                 </div>
                 <div className="flex items-center gap-3">
@@ -200,14 +218,18 @@ function HeroPlayerMock() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-white/60">
+            <div className="mt-4 grid grid-cols-3 gap-2 text-xs text-white/60">
               <div className="rounded-2xl bg-white/[0.06] p-3">
                 <p className="text-lg font-black text-white">Normal</p>
                 <p>Pure random</p>
               </div>
               <div className="rounded-2xl bg-white/[0.06] p-3">
                 <p className="text-lg font-black text-white">Smart</p>
-                <p>Less clustering</p>
+                <p>Energy flow</p>
+              </div>
+              <div className="rounded-2xl bg-white/[0.06] p-3">
+                <p className="text-lg font-black text-white">Daily</p>
+                <p>Fresh finds</p>
               </div>
             </div>
           </div>
@@ -268,6 +290,27 @@ function BentoVisual({ visual }: { visual: string }) {
     );
   }
 
+  if (visual === "suggestions") {
+    return (
+      <div className="mt-8 space-y-2">
+        {["Fresh find 01", "Fresh find 02", "Fresh find 03", "Fresh find 04", "Fresh find 05"].map((title, index) => (
+          <div
+            key={title}
+            className="flex items-center gap-3 rounded-2xl border border-amber-200/10 bg-amber-200/[0.06] p-3"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-200/15 text-xs font-black text-amber-100">
+              {index + 1}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-white">{title}</p>
+              <p className="text-xs text-white/45">Cached for today</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="mt-8 flex h-28 items-end gap-2">
       {[64, 36, 82, 48, 70].map((height, index) => (
@@ -301,8 +344,8 @@ export default function HomePage() {
               </h1>
               <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-8 text-white/65 md:text-xl">
                 Import a public YouTube playlist, shuffle the entire available
-                queue locally, and listen in a calmer player built for long
-                sessions.
+                queue locally, move through smoother energy arcs, and find five
+                fresh suggestions for each playlist every day.
               </p>
               <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link href={getStartedHref}>
@@ -414,15 +457,15 @@ export default function HomePage() {
                 Honest controls
               </p>
               <h2 className="mt-4 text-4xl font-black tracking-tight md:text-5xl">
-                Normal when you want random. Smart when you want breathing room.
+                Normal when you want chance. Smart when you want a wave.
               </h2>
               <p className="mt-5 text-white/60">
-                TubeShuffle keeps the modes simple: one mathematically fair
-                random queue, one explainable de-clustering pass. No fake mood
-                labels, no black-box promises.
+                TubeShuffle keeps the promise clear: one mathematically fair
+                random queue, one metadata-inferred energy flow, and daily
+                suggestions that are cached locally after the first YouTube search.
               </p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-[2rem] border border-white/10 bg-white/[0.05] p-6">
                 <Shuffle className="h-8 w-8 text-white" />
                 <h3 className="mt-6 text-3xl font-black">Normal</h3>
@@ -434,7 +477,14 @@ export default function HomePage() {
                 <Sparkles className="h-8 w-8 text-amber-200" />
                 <h3 className="mt-6 text-3xl font-black">Smart</h3>
                 <p className="mt-2 text-sm text-white/60">
-                  Reduces adjacent repeats from the same artist or channel.
+                  Moves through inferred energies instead of spacing artists.
+                </p>
+              </div>
+              <div className="rounded-[2rem] border border-white/10 bg-white/[0.05] p-6">
+                <Music2 className="h-8 w-8 text-emerald-200" />
+                <h3 className="mt-6 text-3xl font-black">Daily</h3>
+                <p className="mt-2 text-sm text-white/60">
+                  Five suggested YouTube videos per playlist, per browser day.
                 </p>
               </div>
             </div>
@@ -492,7 +542,7 @@ export default function HomePage() {
               name: "TubeShuffle",
               url: "https://tubeshuffle.com",
               description:
-                "Local-first YouTube playlist shuffler with Normal and Smart queue modes.",
+                "Local-first YouTube playlist shuffler with Normal queues, Smart energy flow, and daily suggestions.",
               applicationCategory: "MultimediaApplication",
               operatingSystem: "Any",
               offers: {

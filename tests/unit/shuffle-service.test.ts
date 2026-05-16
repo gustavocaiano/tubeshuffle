@@ -5,6 +5,7 @@ import {
   shuffleVideos,
   type ShuffleVideoItem,
 } from "@/lib/shuffle/shuffle-service";
+import { classifyEnergyTrack } from "@/lib/shuffle/energy-classifier";
 
 type TestVideo = ShuffleVideoItem & {
   playlistId: string;
@@ -80,31 +81,120 @@ describe("Shuffle Service", () => {
   });
 
   describe("smartShuffle", () => {
-    it("should avoid same channel back-to-back when possible", () => {
+    it("should order by inferred energy while preserving all videos", () => {
       const videos = [
-        createVideo({ title: "Artist A - Song 1", channelTitle: "Channel A" }),
-        createVideo({ title: "Artist A - Song 2", channelTitle: "Channel A" }),
-        createVideo({ title: "Artist B - Song 1", channelTitle: "Channel B" }),
-        createVideo({ title: "Artist B - Song 2", channelTitle: "Channel B" }),
-        createVideo({ title: "Artist C - Song 1", channelTitle: "Channel C" }),
-        createVideo({ title: "Artist C - Song 2", channelTitle: "Channel C" }),
+        createVideo({
+          id: "hype-1",
+          title: "Phonk Drill Banger",
+          channelTitle: "Channel A",
+          duration: 150,
+        }),
+        createVideo({
+          id: "chill-1",
+          title: "Lo-fi Chill Beats",
+          channelTitle: "Channel B",
+          duration: 300,
+        }),
+        createVideo({
+          id: "sad-1",
+          title: "Heartbreak Slow Version",
+          channelTitle: "Channel C",
+          duration: 480,
+        }),
+        createVideo({
+          id: "upbeat-1",
+          title: "Happy Dance Remix",
+          channelTitle: "Channel D",
+          duration: 200,
+        }),
+        createVideo({
+          id: "steady-1",
+          title: "Official Live Session",
+          channelTitle: "Channel E",
+          duration: 260,
+        }),
       ];
 
-      // Run multiple times and check that smart shuffle attempts separation
-      let betterThanRandom = 0;
-      for (let i = 0; i < 20; i++) {
-        const shuffled = smartShuffle(videos);
-        let consecutiveSameChannel = 0;
-        for (let j = 0; j < shuffled.length - 1; j++) {
-          if (shuffled[j].channelTitle === shuffled[j + 1].channelTitle) {
-            consecutiveSameChannel++;
-          }
-        }
-        // Smart shuffle should generally have fewer consecutive same-channel pairs
-        if (consecutiveSameChannel <= 1) betterThanRandom++;
-      }
-      // At least some runs should successfully separate channels
-      expect(betterThanRandom).toBeGreaterThan(0);
+      const shuffled = smartShuffle(videos);
+      expect(shuffled).toHaveLength(videos.length);
+      expect(new Set(shuffled.map((video) => video.id)).size).toBe(videos.length);
+
+      const buckets = shuffled.map((video) => classifyEnergyTrack(video).bucket);
+      expect(buckets).toContain("hype");
+      expect(buckets).toContain("upbeat");
+      expect(buckets).toContain("steady");
+      expect(buckets).toContain("melancholy");
+      expect(buckets).toContain("chill");
+    });
+
+    it("should not force channel spacing", () => {
+      const videos = [
+        createVideo({
+          id: "same-channel-1",
+          title: "Nightcore Burst One",
+          channelTitle: "Same Channel",
+          duration: 150,
+        }),
+        createVideo({
+          id: "same-channel-2",
+          title: "Nightcore Burst Two",
+          channelTitle: "Same Channel",
+          duration: 155,
+        }),
+        createVideo({
+          id: "same-channel-3",
+          title: "Nightcore Burst Three",
+          channelTitle: "Same Channel",
+          duration: 160,
+        }),
+      ];
+
+      const shuffled = smartShuffle(videos);
+      expect(shuffled.map((video) => video.channelTitle)).toEqual([
+        "Same Channel",
+        "Same Channel",
+        "Same Channel",
+      ]);
+    });
+  });
+
+  describe("energy classifier", () => {
+    it("should classify obvious energy cues deterministically", () => {
+      expect(
+        classifyEnergyTrack({
+          title: "Lo-fi Chill Beats to Study/Relax To",
+          channelTitle: "Study Channel",
+          duration: 360,
+        }).bucket
+      ).toBe("chill");
+
+      expect(
+        classifyEnergyTrack({
+          title: "Heartbreak Slow Version",
+          channelTitle: "Acoustic Channel",
+          duration: 480,
+        }).bucket
+      ).toBe("melancholy");
+
+      expect(
+        classifyEnergyTrack({
+          title: "Phonk Drill Banger",
+          channelTitle: "Dance Channel",
+          duration: 150,
+        }).bucket
+      ).toBe("hype");
+    });
+
+    it("should fall back to unknown for weak signals", () => {
+      const profile = classifyEnergyTrack({
+        title: "Track 01",
+        channelTitle: "Uploader",
+        categoryId: "10",
+      });
+
+      expect(profile.bucket).toBe("unknown");
+      expect(profile.confidence).toBeGreaterThanOrEqual(0);
+      expect(profile.signals).toContain("category:10");
     });
   });
 

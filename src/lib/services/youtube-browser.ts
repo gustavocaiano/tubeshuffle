@@ -38,21 +38,53 @@ async function fetchYouTubeJson<T>(
   return payload as T;
 }
 
-async function fetchVideoDetails(videoIds: string[]): Promise<Map<string, { duration: number; viewCount?: number; likeCount?: number }>> {
+async function fetchVideoDetails(
+  videoIds: string[]
+): Promise<
+  Map<
+    string,
+    {
+      duration: number;
+      viewCount?: number;
+      likeCount?: number;
+      description?: string;
+      tags?: string[];
+      categoryId?: string;
+      publishedAt?: string;
+    }
+  >
+> {
   if (videoIds.length === 0) return new Map();
 
   const response = await fetchYouTubeJson<{
     items?: Array<{
       id?: string;
+      snippet?: {
+        description?: string;
+        tags?: string[];
+        categoryId?: string;
+        publishedAt?: string;
+      };
       contentDetails?: { duration?: string };
       statistics?: { viewCount?: string; likeCount?: string };
     }>;
   }>("videos", {
-    part: "contentDetails,statistics",
+    part: "snippet,contentDetails,statistics",
     id: videoIds.join(","),
   });
 
-  const details = new Map<string, { duration: number; viewCount?: number; likeCount?: number }>();
+  const details = new Map<
+    string,
+    {
+      duration: number;
+      viewCount?: number;
+      likeCount?: number;
+      description?: string;
+      tags?: string[];
+      categoryId?: string;
+      publishedAt?: string;
+    }
+  >();
 
   for (const item of response.items ?? []) {
     const id = item.id;
@@ -68,6 +100,10 @@ async function fetchVideoDetails(videoIds: string[]): Promise<Map<string, { dura
       likeCount: item.statistics?.likeCount
         ? Number.parseInt(item.statistics.likeCount, 10)
         : undefined,
+      description: item.snippet?.description,
+      tags: item.snippet?.tags,
+      categoryId: item.snippet?.categoryId,
+      publishedAt: item.snippet?.publishedAt,
     });
   }
 
@@ -154,6 +190,10 @@ export async function fetchPlaylistDataFromBrowser(
       video.duration = detail.duration;
       video.viewCount = detail.viewCount;
       video.likeCount = detail.likeCount;
+      video.description = detail.description;
+      video.tags = detail.tags;
+      video.categoryId = detail.categoryId;
+      video.publishedAt = detail.publishedAt;
     }
   }
 

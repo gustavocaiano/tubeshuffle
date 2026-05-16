@@ -40,7 +40,7 @@ const modes: Array<{
   {
     value: "SMART",
     label: "Smart",
-    description: "Spaces out repeat artists",
+    description: "Follows an energy flow",
   },
 ];
 
@@ -104,7 +104,7 @@ export function ShuffleControls({
         <div>
           <div className="mb-2 flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold">Shuffle mode</h3>
-            <span className="text-xs text-white/45">2 honest choices</span>
+            <span className="text-xs text-white/45">2 queue flows</span>
           </div>
           <div className="grid grid-cols-2 gap-1 rounded-2xl bg-black/30 p-1 ring-1 ring-white/10">
             {modes.map((mode) => {
