@@ -219,6 +219,71 @@ function FocusPlayerOverlay({
   );
 }
 
+function createWaveformBars(seed: string, count = 64): number[] {
+  let hash = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return Array.from({ length: count }, (_, index) => {
+    hash ^= index + 1;
+    hash = Math.imul(hash, 16777619);
+    const noise = Math.abs(hash % 100) / 100;
+    const wave = Math.sin(index * 0.42) * 0.28 + Math.sin(index * 0.13) * 0.22;
+    return Math.max(16, Math.min(100, Math.round(38 + noise * 44 + wave * 38)));
+  });
+}
+
+function NowPlayingWaveform({
+  currentVideo,
+  currentIndex,
+  queueLength,
+  focusMode,
+}: Omit<NowPlayingCardProps, "hideThumbnails">) {
+  const bars = createWaveformBars(
+    `${currentVideo?.youtubeId ?? currentVideo?.id ?? "empty"}:${currentVideo?.title ?? ""}`,
+    focusMode ? 76 : 58
+  );
+  const progress =
+    queueLength > 1 && currentIndex >= 0
+      ? Math.max(0.08, currentIndex / Math.max(1, queueLength - 1))
+      : 0.18;
+  const activeBars = Math.max(1, Math.round(bars.length * progress));
+
+  return (
+    <div className={cn("mt-4 rounded-2xl border border-white/10 bg-black/20 p-3", focusMode && "p-4")}>
+      <div className="mb-2 flex items-center justify-between gap-3 text-[0.65rem] uppercase tracking-[0.22em] text-white/35">
+        <span>Waveform</span>
+        <span>{queueLength > 0 && currentIndex >= 0 ? `${currentIndex + 1}/${queueLength}` : "visual"}</span>
+      </div>
+      <div
+        className={cn(
+          "flex items-center gap-[3px] overflow-hidden",
+          focusMode ? "h-20" : "h-14"
+        )}
+        aria-label="Decorative playback waveform"
+      >
+        {bars.map((height, index) => {
+          const active = index < activeBars;
+          return (
+            <span
+              key={`${height}-${index}`}
+              className={cn(
+                "w-full min-w-[2px] rounded-full transition-all duration-500",
+                active
+                  ? "bg-gradient-to-t from-amber-400 via-orange-200 to-white shadow-[0_0_12px_rgba(251,191,36,0.22)]"
+                  : "bg-white/15"
+              )}
+              style={{ height: `${height}%` }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function NowPlayingCard({
   currentVideo,
   hideThumbnails,
@@ -301,6 +366,13 @@ function NowPlayingCard({
           )}
         </div>
       </div>
+
+      <NowPlayingWaveform
+        currentVideo={currentVideo}
+        focusMode={focusMode}
+        currentIndex={currentIndex}
+        queueLength={queueLength}
+      />
     </div>
   );
 }

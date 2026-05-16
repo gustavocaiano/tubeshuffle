@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CalendarDays,
@@ -10,14 +10,17 @@ import {
   Loader2,
   Music,
   Play,
+  RefreshCcw,
   Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { classifyEnergyTrack } from "@/lib/shuffle/energy-classifier";
 import {
+  getDailySuggestionsResuggestUsed,
   getDailySuggestionsCache,
   getLocalDateKey,
+  setDailySuggestionsResuggestUsed,
   setDailySuggestionsCache,
 } from "@/lib/suggestions/daily-suggestions-cache";
 import { cn, formatDuration } from "@/lib/utils";
@@ -106,12 +109,18 @@ async function fetchDailySuggestions(
   playlistId: string,
   playlistTitle: string,
   videos: LocalVideo[],
-  dateKey: string
+  dateKey: string,
+  options: {
+    forceRefresh?: boolean;
+    previousSuggestions?: SuggestedVideo[];
+  } = {}
 ): Promise<DailySuggestionsQueryResult> {
-  const cached = await getDailySuggestionsCache(playlistId, dateKey);
-  if (cached && cached.suggestions.length >= 5) {
+  const cached = options.forceRefresh ? null : await getDailySuggestionsCache(playlistId, dateKey);
+  if (!options.forceRefresh && cached && cached.suggestions.length >= 5) {
     return { ...cached, source: "cache" };
   }
+
+  const excludedSuggestionIds = options.previousSuggestions?.map((suggestion) => suggestion.youtubeId) ?? [];
 
   const response = await fetch("/api/youtube/suggestions", {
     method: "POST",
@@ -124,7 +133,8 @@ async function fetchDailySuggestions(
       playlistTitle,
       dateKey,
       seeds: selectSeeds(videos),
-      excludeVideoIds: videos.map((video) => video.youtubeId),
+      excludeVideoIds: [...videos.map((video) => video.youtubeId), ...excludedSuggestionIds],
+      refreshToken: options.forceRefresh ? `${dateKey}:${Date.now()}` : undefined,
     }),
   });
 
@@ -149,12 +159,14 @@ export function DailySuggestions({
 }: DailySuggestionsProps) {
   const [shouldLoad, setShouldLoad] = useState(false);
   const [dateKey, setDateKey] = useState(() => getLocalDateKey());
+  const [resuggestUsed, setResuggestUsed] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const fallbackUrl = useMemo(
     () => buildFallbackSearchUrl(playlistTitle, videos),
     [playlistTitle, videos]
   );
   const { playNowItem, playNextItem } = usePlayerStore();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const refreshDateKey = () => setDateKey(getLocalDateKey());
@@ -172,6 +184,17 @@ export function DailySuggestions({
       window.clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    void getDailySuggestionsResuggestUsed(playlistId, dateKey).then((used) => {
+      if (active) setResuggestUsed(used);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [playlistId, dateKey]);
 
   useEffect(() => {
     if (shouldLoad || !sentinelRef.current) return;
@@ -198,7 +221,21 @@ export function DailySuggestions({
     staleTime: 60 * 60 * 1000,
   });
 
+  const resuggestMutation = useMutation({
+    mutationFn: () =>
+      fetchDailySuggestions(playlistId, playlistTitle, videos, dateKey, {
+        forceRefresh: true,
+        previousSuggestions: suggestions,
+      }),
+    onSuccess: async (result) => {
+      await setDailySuggestionsResuggestUsed(playlistId, dateKey);
+      setResuggestUsed(true);
+      queryClient.setQueryData(["dailySuggestions", playlistId, dateKey], result);
+    },
+  });
+
   const suggestions = suggestionsQuery.data?.suggestions ?? [];
+  const canResuggest = suggestions.length > 0 && !resuggestUsed;
 
   return (
     <section ref={sentinelRef} className="relative mt-8 overflow-hidden rounded-[2rem] border border-white/10 bg-[#10100e]/80 p-5 text-white shadow-2xl shadow-black/30 backdrop-blur-xl md:p-6">
@@ -210,23 +247,39 @@ export function DailySuggestions({
               <Sparkles className="mr-1 h-3 w-3" />
               Daily suggestions
             </Badge>
-            <span className="text-xs text-white/40">5 per playlist · cached per browser</span>
+            <span className="text-xs text-white/40">5 per playlist · 1 re-suggest/day</span>
           </div>
           <h2 className="text-2xl font-black tracking-tight md:text-3xl">
             Five fresh finds for today.
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55">
-            Generated from this playlist&apos;s metadata and vibe. The first load uses
-            YouTube search quota; repeat visits today reuse your local cache.
+            Generated from this playlist&apos;s metadata and vibe. You can re-roll
+            the set once per day; repeat visits reuse your local cache.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2 text-xs text-white/45">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-white/45">
           {suggestionsQuery.data ? (
             <span className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 ring-1 ring-white/10">
               <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
               {suggestionsQuery.data.source === "cache" ? "Loaded from today's cache" : `~${suggestionsQuery.data.quotaCost} quota units`}
             </span>
+          ) : null}
+          {suggestions.length > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => resuggestMutation.mutate()}
+              disabled={!canResuggest || resuggestMutation.isPending}
+              className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {resuggestMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCcw className="mr-2 h-4 w-4" />
+              )}
+              {resuggestUsed ? "Re-suggest used today" : "Re-suggest"}
+            </Button>
           ) : null}
           {!shouldLoad ? (
             <Button
@@ -239,6 +292,12 @@ export function DailySuggestions({
           ) : null}
         </div>
       </div>
+
+      {resuggestMutation.isError ? (
+        <p className="relative mt-4 rounded-2xl border border-amber-200/15 bg-amber-200/[0.06] px-4 py-3 text-sm text-amber-100">
+          Couldn&apos;t re-suggest: {resuggestMutation.error.message}
+        </p>
+      ) : null}
 
       {suggestionsQuery.isLoading ? (
         <div className="relative mt-6 flex min-h-44 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.045]">

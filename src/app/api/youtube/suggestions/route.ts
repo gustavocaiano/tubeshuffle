@@ -30,6 +30,7 @@ type SuggestionsRequest = {
   dateKey?: string;
   seeds?: SuggestionSeed[];
   excludeVideoIds?: string[];
+  refreshToken?: string;
 };
 
 type ValidatedSuggestionsRequest = {
@@ -38,6 +39,7 @@ type ValidatedSuggestionsRequest = {
   dateKey: string;
   seeds: SuggestionSeed[];
   excludeVideoIds: string[];
+  refreshToken?: string;
 };
 
 type ApiError = {
@@ -162,6 +164,7 @@ function getCacheKey(body: ValidatedSuggestionsRequest): string {
   return `${SUGGESTION_ALGORITHM_VERSION}:${body.playlistId}:${body.dateKey}:${compactHash([
     seedFingerprint,
     excludeFingerprint,
+    body.refreshToken,
   ])}`;
 }
 
@@ -237,6 +240,8 @@ function validateBody(body: unknown): ValidatedSuggestionsRequest {
           .filter((id): id is string => typeof id === "string")
           .slice(0, MAX_EXCLUDED_IDS)
       : [],
+    refreshToken:
+      typeof input.refreshToken === "string" ? input.refreshToken.slice(0, 80) : undefined,
   };
 }
 

@@ -18,6 +18,10 @@ function getCacheKey(playlistId: string, dateKey = getLocalDateKey()): string {
   return `dailySuggestions:${playlistId}:${dateKey}`;
 }
 
+function getResuggestKey(playlistId: string, dateKey = getLocalDateKey()): string {
+  return `dailySuggestionsResuggest:${playlistId}:${dateKey}`;
+}
+
 export async function getDailySuggestionsCache(
   playlistId: string,
   dateKey = getLocalDateKey()
@@ -43,4 +47,18 @@ export async function setDailySuggestionsCache(
 
   await browserStorage.setMetaValue(getCacheKey(result.playlistId, result.dateKey), record);
   return record;
+}
+
+export async function getDailySuggestionsResuggestUsed(
+  playlistId: string,
+  dateKey = getLocalDateKey()
+): Promise<boolean> {
+  return Boolean(await browserStorage.getMetaValue<boolean>(getResuggestKey(playlistId, dateKey)));
+}
+
+export async function setDailySuggestionsResuggestUsed(
+  playlistId: string,
+  dateKey = getLocalDateKey()
+): Promise<void> {
+  await browserStorage.setMetaValue(getResuggestKey(playlistId, dateKey), true);
 }
