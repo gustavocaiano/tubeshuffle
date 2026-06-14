@@ -18,6 +18,7 @@ import {
   ArrowDown,
   ArrowUp,
   ListPlus,
+  ExternalLink,
   MoreHorizontal,
   Music,
   Play,
@@ -27,9 +28,14 @@ import {
 interface PlaylistQueueProps {
   compact?: boolean;
   fill?: boolean;
+  sourcePlaylistYoutubeId?: string;
 }
 
-export function PlaylistQueue({ compact = false, fill = false }: PlaylistQueueProps) {
+export function PlaylistQueue({
+  compact = false,
+  fill = false,
+  sourcePlaylistYoutubeId,
+}: PlaylistQueueProps) {
   const {
     queue,
     currentIndex,
@@ -194,6 +200,20 @@ export function PlaylistQueue({ compact = false, fill = false }: PlaylistQueuePr
                     <ArrowDown className="mr-2 h-4 w-4" />
                     Move down
                   </DropdownMenuItem>
+                  {sourcePlaylistYoutubeId && (
+                    <DropdownMenuItem
+                      onClick={() =>
+                        window.open(
+                          `https://youtube.com/playlist?list=${sourcePlaylistYoutubeId}`,
+                          "_blank",
+                          "noopener,noreferrer"
+                        )
+                      }
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open on YouTube
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-red-300 focus:text-red-200"

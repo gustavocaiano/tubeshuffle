@@ -584,7 +584,11 @@ export default function PlaylistPage() {
                       {queue.length} videos
                     </Badge>
                   </div>
-                  <PlaylistQueue compact={focusMode} fill />
+                  <PlaylistQueue
+                    compact={focusMode}
+                    fill
+                    sourcePlaylistYoutubeId={playlist.youtubeId}
+                  />
                 </div>
               </div>
 
