@@ -95,6 +95,9 @@ export function PlaylistQueue({
       <div className="space-y-1.5 pr-4">
         {queue.map((video, index) => {
           const active = index === currentIndex;
+          const youtubeVideoUrl = sourcePlaylistYoutubeId
+            ? `https://youtube.com/watch?v=${video.youtubeId}&list=${sourcePlaylistYoutubeId}`
+            : `https://youtube.com/watch?v=${video.youtubeId}`;
           return (
             <div
               key={`${video.id}-${index}`}
@@ -200,20 +203,14 @@ export function PlaylistQueue({
                     <ArrowDown className="mr-2 h-4 w-4" />
                     Move down
                   </DropdownMenuItem>
-                  {sourcePlaylistYoutubeId && (
-                    <DropdownMenuItem
-                      onClick={() =>
-                        window.open(
-                          `https://youtube.com/playlist?list=${sourcePlaylistYoutubeId}`,
-                          "_blank",
-                          "noopener,noreferrer"
-                        )
-                      }
-                    >
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      Open on YouTube
-                    </DropdownMenuItem>
-                  )}
+                  <DropdownMenuItem
+                    onClick={() =>
+                      window.open(youtubeVideoUrl, "_blank", "noopener,noreferrer")
+                    }
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Open video on YouTube
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-red-300 focus:text-red-200"
