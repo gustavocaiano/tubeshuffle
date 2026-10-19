@@ -1,42 +1,46 @@
 "use client";
 
 import { useEffect, useRef, useCallback, type ReactNode } from "react";
-import { usePlayerStore } from "@/stores/player-store";
+import { usePlayerStore, type VideoItem } from "@/stores/player-store";
 import { cn } from "@/lib/utils";
+import { usePlaybackStore } from "@/stores/playback-store";
+import { useUiPreferencesStore } from "@/stores/ui-preferences-store";
+import { createSilentAudioUrl } from "@/lib/media/silent-audio";
+import {
+  YouTubeQueueController,
+  type YouTubeQueuePlayer,
+} from "@/lib/media/youtube-queue";
 
 // YouTube IFrame API types
 declare global {
   interface Window {
     YT: {
       Player: new (
-        elementId: string,
+        element: string | HTMLElement,
         config: {
           height: string;
           width: string;
           videoId: string;
           playerVars: Record<string, number | string>;
           events: Record<string, (event: YouTubeEvent) => void>;
-        }
+        },
       ) => YouTubePlayer;
       PlayerState: {
         ENDED: number;
         PLAYING: number;
         PAUSED: number;
         BUFFERING: number;
+        CUED: number;
       };
     };
     onYouTubeIframeAPIReady: () => void;
   }
 }
 
-interface YouTubePlayer {
-  playVideo: () => void;
-  pauseVideo: () => void;
-  loadVideoById: (videoId: string) => void;
+interface YouTubePlayer extends YouTubeQueuePlayer {
   setVolume: (volume: number) => void;
-  getCurrentTime: () => number;
   getDuration: () => number;
-  seekTo?: (seconds: number, allowSeekAhead: boolean) => void;
+  seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   destroy: () => void;
 }
 
@@ -45,8 +49,16 @@ interface YouTubeEvent {
   target: YouTubePlayer;
 }
 
+function updateMediaPosition(state?: MediaPositionState) {
+  try {
+    navigator.mediaSession?.setPositionState?.(state);
+  } catch {
+    // Position state is optional, even in browsers supporting media actions.
+  }
+}
+
 interface VideoPlayerProps {
-  onVideoEnd?: () => void;
+  onVideoEnd?: (video: VideoItem) => void;
   onPlayStateChange?: (playing: boolean) => void;
   compact?: boolean;
   className?: string;
@@ -60,8 +72,9 @@ export function VideoPlayer({
   className,
   overlay,
 }: VideoPlayerProps) {
+  const hideThumbnails = useUiPreferencesStore((state) => state.hideThumbnails);
   const playerRef = useRef<YouTubePlayer | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const playerHostRef = useRef<HTMLDivElement>(null);
   const {
     currentVideo,
     isPlaying,
@@ -70,13 +83,11 @@ export function VideoPlayer({
     playPrevious,
     setPlaying,
   } = usePlayerStore();
-  const currentVideoIdRef = useRef<string | null>(null);
+  const queueControllerRef = useRef<YouTubeQueueController | null>(null);
   const onVideoEndRef = useRef(onVideoEnd);
   const onPlayStateChangeRef = useRef(onPlayStateChange);
-  const playNextRef = useRef(playNext);
-  const volumeRef = useRef(volume);
-  const isPlayingRef = useRef(isPlaying);
-  const isSkippingRef = useRef(false);
+  const readyRef = useRef(false);
+  const mediaAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     onVideoEndRef.current = onVideoEnd;
@@ -86,44 +97,37 @@ export function VideoPlayer({
     onPlayStateChangeRef.current = onPlayStateChange;
   }, [onPlayStateChange]);
 
-  useEffect(() => {
-    playNextRef.current = playNext;
-  }, [playNext]);
-
-  useEffect(() => {
-    volumeRef.current = volume;
-  }, [volume]);
-
-  useEffect(() => {
-    isPlayingRef.current = isPlaying;
-  }, [isPlaying]);
-
-  const onPlayerStateChange = useCallback(
-    (event: YouTubeEvent) => {
-      if (event.data === window.YT?.PlayerState?.ENDED) {
-        onVideoEndRef.current?.();
-        playNextRef.current();
-      } else if (event.data === window.YT?.PlayerState?.PLAYING) {
-        isSkippingRef.current = false;
-        setPlaying(true);
-        onPlayStateChangeRef.current?.(true);
-      } else if (event.data === window.YT?.PlayerState?.PAUSED) {
-        if (isSkippingRef.current) return;
-        setPlaying(false);
-        onPlayStateChangeRef.current?.(false);
-      }
-    },
-    [setPlaying]
+  useEffect(
+    () => usePlayerStore.subscribe(() => queueControllerRef.current?.sync()),
+    [],
   );
+
+  const onPlayerStateChange = useCallback((event: YouTubeEvent) => {
+    if (event.target !== playerRef.current || event.data === undefined) return;
+    queueControllerRef.current?.observe(event.data);
+  }, []);
 
   const handlePreviousAction = useCallback(() => {
     const player = playerRef.current;
-    if (player?.seekTo) {
+    if (
+      readyRef.current &&
+      player &&
+      !queueControllerRef.current?.isTransitioning
+    ) {
       const currentTime = player.getCurrentTime();
       if (Number.isFinite(currentTime) && currentTime > 5) {
         player.seekTo(0, true);
+        usePlaybackStore.setState({ position: 0 });
         return;
       }
+    }
+    if (
+      usePlayerStore.getState().currentIndex <= 0 &&
+      readyRef.current &&
+      player
+    ) {
+      player.seekTo(0, true);
+      usePlaybackStore.setState({ position: 0 });
     }
     playPrevious();
   }, [playPrevious]);
@@ -132,9 +136,130 @@ export function VideoPlayer({
     playNext();
   }, [playNext]);
 
+  const seekTo = useCallback((seconds: number) => {
+    const player = playerRef.current;
+    if (
+      !readyRef.current ||
+      !player ||
+      queueControllerRef.current?.isTransitioning ||
+      !Number.isFinite(seconds)
+    )
+      return;
+    const duration = player.getDuration();
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    const position = Math.max(0, Math.min(seconds, duration));
+    player.seekTo(position, true);
+    usePlaybackStore.setState({ position });
+  }, []);
+
+  // Some browsers route the session to YouTube's frame. A user-activated,
+  // silent top-level element can make the page's own handlers routable.
+  useEffect(() => {
+    let disposed = false;
+    async function connectMediaKeys() {
+      if (!navigator.mediaSession) {
+        usePlaybackStore.setState({ mediaKeysStatus: "unavailable" });
+        return;
+      }
+      usePlaybackStore.setState({ mediaKeysStatus: "connecting" });
+      if (!mediaAudioRef.current) {
+        const audio = new Audio(createSilentAudioUrl());
+        audio.loop = true;
+        mediaAudioRef.current = audio;
+      }
+      try {
+        await mediaAudioRef.current.play();
+        if (disposed) return;
+        usePlaybackStore.setState({ mediaKeysStatus: "connected" });
+        if (!usePlayerStore.getState().isPlaying)
+          mediaAudioRef.current?.pause();
+      } catch {
+        if (!disposed)
+          usePlaybackStore.setState({ mediaKeysStatus: "unavailable" });
+      }
+    }
+    function disconnectMediaKeys() {
+      const audio = mediaAudioRef.current;
+      if (audio) {
+        audio.pause();
+        URL.revokeObjectURL(audio.src);
+        audio.removeAttribute("src");
+        audio.load();
+        mediaAudioRef.current = null;
+      }
+      usePlaybackStore.setState({ mediaKeysStatus: "idle" });
+    }
+    usePlaybackStore.setState({
+      seekTo,
+      previous: handlePreviousAction,
+      connectMediaKeys,
+      disconnectMediaKeys,
+    });
+    return () => {
+      disposed = true;
+      disconnectMediaKeys();
+      usePlaybackStore.setState({
+        position: 0,
+        duration: 0,
+        seekTo: null,
+        previous: null,
+        connectMediaKeys: null,
+        disconnectMediaKeys: null,
+        mediaKeysStatus: "idle",
+      });
+    };
+  }, [seekTo, handlePreviousAction]);
+
+  useEffect(() => {
+    const audio = mediaAudioRef.current;
+    if (!audio || usePlaybackStore.getState().mediaKeysStatus !== "connected")
+      return;
+    if (isPlaying) {
+      audio.play().catch(() => {
+        if (mediaAudioRef.current === audio) {
+          usePlaybackStore.setState({ mediaKeysStatus: "unavailable" });
+        }
+      });
+    } else {
+      audio.pause();
+    }
+  }, [isPlaying]);
+
+  // Keep all player views and the OS timeline on the same clock.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const player = playerRef.current;
+      if (
+        !readyRef.current ||
+        !player ||
+        !usePlayerStore.getState().currentVideo
+      )
+        return;
+      queueControllerRef.current?.observe(player.getPlayerState());
+      if (queueControllerRef.current?.isTransitioning) return;
+      const duration = player.getDuration();
+      const currentTime = player.getCurrentTime();
+      if (
+        !Number.isFinite(duration) ||
+        duration <= 0 ||
+        !Number.isFinite(currentTime)
+      )
+        return;
+      const position = Math.max(0, Math.min(currentTime, duration));
+      usePlaybackStore.setState({ position, duration });
+      updateMediaPosition({ duration, position, playbackRate: 1 });
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, []);
+
   // Load YouTube IFrame API
   useEffect(() => {
-    if (typeof window !== "undefined" && !window.YT) {
+    if (
+      !window.YT?.Player &&
+      !document.querySelector(
+        'script[src="https://www.youtube.com/iframe_api"]',
+      )
+    ) {
       const tag = document.createElement("script");
       tag.src = "https://www.youtube.com/iframe_api";
       document.body.appendChild(tag);
@@ -146,26 +271,20 @@ export function VideoPlayer({
     if (!currentVideo) return;
 
     const initPlayer = () => {
-      if (playerRef.current) {
-        if (currentVideoIdRef.current !== currentVideo.youtubeId) {
-          isSkippingRef.current = true;
-          playerRef.current.loadVideoById(currentVideo.youtubeId);
-          currentVideoIdRef.current = currentVideo.youtubeId;
-          if (isPlayingRef.current) {
-            playerRef.current.playVideo();
-          } else {
-            playerRef.current.pauseVideo();
-          }
-        }
-        return;
-      }
+      if (playerRef.current) return;
 
-      playerRef.current = new window.YT.Player("youtube-player", {
+      const host = playerHostRef.current;
+      if (!host) return;
+      // YouTube replaces its mount node. Keep React's host intact so remounts
+      // (including Strict Mode) always have a fresh target.
+      const mount = document.createElement("div");
+      host.replaceChildren(mount);
+      playerRef.current = new window.YT.Player(mount, {
         height: "100%",
         width: "100%",
         videoId: currentVideo.youtubeId,
         playerVars: {
-          autoplay: isPlayingRef.current ? 1 : 0,
+          autoplay: 0,
           modestbranding: 1,
           rel: 0,
           playsinline: 1,
@@ -173,17 +292,38 @@ export function VideoPlayer({
         },
         events: {
           onReady: (event: YouTubeEvent) => {
-            event.target.setVolume(volumeRef.current);
-            if (isPlayingRef.current) {
-              event.target.playVideo();
-            } else {
-              event.target.pauseVideo();
-            }
+            if (event.target !== playerRef.current) return;
+            readyRef.current = true;
+            event.target.setVolume(usePlayerStore.getState().volume);
+            queueControllerRef.current = new YouTubeQueueController(
+              event.target,
+              {
+                read: usePlayerStore.getState,
+                select: (index, playing) => {
+                  const state = usePlayerStore.getState();
+                  const video = state.queue[index];
+                  if (!video) return;
+                  usePlayerStore.setState({
+                    currentIndex: index,
+                    currentVideo: video,
+                    isPlaying: playing,
+                  });
+                  if (state.isPlaying !== playing)
+                    onPlayStateChangeRef.current?.(playing);
+                },
+                ended: (video) => onVideoEndRef.current?.(video),
+                resetProgress: (position) => {
+                  usePlaybackStore.setState({ position, duration: 0 });
+                  updateMediaPosition();
+                },
+              },
+            );
+            queueControllerRef.current.sync();
           },
           onStateChange: onPlayerStateChange,
+          onAutoplayBlocked: () => setPlaying(false),
         },
       });
-      currentVideoIdRef.current = currentVideo.youtubeId;
     };
 
     if (window.YT?.Player) {
@@ -191,30 +331,22 @@ export function VideoPlayer({
     } else {
       window.onYouTubeIframeAPIReady = initPlayer;
     }
-  }, [currentVideo, onPlayerStateChange]);
+  }, [currentVideo, onPlayerStateChange, setPlaying]);
 
   useEffect(() => {
     return () => {
+      queueControllerRef.current?.dispose();
+      queueControllerRef.current = null;
       playerRef.current?.destroy();
       playerRef.current = null;
-      currentVideoIdRef.current = null;
+      readyRef.current = false;
+      window.onYouTubeIframeAPIReady = () => {};
     };
   }, []);
 
-  // Sync play/pause state
-  useEffect(() => {
-    if (!playerRef.current) return;
-    if (isSkippingRef.current) return;
-    if (isPlaying) {
-      playerRef.current.playVideo();
-    } else {
-      playerRef.current.pauseVideo();
-    }
-  }, [isPlaying]);
-
   // Sync volume
   useEffect(() => {
-    if (playerRef.current) {
+    if (readyRef.current && playerRef.current) {
       playerRef.current.setVolume(volume);
     }
   }, [volume]);
@@ -223,7 +355,10 @@ export function VideoPlayer({
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.mediaSession) return;
     const mediaSession = navigator.mediaSession;
-    const setHandler = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+    const setHandler = (
+      action: MediaSessionAction,
+      handler: MediaSessionActionHandler | null,
+    ) => {
       try {
         mediaSession.setActionHandler(action, handler);
       } catch {
@@ -235,8 +370,13 @@ export function VideoPlayer({
     setHandler("pause", () => setPlaying(false));
     setHandler("previoustrack", handlePreviousAction);
     setHandler("nexttrack", handleNextAction);
-    setHandler("seekbackward", handlePreviousAction);
-    setHandler("seekforward", handleNextAction);
+    // Keep compact system surfaces focused on changing songs. The seek bar
+    // still supports absolute seeking through seekto.
+    setHandler("seekbackward", null);
+    setHandler("seekforward", null);
+    setHandler("seekto", (details) => {
+      if (details.seekTime !== undefined) seekTo(details.seekTime);
+    });
 
     return () => {
       setHandler("play", null);
@@ -245,36 +385,60 @@ export function VideoPlayer({
       setHandler("nexttrack", null);
       setHandler("seekbackward", null);
       setHandler("seekforward", null);
+      setHandler("seekto", null);
+      mediaSession.metadata = null;
+      mediaSession.playbackState = "none";
+      updateMediaPosition();
     };
-  }, [setPlaying, handlePreviousAction, handleNextAction]);
+  }, [setPlaying, handlePreviousAction, handleNextAction, seekTo]);
 
   // Media Session metadata
   useEffect(() => {
-    if (!currentVideo || typeof navigator === "undefined" || !navigator.mediaSession) {
+    if (!navigator.mediaSession || typeof MediaMetadata === "undefined") {
       return;
     }
 
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentVideo.title,
-      artist: currentVideo.channelTitle,
-      artwork: currentVideo.thumbnail ? [{ src: currentVideo.thumbnail }] : [],
-    });
-  }, [currentVideo]);
+    navigator.mediaSession.metadata = currentVideo
+      ? new MediaMetadata({
+          title: currentVideo.title,
+          artist: currentVideo.channelTitle,
+          artwork:
+            currentVideo.thumbnail && !hideThumbnails
+              ? [{ src: currentVideo.thumbnail }]
+              : [],
+        })
+      : null;
+  }, [currentVideo, hideThumbnails]);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.mediaSession) return;
-    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
-  }, [isPlaying]);
+    let playbackState: MediaSessionPlaybackState = "none";
+    if (currentVideo) playbackState = isPlaying ? "playing" : "paused";
+    navigator.mediaSession.playbackState = playbackState;
+  }, [currentVideo, isPlaying]);
 
   // Keyboard shortcuts for media control
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input/textarea
       const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+      if (
+        e.defaultPrevented ||
+        e.altKey ||
+        e.ctrlKey ||
+        e.metaKey ||
+        target.closest(
+          'input, textarea, select, [contenteditable="true"], [role="dialog"]:not([data-stage-player]), [role="slider"]',
+        )
+      ) {
         return;
       }
 
+      if (
+        e.key === " " &&
+        target.closest('button, a, [role="button"], [role="switch"]')
+      )
+        return;
       switch (e.key.toLowerCase()) {
         case "k": // Play/pause
         case " ": // Spacebar also toggles play/pause
@@ -296,35 +460,26 @@ export function VideoPlayer({
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, [isPlaying, setPlaying, handlePreviousAction, handleNextAction]);
 
-  if (!currentVideo) {
-    return (
-      <div
-        className={cn(
-          "flex aspect-video w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.045] text-white",
-          compact && "min-h-[200px]",
-          className
-        )}
-      >
-        <p className="text-white/45">
-          Select a video or shuffle to start playing
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div
-      ref={containerRef}
       className={cn(
         "relative aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl shadow-black/20",
         compact && "min-h-[200px]",
-        className
+        className,
       )}
     >
-      <div id="youtube-player" className="relative z-0 h-full w-full" />
-      {overlay ? (
-        <div className="absolute inset-0 z-10">{overlay}</div>
-      ) : null}
+      <div
+        className="absolute inset-0 z-0"
+        inert={Boolean(overlay) || !currentVideo}
+      >
+        <div ref={playerHostRef} className="h-full w-full" />
+      </div>
+      {!currentVideo && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#10100f] p-6 text-center text-white/55">
+          Select a video or shuffle to start playing
+        </div>
+      )}
+      {overlay ? <div className="absolute inset-0 z-10">{overlay}</div> : null}
     </div>
   );
 }

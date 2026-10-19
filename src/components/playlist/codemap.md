@@ -9,13 +9,15 @@ Feature UI for TubeShuffle's core playlist experience: importing playlists, disp
 - **Mutation-driven imports**: `ImportPlaylistModal` and `BatchImportModal` call `playlistRepository.importPlaylistFromUrl()` and report progress with Sonner/to local state.
 - **Store-driven player UI**: `VideoPlayer`, `PlaylistQueue`, and `ShuffleControls` read/write `usePlayerStore`.
 - **Dark ambient media UI**: playlist cards, import dialogs, shuffle controls, keyboard shortcuts, and queue actions use glassy dark surfaces matching the landing page.
-- **YouTube IFrame bridge**: `VideoPlayer` dynamically loads `https://www.youtube.com/iframe_api`, creates `YT.Player`, and syncs state to Zustand.
+- **YouTube IFrame bridge**: `VideoPlayer` dynamically loads `https://www.youtube.com/iframe_api` and creates `YT.Player`. `YouTubeQueueController` mirrors the app queue through `loadPlaylist`/`cuePlaylist`, preserves position/pause during edits, and accepts native previous/next changes back into Zustand. Natural ends are recorded once; native advancement has a guarded recovery timer.
 - **UI preference store**: player-facing components consume `useUiPreferencesStore` for Focus Mode and No Artwork behavior.
-- **Stage player mode**: playlist page can switch to a fixed full-window player overlay with hover-only left/center/right transport zones while keeping the embedded YouTube player mounted underneath.
+- **Player views**: `PlayerViewControls` offers Video/Focus choices, an Artwork preference, and a Stage action. `StagePlayer` is a focus-trapped full-window dialog with visible transport controls, seeking, and Escape/focus return. View switches keep the YouTube instance mounted.
 - **Queue management**: `PlaylistQueue` supports active-track auto-scroll, optional fill-height layout, play-next, move up/down, and remove actions through `usePlayerStore` queue helpers.
 - **Daily suggestions**: `DailySuggestions` lazily fetches/caches five YouTube suggestions per playlist/browser/day and can play or queue them locally.
-- **Media Session integration**: playback metadata and play/pause/previous/next handlers map to OS/media keys; skip actions force playback on the selected track.
-- **Keyboard shortcuts**: `K`/space toggles playback, `J` restarts/previous, `L` goes next, `Esc` exits Stage player; input/textarea targets are ignored.
+- **Shared playback controls**: `PlaybackControls` reads transient `playback-store` progress and seek callbacks; the same progress, transport, and volume controls appear in the page and Stage.
+- **Media Session integration**: metadata, play/pause, previous/next, absolute seeking, and position state map to browser/OS controls. `KeyboardShortcutsDialog` offers an opt-in silent top-level media connection for iframe routing; see `docs/media-controls.md` for limitations.
+- **Iframe lifecycle**: a React-owned host creates a fresh YouTube mount node on initialization; API calls wait for readiness, and blocked autoplay restores a paused UI.
+- **Keyboard shortcuts**: `K`/space toggles playback, `J` restarts/previous, `L` goes next, `Esc` exits Stage player; form fields, editable targets, and non-player dialogs are ignored; Space preserves native button activation.
 
 ## Flow
 
@@ -29,12 +31,12 @@ Playlist card action
 
 Player route shuffles videos
   -> usePlayerStore.setQueue(...)
-  -> VideoPlayer loads currentVideo.youtubeId
-  -> YouTube state changes update play state and advance queue
+  -> VideoPlayer mirrors queue IDs and current index into YouTube
+  -> YouTube native selection/state updates the app without issuing a second skip
 
 Queue click
   -> usePlayerStore.playVideo(index)
-  -> VideoPlayer loadVideoById(new youtubeId)
+  -> YouTube playVideoAt(index), or cuePlaylist while paused
 ```
 
 ## Integration
