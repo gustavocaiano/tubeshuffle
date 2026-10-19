@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Shuffle, LayoutDashboard } from "lucide-react";
+import { LayoutDashboard } from "lucide-react";
 
 export function Navbar() {
   return (
@@ -10,7 +11,14 @@ export function Navbar() {
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/15 bg-white/10 shadow-lg shadow-black/20">
-            <Shuffle className="h-4 w-4 text-white" />
+            <Image
+              src="/favicon.svg"
+              alt=""
+              aria-hidden="true"
+              width={16}
+              height={16}
+              className="h-4 w-4"
+            />
           </div>
           <span className="text-lg font-semibold tracking-tight">TubeShuffle</span>
         </Link>

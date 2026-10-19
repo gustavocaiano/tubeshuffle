@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Shuffle } from "lucide-react";
+import Image from "next/image";
 
 export function Footer() {
   return (
@@ -7,7 +7,14 @@ export function Footer() {
       <div className="container mx-auto flex flex-col items-center gap-4 px-4 py-8 md:flex-row md:justify-between">
         <div className="flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-white/15 bg-white/10">
-            <Shuffle className="h-3 w-3 text-white" />
+            <Image
+              src="/favicon.svg"
+              alt=""
+              aria-hidden="true"
+              width={12}
+              height={12}
+              className="h-3 w-3"
+            />
           </div>
           <span className="text-sm font-medium">TubeShuffle</span>
         </div>
