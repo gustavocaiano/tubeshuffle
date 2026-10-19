@@ -21,6 +21,12 @@ Reactive state and repository layer. Provides the playlist repository facade use
 - `partialize` persists queue/current video/playlist context/volume, but not transient `isPlaying`.
 - Clamps volume between 0 and 100.
 
+### `playback-store.ts`
+
+- Runtime-only position/duration and seek/previous callbacks published by `VideoPlayer`.
+- Shares the clock and controls across page/Stage without persisting progress.
+- Holds optional media-key connect/disconnect actions and connection status; cleaned up on player unmount.
+
 ## Flow
 
 ```text
