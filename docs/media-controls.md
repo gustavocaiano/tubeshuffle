@@ -1,10 +1,20 @@
 # macOS media controls
 
 TubeShuffle mirrors the app's ordered queue into YouTube using `loadPlaylist`
-and `cuePlaylist`. This lets YouTube's own active media session navigate the
-shuffled list. Native next/previous changes are synchronized back to the app;
-queue edits retain the current track's position and paused state. YouTube's
-own shuffle and repeat are disabled so the app remains responsible for order.
+and `cuePlaylist`. The app retains the full queue and sends a 100-track window
+to YouTube, translating native indexes back to the full queue. This avoids the
+iframe's observed 200-item truncation and navigation failure at that boundary.
+Windows recenter when a track changes at either edge, keeping native next and
+previous available. This lets YouTube's own active media session navigate the
+shuffled list. Native next/previous changes are synchronized back to the app.
+Queue additions, removals, and reordering that retain the playing occurrence
+leave the active video and progress untouched, including while paused or loading.
+YouTube has no documented in-place playlist edit operation, so the native queue
+snapshot is refreshed at the next track change. Native next/previous transitions
+resolve against the latest app order; reaching the old native playlist's end also
+continues into newly appended tracks. YouTube's inline playlist can show the old
+snapshot until that refresh. Its own shuffle and repeat are disabled so the app
+remains responsible for order.
 
 App Media Session handlers advertise play/pause, previous/next track, and absolute
 seeking. Relative seek buttons are deliberately omitted so they do not displace
@@ -19,9 +29,10 @@ between playlist items; forward transitions that reach the previous playing
 clock’s projected end are also treated as completion. The transition start time
 excludes the next video’s loading delay, so early native skips stay incomplete.
 A 200ms timing tolerance accounts for iframe delivery and media clock precision.
-YouTube normally
-advances the native playlist; a guarded fallback advances the app only if the
-iframe remains ended for 1.5 seconds. Native skips do not mark tracks completed.
+YouTube normally advances the native playlist; a guarded fallback advances the
+app only if the iframe remains ended for 1.5 seconds. With deferred edits, the app
+loads the updated queue at the next track immediately on ENDED, or when native
+advancement is observed. Native skips do not mark tracks completed.
 
 ## Browser limitation and workaround
 
@@ -63,7 +74,10 @@ view switching without replacing the iframe, Stage seeking and Escape/focus
 return, silent-connection activation, and desktop/mobile layout. Queue tests
 cover native previous/next, natural completion without double skips, stalled
 advancement, repeated videos, pause during loading, stale iframe updates, and
-queue editing. The app passes all IDs through without truncating long queues.
+queue editing. Long-queue tests model the iframe truncating oversized requests,
+check index mapping in both directions across window boundaries, and retain all
+tracks in the app queue. The queue marks its current playback row with
+`aria-current`, which follows native track changes and remains present on pause.
 
 Physical media keys and macOS Control Center still require testing on a Mac:
 

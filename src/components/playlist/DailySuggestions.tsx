@@ -301,11 +301,11 @@ export function DailySuggestions({
           </div>
         </div>
       ) : suggestions.length > 0 ? (
-        <div className="relative mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="relative mt-6 grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3">
           {suggestions.map((suggestion, index) => (
             <article
               key={suggestion.youtubeId}
-              className="group flex min-h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.055] shadow-xl shadow-black/15 transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-white/[0.08]"
+              className="group flex min-h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.055] shadow-xl shadow-black/15 transition-colors hover:border-white/25 hover:bg-white/[0.08]"
             >
               <div className="relative aspect-video overflow-hidden bg-white/10">
                 {suggestion.thumbnail ? (
@@ -332,7 +332,7 @@ export function DailySuggestions({
               </div>
 
               <div className="flex flex-1 flex-col p-4">
-                <h3 className="line-clamp-2 text-sm font-bold leading-snug text-white">
+                <h3 className="line-clamp-2 text-sm font-bold leading-snug text-white [overflow-wrap:anywhere]">
                   {suggestion.title}
                 </h3>
                 <p className="mt-2 truncate text-xs text-white/45">{suggestion.channelTitle}</p>

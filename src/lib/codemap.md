@@ -9,7 +9,7 @@ Shared domain library. Contains general utilities (`utils.ts`) plus dedicated su
 - `utils.ts` provides pure helpers: `cn`, `extractPlaylistId`, `formatDuration`, `parseIsoDuration`, and truncation helpers.
 - `services/` encapsulates YouTube data transport and mode selection.
 - `storage/` encapsulates IndexedDB schema and CRUD operations.
-- `media/` contains the opt-in silent-audio bridge and `YouTubeQueueController`, which synchronizes native playlist navigation and queue edits.
+- `media/` contains the opt-in silent-audio bridge and `YouTubeQueueController`, which maps moving native playlist windows to the full app queue and defers queue edits until track transitions to avoid interrupting the active video.
 - `shuffle/` contains pure strategy functions without React/browser dependencies.
 
 ## Flow

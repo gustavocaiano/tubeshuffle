@@ -171,8 +171,7 @@ export default function PlaylistPage() {
   const playlist = playlistQuery.data?.playlist;
   const listeningView = focusMode || hideThumbnails;
   const playerClassName = cn(
-    "rounded-2xl",
-    !listeningView && "lg:max-h-[34dvh] lg:min-h-[200px]",
+    "min-h-[200px] rounded-2xl",
     listeningView && "aspect-auto min-h-64",
     listeningView && !hideThumbnails && "min-h-[336px]",
   );
@@ -184,7 +183,7 @@ export default function PlaylistPage() {
     <div className="flex min-h-screen flex-col bg-[#080807] text-white">
       <Navbar />
 
-      <main className="relative flex-1 overflow-hidden">
+      <main className="relative min-w-0 flex-1">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-[620px] overflow-hidden opacity-90">
           {showAmbientThumbnail ? (
             <div
@@ -197,7 +196,7 @@ export default function PlaylistPage() {
           <div className="absolute inset-0 bg-gradient-to-b from-[#080807]/10 via-[#080807]/75 to-[#080807]" />
         </div>
 
-        <div className="container relative mx-auto px-4 py-6">
+        <div className="relative mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-center gap-4">
             <Link href="/dashboard">
               <Button
@@ -211,7 +210,7 @@ export default function PlaylistPage() {
             </Link>
             {playlistQuery.isLoading ? (
               <div>
-                <Skeleton className="h-7 w-64 bg-white/10" />
+                <Skeleton className="h-7 w-48 max-w-full bg-white/10 sm:w-64" />
                 <Skeleton className="mt-1 h-4 w-40 bg-white/10" />
               </div>
             ) : playlist ? (
@@ -256,53 +255,45 @@ export default function PlaylistPage() {
             <>
               <div
                 className={cn(
-                  "grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px]",
+                  "grid min-w-0 items-start gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]",
                 )}
               >
-                <div className="min-w-0 space-y-4">
-                  <div className="rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-black/30 backdrop-blur-xl">
-                    <PlayerViewControls />
-                    <VideoPlayer
-                      onVideoEnd={handleVideoEnd}
-                      className={playerClassName}
-                      overlay={
-                        listeningView ? (
-                          <ListeningView
-                            currentVideo={currentVideo}
-                            hideThumbnails={hideThumbnails}
-                          />
-                        ) : undefined
-                      }
-                    />
-                    {!focusMode && !hideThumbnails && currentVideo && (
-                      <div className="px-1 pb-2 pt-5">
-                        <p className="mb-2 text-xs text-white/45">
-                          Now playing · Track {currentIndex + 1} of{" "}
-                          {queue.length}
-                        </p>
-                        <h2 className="text-balance text-xl font-bold tracking-tight">
-                          {currentVideo.title}
-                        </h2>
-                        <p className="mt-1 text-sm text-white/55">
-                          {currentVideo.channelTitle}
-                        </p>
-                      </div>
-                    )}
-                    <div className="mt-4 border-t border-white/10 pt-2">
-                      <PlaybackControls />
-                    </div>
-                  </div>
-
-                  <ShuffleControls
-                    currentPreset={shufflePreset}
-                    excludeWatched={excludeWatched}
-                    onShuffle={handleShuffle}
-                    onExcludeWatchedChange={setExcludeWatched}
-                    isShuffling={shuffleMutation.isPending}
+                <div className="min-w-0 rounded-3xl border border-white/10 bg-white/[0.045] p-3 shadow-2xl shadow-black/30 backdrop-blur-xl sm:rounded-[2rem] sm:p-4">
+                  <PlayerViewControls />
+                  <VideoPlayer
+                    onVideoEnd={handleVideoEnd}
+                    className={playerClassName}
+                    overlay={
+                      listeningView ? (
+                        <ListeningView
+                          currentVideo={currentVideo}
+                          hideThumbnails={hideThumbnails}
+                        />
+                      ) : undefined
+                    }
                   />
+                  {!focusMode && !hideThumbnails && currentVideo && (
+                    <div className="px-1 pb-2 pt-5">
+                      <p className="mb-2 text-xs text-white/45">
+                        Now playing · Track {currentIndex + 1} of {queue.length}
+                      </p>
+                      <h2 className="text-balance text-xl font-bold tracking-tight [overflow-wrap:anywhere]">
+                        {currentVideo.title}
+                      </h2>
+                      <p className="mt-1 text-sm text-white/55">
+                        {currentVideo.channelTitle}
+                      </p>
+                    </div>
+                  )}
+                  <div className="mt-4 border-t border-white/10 pt-2">
+                    <PlaybackControls />
+                  </div>
                 </div>
 
-                <div className="flex h-[min(700px,calc(100dvh-7rem))] min-h-[360px] min-w-0 flex-col rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-black/30 backdrop-blur-xl lg:sticky lg:top-20">
+                <section
+                  aria-label="Queue"
+                  className="flex h-[min(65dvh,40rem)] min-h-80 min-w-0 flex-col rounded-3xl border border-white/10 bg-white/[0.045] p-3 shadow-2xl shadow-black/30 backdrop-blur-xl sm:rounded-[2rem] sm:p-4 xl:sticky xl:top-6 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:h-[calc(100dvh-3rem)] xl:max-h-[56rem]"
+                >
                   <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
                     <div>
                       <h2 className="font-semibold">Queue</h2>
@@ -320,6 +311,16 @@ export default function PlaylistPage() {
                     compact={focusMode}
                     fill
                     sourcePlaylistYoutubeId={playlist.youtubeId}
+                  />
+                </section>
+
+                <div className="min-w-0 xl:col-start-1 xl:row-start-2">
+                  <ShuffleControls
+                    currentPreset={shufflePreset}
+                    excludeWatched={excludeWatched}
+                    onShuffle={handleShuffle}
+                    onExcludeWatchedChange={setExcludeWatched}
+                    isShuffling={shuffleMutation.isPending}
                   />
                 </div>
               </div>
