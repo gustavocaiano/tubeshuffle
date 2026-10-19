@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VideoPlayer } from "@/components/playlist/VideoPlayer";
 import { PlaybackControls } from "@/components/playlist/PlaybackControls";
+import { PlaylistQueue } from "@/components/playlist/PlaylistQueue";
 import { usePlayerStore, type VideoItem } from "@/stores/player-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 
@@ -115,6 +116,37 @@ afterEach(() => {
 });
 
 describe("YouTube playback and system actions", () => {
+  it("moves the queue marker for native events, polling, and media-session skips", () => {
+    render(
+      <>
+        <VideoPlayer />
+        <PlaylistQueue />
+      </>,
+    );
+    ready();
+    const first = screen.getByText("one").closest("button")!;
+    const second = screen.getByText("two").closest("button")!;
+    expect(first.getAttribute("aria-current")).toBe("true");
+    act(() => {
+      nativeIndex = 1;
+      events.onStateChange({ target: player, data: 1 });
+    });
+    expect(first.getAttribute("aria-current")).toBeNull();
+    expect(second.getAttribute("aria-current")).toBe("true");
+    expect(usePlayerStore.getState().currentVideo?.id).toBe("two");
+    act(() => {
+      nativeIndex = 0;
+      vi.advanceTimersByTime(500);
+    });
+    expect(first.getAttribute("aria-current")).toBe("true");
+    expect(second.getAttribute("aria-current")).toBeNull();
+    action("nexttrack");
+    expect(first.getAttribute("aria-current")).toBeNull();
+    expect(second.getAttribute("aria-current")).toBe("true");
+    act(() => usePlayerStore.getState().setPlaying(false));
+    expect(second.getAttribute("aria-current")).toBe("true");
+  });
+
   it("creates a fresh iframe mount during Strict Mode effect replay", () => {
     render(
       <React.StrictMode>

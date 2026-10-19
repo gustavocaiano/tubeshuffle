@@ -10,7 +10,7 @@ Core player route at `/playlist/:id`, where `:id` is the local playlist UUID sto
 - Auto-shuffle guard avoids replacing an existing queue for the same playlist.
 - `shuffleVideos()` provides `RANDOM`/Normal and `SMART` energy-flow presets.
 - Persists Focus Mode, No Artwork, and Stage full-window player preferences through `useUiPreferencesStore` for simplified playback presentation.
-- Renders an ambient player deck with explicit Video/Focus choices, an Artwork preference, shared seeking/transport controls, shortcut/media-key help, and a viewport-height queue. Stage uses a full-window accessible dialog with visible controls and a progress bar; no-art views omit artwork placeholders.
+- Renders an ambient player deck with explicit Video/Focus choices, an Artwork preference, shared seeking/transport controls, shortcut/media-key help, and a bounded native-scrolling queue with permanently visible row actions. Below 1280px the queue follows the player before shuffle settings; above it the queue is sticky beside the player. Stage uses a full-window accessible dialog with a scrollable track region, fixed transport/volume controls, and a progress bar; no-art views omit artwork placeholders.
 - Renders daily playlist suggestions below the player/queue grid; suggestions are cached per browser day, can be refreshed once per day, and can be played/queued locally.
 - `excludeWatched` uses persisted completed play events to filter videos before shuffling.
 - YouTube playback is delegated to `VideoPlayer`; queue rendering to `PlaylistQueue`; controls to `ShuffleControls`.

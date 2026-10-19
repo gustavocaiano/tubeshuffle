@@ -23,7 +23,7 @@ export function StagePlayer() {
         <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-[#080807]" />
         <DialogPrimitive.Content
           data-stage-player
-          className="fixed inset-0 z-[101] flex flex-col overflow-y-auto bg-[#080807] text-white outline-none"
+          className="fixed inset-0 z-[101] grid grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden bg-[#080807] text-white outline-none"
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             document.getElementById("enter-stage")?.focus();
@@ -60,28 +60,35 @@ export function StagePlayer() {
               </Button>
             </DialogPrimitive.Close>
           </header>
-          <div className="relative mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center gap-8 px-6 py-8 text-center">
-            {showArtwork && (
-              <div className="relative size-[min(36vh,320px)] shrink-0 overflow-hidden rounded-3xl shadow-2xl shadow-black/50 outline outline-white/10">
-                <Image
-                  src={currentVideo!.thumbnail}
-                  alt=""
-                  fill
-                  sizes="320px"
-                  className="object-cover"
-                />
+          <div
+            role="region"
+            aria-label="Now playing"
+            tabIndex={0}
+            className="relative min-h-0 overflow-y-auto overscroll-y-contain px-6 py-4 outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-white/30"
+          >
+            <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col items-center justify-center gap-6 text-center sm:gap-8">
+              {showArtwork && (
+                <div className="relative size-[min(24dvh,12rem)] shrink-0 overflow-hidden rounded-3xl shadow-2xl shadow-black/50 outline outline-white/10 sm:size-[min(32dvh,20rem)]">
+                  <Image
+                    src={currentVideo!.thumbnail}
+                    alt=""
+                    fill
+                    sizes="320px"
+                    className="object-cover"
+                  />
+                </div>
+              )}
+              <div className="w-full max-w-3xl shrink-0 space-y-4">
+                <p className="text-xs font-medium uppercase tracking-[0.22em] text-white/45">
+                  Now playing
+                </p>
+                <h2 className="text-balance text-3xl font-bold tracking-tight [overflow-wrap:anywhere] sm:text-5xl">
+                  {currentVideo?.title ?? "Choose a track to start listening"}
+                </h2>
+                <p className="text-base text-white/60 sm:text-xl">
+                  {currentVideo?.channelTitle}
+                </p>
               </div>
-            )}
-            <div className="max-w-3xl space-y-4">
-              <p className="text-xs font-medium uppercase tracking-[0.22em] text-white/45">
-                Now playing
-              </p>
-              <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-5xl">
-                {currentVideo?.title ?? "Choose a track to start listening"}
-              </h2>
-              <p className="text-base text-white/60 sm:text-xl">
-                {currentVideo?.channelTitle}
-              </p>
             </div>
           </div>
           <footer className="relative shrink-0 px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-4 sm:px-10">

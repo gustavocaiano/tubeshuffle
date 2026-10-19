@@ -25,10 +25,10 @@ export function PlayerViewControls() {
       "Artwork is off. Enjoy a clean player with your queue close by.";
 
   return (
-    <div className="mb-5 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="@container/views mb-5 min-w-0 space-y-3">
+      <div className="flex flex-col gap-3 @min-[30rem]/views:flex-row @min-[30rem]/views:items-center @min-[30rem]/views:justify-between">
         <div
-          className="inline-flex rounded-xl bg-black/30 p-1 ring-1 ring-white/10"
+          className="inline-flex rounded-xl bg-black/30 p-1 ring-1 ring-white/10 @min-[30rem]/views:shrink-0"
           role="group"
           aria-label="Player view"
         >
@@ -53,18 +53,18 @@ export function PlayerViewControls() {
                 if (label === "Video") setHideThumbnails(false);
               }}
               className={cn(
-                "inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+                "inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white @min-[30rem]/views:flex-none",
                 active
                   ? "bg-white text-black shadow-sm"
                   : "text-white/60 hover:text-white",
               )}
             >
-              <Icon className="size-4" />
+              <Icon className="size-4 shrink-0" />
               {label}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between gap-4">
           <div className="flex min-h-11 items-center gap-2">
             <Label htmlFor="show-artwork" className="text-sm text-white/65">
               Artwork

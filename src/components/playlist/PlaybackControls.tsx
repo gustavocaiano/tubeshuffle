@@ -32,9 +32,14 @@ export function PlaybackControls({ stage = false }: { stage?: boolean }) {
   }
 
   return (
-    <div className={cn("space-y-2", stage && "mx-auto w-full max-w-2xl")}>
-      <div className="flex items-center gap-3">
-        <span className="w-12 text-right text-xs tabular-nums text-white/60">
+    <div
+      className={cn(
+        "@container/playback min-w-0 space-y-2",
+        stage && "mx-auto w-full max-w-2xl",
+      )}
+    >
+      <div className="flex min-w-0 items-center gap-2 @min-[28rem]/playback:gap-3">
+        <span className="w-10 shrink-0 text-right text-xs tabular-nums text-white/60 @min-[28rem]/playback:w-12">
           {elapsedLabel}
         </span>
         <input
@@ -59,13 +64,21 @@ export function PlaybackControls({ stage = false }: { stage?: boolean }) {
           onBlur={commitSeek}
           className="h-10 min-w-0 flex-1 cursor-pointer accent-white disabled:cursor-default disabled:opacity-40"
         />
-        <span className="w-12 text-xs tabular-nums text-white/60">
+        <span className="w-10 shrink-0 text-xs tabular-nums text-white/60 @min-[28rem]/playback:w-12">
           {durationLabel}
         </span>
       </div>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+      <div
+        className={cn(
+          "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2",
+          stage &&
+            "grid-cols-[0_minmax(0,1fr)_0] @min-[28rem]/playback:grid-cols-[7rem_minmax(0,1fr)_7rem]",
+        )}
+      >
         <div />
-        <div className="flex items-center gap-3">
+        <div
+          className={cn("flex items-center gap-3", stage && "justify-between")}
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -100,7 +113,7 @@ export function PlaybackControls({ stage = false }: { stage?: boolean }) {
             <SkipForward className="size-5" />
           </Button>
         </div>
-        <label className="ml-auto hidden max-w-28 items-center gap-2 sm:flex">
+        <label className="col-span-3 col-start-1 row-start-2 flex w-36 items-center justify-self-center gap-2 @min-[28rem]/playback:col-span-1 @min-[28rem]/playback:col-start-3 @min-[28rem]/playback:row-start-1 @min-[28rem]/playback:w-full @min-[28rem]/playback:max-w-28 @min-[28rem]/playback:justify-self-end">
           <Volume2
             className="size-4 shrink-0 text-white/50"
             aria-hidden="true"
