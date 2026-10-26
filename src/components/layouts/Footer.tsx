@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Coffee } from "lucide-react";
 
 export function Footer() {
   return (
@@ -19,10 +20,20 @@ export function Footer() {
           <span className="text-sm font-medium">TubeShuffle</span>
         </div>
 
-        <nav className="flex gap-6 text-sm text-white/55">
+        <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-white/55">
           <Link href="/dashboard" className="transition-colors hover:text-white">
             Open app
           </Link>
+          <a
+            href="https://buymeacoffee.com/gustavocaiano"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-white/15 bg-white/5 px-3 text-white/75 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/75"
+          >
+            <Coffee aria-hidden="true" className="h-4 w-4" strokeWidth={1.5} />
+            Buy me a coffee
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
         </nav>
 
         <p className="text-sm text-white/45">
