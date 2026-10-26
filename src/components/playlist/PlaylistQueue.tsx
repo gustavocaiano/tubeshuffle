@@ -146,6 +146,8 @@ export function PlaylistQueue({
                       src={video.thumbnail}
                       alt={video.title}
                       fill
+                      // Load queue thumbnails directly to avoid image-optimizer usage.
+                      unoptimized
                       className="object-cover"
                       sizes="56px"
                     />
