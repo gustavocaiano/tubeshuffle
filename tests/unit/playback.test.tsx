@@ -300,6 +300,32 @@ describe("YouTube playback and system actions", () => {
   });
 });
 
+describe("queue thumbnails", () => {
+  it("loads the original remote image without optimization", () => {
+    const thumbnail = "https://i.ytimg.com/vi/example/hqdefault.jpg";
+    usePlayerStore.getState().setQueue(
+      [
+        {
+          id: "thumbnail",
+          youtubeId: "example",
+          title: "Thumbnail",
+          channelTitle: "Artist",
+          thumbnail,
+          duration: 200,
+        },
+      ],
+      "playlist",
+      "Playlist",
+    );
+    render(<PlaylistQueue />);
+    const image = screen.getByRole("img", { name: "Thumbnail" });
+    expect(image.getAttribute("alt")).toBe("Thumbnail");
+    expect(image.getAttribute("src")).toBe(thumbnail);
+    expect(image.hasAttribute("srcset")).toBe(false);
+    expect(image.getAttribute("loading")).toBe("lazy");
+  });
+});
+
 describe("shared progress control", () => {
   it("renders safely before a track has been selected", () => {
     usePlayerStore.getState().clearQueue();
