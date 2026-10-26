@@ -107,6 +107,12 @@ Next.js App Router · React · TypeScript · Tailwind CSS · shadcn/ui · Zustan
 - Private playlists and Liked Videos are not imported because TubeShuffle does not use Google login.
 - Playlist data is local to the browser unless you self-host and change that behavior.
 
+## Support
+
+If TubeShuffle is useful to you, you can support its development:
+
+[☕ Buy me a coffee](https://buymeacoffee.com/gustavocaiano)
+
 ## License
 
 TubeShuffle is released under the [MIT License](./LICENSE).
