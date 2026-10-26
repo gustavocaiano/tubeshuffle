@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   CircleOff,
   Database,
+  Github,
   Headphones,
   HelpCircle,
   ListMusic,
@@ -364,6 +365,19 @@ export default function HomePage() {
               </div>
               <p className="mt-4 text-sm text-white/45">
                 Free. No login. Built for long sessions.
+              </p>
+              <p className="mt-1 flex flex-wrap items-center justify-center gap-x-2 text-sm text-white/55">
+                <span>Open source &middot; MIT licensed</span>
+                <a
+                  href="https://github.com/gustavocaiano/tubeshuffle"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-white/75 underline decoration-white/25 underline-offset-4 transition-colors hover:text-white hover:decoration-white/75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/75"
+                >
+                  <Github aria-hidden="true" className="h-4 w-4" strokeWidth={1.5} />
+                  View source
+                  <span className="sr-only"> (opens in a new tab)</span>
+                </a>
               </p>
             </div>
 
