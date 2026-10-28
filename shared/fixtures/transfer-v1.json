@@ -38,6 +38,14 @@
     }
   ],
   "vectors": {
+    "boundedDiagnostics": {
+      "limit": 100,
+      "order": ["kind", "id", "reason"],
+      "examples": [
+        { "name": "duplicate plus unknown", "records": [{ "id": "p", "youtubeId": "PL123456789" }, { "id": "p", "youtubeId": "PL123456789", "extra": true }], "expectedReasons": ["duplicate:id", "duplicate:youtubeId", "unknown_field:extra"] },
+        { "name": "many unknown fields", "generator": "5000 history records, distinct IDs e0000 through e4999, each with unknown00 through unknown39", "diagnostics": 100, "omittedDiagnostics": 199900, "first": ["history", "e0000", "unknown_field:unknown00"], "last": ["history", "e0002", "unknown_field:unknown19"] }
+      ]
+    },
     "merge": [
       {
         "name": "create repeated occurrences",

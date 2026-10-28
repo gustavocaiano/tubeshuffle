@@ -111,6 +111,33 @@ export async function listLocalPlaylists(): Promise<LocalPlaylist[]> {
   return playlists;
 }
 
+/** Process all transfer stores in one readonly transaction; meta is never read.
+ * IndexedDB clones each cursor value before delivery: one pathological stored
+ * record can still exhaust memory before application validation sees it. */
+export async function readTransferSnapshot(
+  accept: (kind: "playlist" | "video" | "history", value: unknown) => boolean,
+  next: (kind: "video" | "history") => void,
+  testDatabase?: IDBDatabase,
+): Promise<void> {
+  const db = testDatabase ?? await initializeStorage();
+  const tx = db.transaction([STORE_PLAYLISTS, STORE_VIDEOS, STORE_PLAY_HISTORY], "readonly");
+  const done = completeTransaction(tx);
+  const names = [STORE_PLAYLISTS, STORE_VIDEOS, STORE_PLAY_HISTORY];
+  const kinds = ["playlist", "video", "history"] as const;
+  let callbackError: unknown;
+  function scan(index: number) {
+    const request = tx.objectStore(names[index]).openCursor();
+    request.onsuccess = () => {
+      try {
+        const cursor = request.result;
+        if (cursor && accept(kinds[index], cursor.value)) { cursor.continue(); }
+        else if (index < 2) { next(kinds[index + 1] as "video" | "history"); scan(index + 1); }
+      } catch (error) { callbackError = error; tx.abort(); }
+    };
+  }
+  try { scan(0); await done; } catch (error) { throw callbackError ?? error; }
+}
+
 export async function getLocalPlaylist(id: string): Promise<LocalPlaylistBundle | null> {
   const db = await initializeStorage();
   const transaction = db.transaction([STORE_PLAYLISTS, STORE_VIDEOS], "readonly");
