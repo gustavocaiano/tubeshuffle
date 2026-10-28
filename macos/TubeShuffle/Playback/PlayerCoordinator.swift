@@ -11,9 +11,9 @@ final class PlayerCoordinator: ObservableObject {
     }
 
     // Fixed public examples; availability and embed permission can change.
-    let queue = ["M7lc1UVf-VE", "aqz-KE-bpKQ", "ScMzIvxBSi4", "ysz5S6PUM-U", "jNQXAC9IVRw", "dQw4w9WgXcQ"]
+    let queue = ["ScMzIvxBSi4", "jNQXAC9IVRw", "dQw4w9WgXcQ", "M7lc1UVf-VE", "aqz-KE-bpKQ", "ysz5S6PUM-U"]
         .enumerated().map { Item(id: $0.offset, videoID: $0.element) }
-    let player = YouTubePlayer(source: .video(id: "M7lc1UVf-VE"))
+    let player = YouTubePlayer(source: .video(id: "ScMzIvxBSi4"))
     @Published private(set) var queueState = QueueState(count: 6)
     var index: Int { queueState.index }
     @Published private(set) var status = "Waiting for player"

@@ -20,6 +20,10 @@ struct QueueState {
     private var pendingInvalidated = false
     private var awaitingNaturalObservation = false
 
+    init(count: Int) {
+        self.count = count
+    }
+
     var nextTarget: Int { (failedTarget ?? index) + 1 }
 
     mutating func request(_ target: Int, reason: Reason, allowed: Bool) -> Request? {

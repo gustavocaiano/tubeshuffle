@@ -2,6 +2,8 @@
 
 This is an isolated feasibility experiment, not the native product. It uses one retained YouTubePlayerKit player and a native-owned queue of six fixed public example IDs. It does not contain accounts, cloud data, API keys, downloads, or a media workaround. Video availability and embedding permissions may change. The player library explicitly does **not** support background audio.
 
+For the owner-authorized shorter P0 runs on 2026-10-28, the existing fixture was reordered to `ScMzIvxBSi4`, `jNQXAC9IVRw`, `dQw4w9WgXcQ`, `M7lc1UVf-VE`, `aqz-KE-bpKQ`, `ysz5S6PUM-U`. The first two items allow shorter natural-ending observations; no seeking or shortened end times are configured. The final item displayed “Video unavailable” on this Mac. Original-order results and revised-order results are recorded separately in the plan.
+
 ## Build on the owner's Mac
 
 1. Check `xcodebuild -version`, `swift --version`, and the installed SDK; YouTubePlayerKit 2.0.5 requires Swift tools 6.0 (Xcode 16 or later). This project targets macOS 13 or later; actual host/Xcode compatibility and signing must be checked locally.
@@ -9,6 +11,12 @@ This is an isolated feasibility experiment, not the native product. It uses one 
 
    ```sh
    xcodebuild -project macos/TubeShuffle.xcodeproj -scheme TubeShuffle -destination 'platform=macOS' build
+   ```
+
+   On the tested Apple Silicon Mac, the default build attempted x86_64 while the package built arm64. This command succeeded with the local initializer fix included:
+
+   ```sh
+   xcodebuild -project macos/TubeShuffle.xcodeproj -scheme TubeShuffle -destination 'platform=macOS,arch=arm64' -derivedDataPath /tmp/tubeshuffle-p0-derived ONLY_ACTIVE_ARCH=YES build
    ```
 
 The exact package version and tag revision are pinned in the project and `Package.resolved`. The installed bundle ID is `com.tubeshuffle.playbacklab`; the tagged library derives `https://com.tubeshuffle.playbacklab` as its iframe origin and HTML base URL. Do not replace it with an unrelated identity. The iframe `origin` and `widget_referrer` are not themselves an HTTP Referer header. Verify actual ready/playback and specifically error 153 on the Mac; the source configuration does not prove YouTube receives or accepts the required identification.
