@@ -16,6 +16,14 @@ struct TubeShuffleApp: App {
 
 struct ContentView: View {
     @ObservedObject var coordinator: PlayerCoordinator
+    @State private var seeking = false
+    @State private var seekPosition: Double = 0
+    @State private var seekOccurrence: Int?
+
+    private func timeLabel(_ seconds: Double) -> String {
+        let value = Int(max(0, seconds.isFinite ? seconds : 0))
+        return String(format: "%d:%02d", value / 60, value % 60)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -48,12 +56,42 @@ struct ContentView: View {
                 }.frame(minWidth: 180, alignment: .leading)
             }
             HStack {
-                Button("Play", action: coordinator.play).disabled(!coordinator.ready)
-                Button("Pause", action: coordinator.pause).disabled(!coordinator.ready)
+                Button("Play", action: coordinator.play).disabled(!coordinator.canTransport)
+                Button("Pause", action: coordinator.pause).disabled(!coordinator.canTransport)
                 Button("Next", action: coordinator.next).disabled(!coordinator.canNext)
+                if coordinator.recoveryRequired {
+                    Button("Quit to recover") { NSApp.terminate(nil) }
+                        .help("Reopen the app to create a fresh player.")
+                }
                 Spacer()
                 Text(coordinator.status).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
+            HStack(spacing: 10) {
+                Text(timeLabel(seeking ? seekPosition : coordinator.elapsed))
+                    .monospacedDigit().foregroundStyle(.secondary)
+                Slider(value: Binding(
+                    get: { seeking ? seekPosition : coordinator.elapsed },
+                    set: { value in
+                        if seeking && seekOccurrence != coordinator.occurrence { return }
+                        seekPosition = value
+                        if !seeking && coordinator.canSeek { coordinator.seek(to: value, occurrence: coordinator.occurrence) }
+                    }
+                ), in: 0...max(coordinator.duration, 1), onEditingChanged: { editing in
+                    if editing { seekPosition = coordinator.elapsed; seekOccurrence = coordinator.occurrence; seeking = true }
+                    else {
+                        let occurrence = seekOccurrence
+                        seeking = false; seekOccurrence = nil
+                        if let occurrence { coordinator.seek(to: seekPosition, occurrence: occurrence) }
+                    }
+                })
+                .disabled(!coordinator.canSeek)
+                .onChange(of: coordinator.occurrence) { _ in
+                    seekOccurrence = nil
+                }
+                .accessibilityLabel("Playback position")
+                .accessibilityValue("\(timeLabel(seeking ? seekPosition : coordinator.elapsed)) of \(timeLabel(coordinator.duration))")
+                Text(timeLabel(coordinator.duration)).monospacedDigit().foregroundStyle(.secondary)
+            }.font(.caption)
             Divider()
             HStack {
                 Text("Event log").font(.headline)
