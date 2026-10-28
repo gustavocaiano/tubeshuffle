@@ -338,7 +338,7 @@ Recorded 2026-10-28 from repository inspection in a Linux workspace. This record
 
 **Existing implementation state**
 
-- Prototype files exist under `macos/` (untracked working-tree files on branch `t3/macos-app`, not committed). No dedicated prototype commit SHA, branch URL, or pull request is recorded; none should be inferred.
+- Prototype implementation commit: `5b1d5e764e39cbeb620ea940e0823e67795d62a0` on branch `t3/macos-app`; pull request: https://github.com/gustavocaiano/tubeshuffle/pull/9. The branch may contain subsequent documentation commits; use its current head for testing.
 - Dependency pin: YouTubePlayerKit 2.0.5, resolved revision `1ae827573024ab13dd6adea33b25d3eef6ff667c`, exact-version requirement in the project and `Package.resolved`. The revision is an upstream package pin, not a commit of this repository.
 - Bundle identity: `com.tubeshuffle.playbacklab`; deployment target macOS 13.0; sandbox with outgoing-client networking. Whether the required HTTP Referer is actually delivered remains unverified.
 - Fixed sample queue (six IDs, in order): `M7lc1UVf-VE`, `aqz-KE-bpKQ`, `ScMzIvxBSi4`, `ysz5S6PUM-U`, `jNQXAC9IVRw`, `dQw4w9WgXcQ`. Availability and embed permission are unverified.
