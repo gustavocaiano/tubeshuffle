@@ -53,15 +53,25 @@ struct ContentView: View {
                     Text("Requested \(coordinator.queueState.requested) · accepted \(coordinator.queueState.accepted)").font(.caption).foregroundStyle(.secondary)
                     if let pending = coordinator.queueState.pending { Text("Loading item \(pending.target + 1)").font(.caption) }
                     if let failed = coordinator.queueState.failedTarget { Text("Item \(failed + 1) command failed").font(.caption) }
+                    if coordinator.index == coordinator.queue.count - 1 {
+                        Text("Last item in queue. Next is unavailable. If the video cannot play, quit and reopen to restart the queue.")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
                 }.frame(minWidth: 180, alignment: .leading)
             }
             HStack {
                 Button("Play", action: coordinator.play).disabled(!coordinator.canTransport)
                 Button("Pause", action: coordinator.pause).disabled(!coordinator.canTransport)
                 Button("Next", action: coordinator.next).disabled(!coordinator.canNext)
+                Button("Capture state probe", action: coordinator.captureEmissionProbe).disabled(!coordinator.canCaptureEmissionProbe)
+                    .help("Capture callbacks even after a player error when the bridge is safe to use. Unavailable during operations or recovery; a stalled bridge cannot be captured safely.")
                 if coordinator.recoveryRequired {
                     Button("Quit to recover") { NSApp.terminate(nil) }
                         .help("Reopen the app to create a fresh player.")
+                }
+                if !coordinator.recoveryRequired && coordinator.index == coordinator.queue.count - 1 {
+                    Button("Quit to restart") { NSApp.terminate(nil) }
+                        .help("Reopen the app to start the queue again.")
                 }
                 Spacer()
                 Text(coordinator.status).font(.caption).foregroundStyle(.secondary).lineLimit(2)

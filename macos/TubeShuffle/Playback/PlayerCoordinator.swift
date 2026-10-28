@@ -28,7 +28,22 @@ final class PlayerCoordinator: ObservableObject {
     // Fixed public examples; availability and embed permission can change.
     let queue = ["ScMzIvxBSi4", "jNQXAC9IVRw", "dQw4w9WgXcQ", "M7lc1UVf-VE", "aqz-KE-bpKQ", "ysz5S6PUM-U"]
         .enumerated().map { Item(id: $0.offset, videoID: $0.element) }
-    let player = YouTubePlayer(source: .video(id: "ScMzIvxBSi4"))
+    // Temporary probe: keep the pinned provider and normal callback transport.
+    let player = YouTubePlayer(source: .video(id: "ScMzIvxBSi4"), configuration: .init(htmlBuilder: .init(htmlProvider: { builder, options in
+        let html = try YouTubePlayer.HTMLBuilder.defaultHTMLProvider()(builder, options)
+        let marker = "function sendYouTubePlayerEvent(eventName, event) {"
+        guard html.components(separatedBy: marker).count == 2 else {
+            throw NSError(domain: "PlaybackLabProbe", code: 1)
+        }
+        return html.replacingOccurrences(of: marker, with: marker + """
+
+            if (eventName === 'onStateChange' && event && Number.isInteger(event.data) && [-1, 0, 1, 2, 3, 5].includes(event.data)) {
+                window.__p0States = window.__p0States || [];
+                window.__p0States.push([Math.round(performance.now()), event.data]);
+                if (window.__p0States.length > 100) window.__p0States.shift();
+            }
+        """)
+    })))
     @Published private(set) var queueState = QueueState(count: 6)
     var index: Int { queueState.index }
     @Published private(set) var status = "Waiting for player"
@@ -214,6 +229,39 @@ final class PlayerCoordinator: ObservableObject {
     func play() { command("play", wantsPlayback: true) { try await self.player.play() } }
     func pause() { command("pause", wantsPlayback: false) { try await self.player.pause() } }
     func next() { select(queueState.nextTarget) }
+    func captureEmissionProbe() {
+        guard canCaptureEmissionProbe, let token = mutationGate.begin() else { return }
+        mutationInFlight = true
+        let generation = windowGeneration
+        let watchdog = mutationWatchdog(token)
+        publishNowPlaying()
+        Task {
+            defer {
+                watchdog.cancel()
+                let advance = mutationGate.finish(token, current: mutationContext)
+                mutationInFlight = false
+                publishNowPlaying()
+                if advance && windowOpen && ready && !recoveryRequired { advanceNaturally() }
+            }
+            do {
+                let snapshot: String = try await player.evaluate(javaScript: .init("JSON.stringify(window.__p0States || [])"), converter: .typeCast(to: String.self))
+                guard windowOpen, generation == windowGeneration, !recoveryRequired else { return }
+                guard let data = snapshot.data(using: .utf8), let rows = try? JSONSerialization.jsonObject(with: data) as? [[Int]], rows.count <= 100,
+                      rows.allSatisfy({ $0.count == 2 && $0[0] >= 0 && [-1, 0, 1, 2, 3, 5].contains($0[1]) }) else {
+                    record("JS emission probe returned invalid data"); return
+                }
+                let truncation = rows.count == 100 ? "potentially truncated; " : ""
+                record("JS emission probe (\(truncation)page milliseconds:state; last 100): " + rows.map { "\($0[0]):\($0[1])" }.joined(separator: ", "))
+            } catch {
+                guard windowOpen, generation == windowGeneration, !recoveryRequired else { return }
+                record("JS emission probe failed (details redacted)")
+            }
+        }
+    }
+    // Capture does not require a ready player, but shares mutation admission so
+    // an evaluation cannot overlap an outstanding load, command, or seek.
+    // Recovery may hide an invalidated but still-running seek, so it is unsafe.
+    var canCaptureEmissionProbe: Bool { windowOpen && !recoveryRequired && !mutationInFlight && !mutationGate.busy && !mutationGate.restartRequired && !seekGate.seeking && queueState.pending == nil }
     var canTransport: Bool { ready && windowOpen && !recoveryRequired && !mutationInFlight && !seekGate.seeking && queueState.pending == nil }
     var canNext: Bool { windowOpen && (ready || playerError) && !recoveryRequired && !mutationInFlight && !seekGate.seeking && queueState.pending == nil && queueState.nextTarget < queue.count }
 
