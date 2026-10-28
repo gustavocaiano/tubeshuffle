@@ -1,6 +1,6 @@
 import SwiftUI
 import AppKit
-import YouTubePlayerKit
+import WebKit
 
 @main
 struct TubeShuffleApp: App {
@@ -36,7 +36,7 @@ struct ContentView: View {
                 Text("P0 PROTOTYPE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             }
             HStack(alignment: .top, spacing: 16) {
-                YouTubePlayerView(coordinator.player)
+                PlayerWebView(player: coordinator.player)
                     .frame(minWidth: 480, minHeight: 270)
                     .aspectRatio(16 / 9, contentMode: .fit)
                 VStack(alignment: .leading, spacing: 8) {
@@ -63,8 +63,6 @@ struct ContentView: View {
                 Button("Play", action: coordinator.play).disabled(!coordinator.canTransport)
                 Button("Pause", action: coordinator.pause).disabled(!coordinator.canTransport)
                 Button("Next", action: coordinator.next).disabled(!coordinator.canNext)
-                Button("Capture state probe", action: coordinator.captureEmissionProbe).disabled(!coordinator.canCaptureEmissionProbe)
-                    .help("Capture callbacks even after a player error when the bridge is safe to use. Unavailable during operations or recovery; a stalled bridge cannot be captured safely.")
                 if coordinator.recoveryRequired {
                     Button("Quit to recover") { NSApp.terminate(nil) }
                         .help("Reopen the app to create a fresh player.")
@@ -128,4 +126,10 @@ private struct WindowObserver: NSViewRepresentable {
     func updateNSView(_ view: NSView, context: Context) {
         DispatchQueue.main.async { if let window = view.window { coordinator.attach(window: window) } }
     }
+}
+
+private struct PlayerWebView: NSViewRepresentable {
+    let player: DirectPlayer
+    func makeNSView(context: Context) -> WKWebView { player.webView }
+    func updateNSView(_ view: WKWebView, context: Context) {}
 }

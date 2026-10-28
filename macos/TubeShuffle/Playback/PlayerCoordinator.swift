@@ -2,21 +2,7 @@ import AppKit
 import Combine
 import Foundation
 import MediaPlayer
-import YouTubePlayerKit
-
-// MediaPlayer callbacks can arrive on any thread; this snapshot is advisory and
-// all commands are revalidated on the main actor before being issued.
-private final class RemoteEligibility {
-    private let lock = NSLock()
-    private var values = (transport: false, next: false, seek: false, generation: 0)
-    func update(transport: Bool, next: Bool, seek: Bool, generation: Int) {
-        lock.lock(); defer { lock.unlock() }
-        values = (transport, next, seek, generation)
-    }
-    func read() -> (transport: Bool, next: Bool, seek: Bool, generation: Int) {
-        lock.lock(); defer { lock.unlock() }; return values
-    }
-}
+import WebKit
 
 @MainActor
 final class PlayerCoordinator: ObservableObject {
@@ -28,22 +14,7 @@ final class PlayerCoordinator: ObservableObject {
     // Fixed public examples; availability and embed permission can change.
     let queue = ["ScMzIvxBSi4", "jNQXAC9IVRw", "dQw4w9WgXcQ", "M7lc1UVf-VE", "aqz-KE-bpKQ", "ysz5S6PUM-U"]
         .enumerated().map { Item(id: $0.offset, videoID: $0.element) }
-    // Temporary probe: keep the pinned provider and normal callback transport.
-    let player = YouTubePlayer(source: .video(id: "ScMzIvxBSi4"), configuration: .init(htmlBuilder: .init(htmlProvider: { builder, options in
-        let html = try YouTubePlayer.HTMLBuilder.defaultHTMLProvider()(builder, options)
-        let marker = "function sendYouTubePlayerEvent(eventName, event) {"
-        guard html.components(separatedBy: marker).count == 2 else {
-            throw NSError(domain: "PlaybackLabProbe", code: 1)
-        }
-        return html.replacingOccurrences(of: marker, with: marker + """
-
-            if (eventName === 'onStateChange' && event && Number.isInteger(event.data) && [-1, 0, 1, 2, 3, 5].includes(event.data)) {
-                window.__p0States = window.__p0States || [];
-                window.__p0States.push([Math.round(performance.now()), event.data]);
-                if (window.__p0States.length > 100) window.__p0States.shift();
-            }
-        """)
-    })))
+    let player = DirectPlayer()
     @Published private(set) var queueState = QueueState(count: 6)
     var index: Int { queueState.index }
     @Published private(set) var status = "Waiting for player"
@@ -59,6 +30,11 @@ final class PlayerCoordinator: ObservableObject {
     private var windowOpen = false
     private var windowGeneration = 0
     private var playerError = false
+    private var startupGate = StartupGate()
+    // Readiness is per occurrence: it holds only while the generation that
+    // reported ready is still the expected one.
+    private var readyGeneration: Int?
+    private var readinessGate = ReadinessGate()
     @Published private var mutationInFlight = false
     private var mutationGate = MutationGate()
     @Published private(set) var recoveryRequired = false
@@ -77,35 +53,65 @@ final class PlayerCoordinator: ObservableObject {
         Timer.publish(every: 1, on: .main, in: .common).autoconnect()
             .sink { [weak self] _ in self?.refreshProgress() }.store(in: &subscriptions)
         record("Session started; bundle \(Bundle.main.bundleIdentifier ?? "missing")")
-        player.statePublisher.sink { [weak self] state in
+        player.onEvent = { [weak self] event in
             guard let self else { return }
-            self.ready = state.isReady
-            if case .error = state { self.playerError = true } else { self.playerError = false }
-            switch state {
-            case .idle:
-                self.queueState.invalidatePlayback()
-                self.invalidateSeek()
-                self.resetProgress()
-                self.status = "Waiting for player"
-            case .ready: self.status = "Player ready"
-            case .error(let error):
-                self.queueState.invalidatePlayback()
-                self.invalidateSeek()
-                self.resetProgress()
-                self.status = "Player error: \(Self.errorLabel(error))"
+            guard !self.recoveryRequired else { return }
+            switch event {
+            case .iframeReady: self.record("iframe API ready")
+            case .ready(let generation):
+                // The bridge tags readiness with the occurrence generation it was
+                // loaded under. Readiness is per instance: it never carries across
+                // a load, is never treated as playing, does not prove the loaded
+                // video, and cannot undo a terminal startup failure: fail/timeout
+                // always require a restart, and recovery blocks every callback above.
+                guard generation == self.queueState.expectedGeneration else {
+                    self.record("stale ready event generation \(generation); expected \(self.queueState.expectedGeneration); rejected")
+                    return
+                }
+                _ = self.startupGate.ready()
+                _ = self.readinessGate.ready(generation)
+                self.readyGeneration = generation
+                self.playerError = false
+                self.syncReady()
+                self.status = "Player ready"; self.record(self.status); self.publishNowPlaying()
+                self.refreshProgress()
+            case .state(let generation, let value):
+                self.playbackChanged(value, generation: generation)
+            case .error(let generation, let code):
+                guard generation == self.queueState.expectedGeneration else {
+                    self.record("stale error event generation \(generation); expected \(self.queueState.expectedGeneration); rejected")
+                    return
+                }
+                if self.queueState.pending != nil {
+                    // The pending instance already replaced the previous player, so
+                    // the previous occurrence cannot be trusted as active. Quarantine
+                    // the session: the in-flight load completion is rejected below and
+                    // has no further effects.
+                    self.failOccurrence("player error \(Self.errorLabel(code)) while load generation \(generation) was pending")
+                } else {
+                    self.playerError = true
+                    self.queueState.invalidatePlayback(); self.invalidateSeek(); self.resetProgress()
+                    self.status = "Player error: \(Self.errorLabel(code))"
+                    self.record(self.status); self.publishNowPlaying()
+                }
+            case .autoplayBlocked(let generation):
+                guard generation == self.queueState.expectedGeneration else {
+                    self.record("stale autoplay-blocked event generation \(generation); expected \(self.queueState.expectedGeneration); rejected")
+                    return
+                }
+                self.status = "Playback blocked; press Play"
+                self.record(self.status)
+            case .failure:
+                guard self.startupGate.fail() else { return }
+                self.failOccurrence("player bridge or navigation failed")
             }
-            self.record("player state: \(self.status)")
-            self.publishNowPlaying()
-        }.store(in: &subscriptions)
-        player.eventPublisher.sink { [weak self] event in
-            // Event payloads are untrusted and may contain URLs; only numeric data is logged.
-            let raw = event.data?.value ?? ""
-            let safe = Int(raw).map(String.init) ?? (raw.isEmpty ? "none" : "non-numeric redacted")
-            self?.record("event \(event.name.rawValue), data \(safe)")
-        }.store(in: &subscriptions)
-        player.playbackStatePublisher.sink { [weak self] state in
-            self?.playbackChanged(state)
-        }.store(in: &subscriptions)
+        }
+        player.start()
+        Task { [weak self] in
+            do { try await Task.sleep(nanoseconds: 15_000_000_000) } catch { return }
+            guard let self, self.startupGate.timeout() else { return }
+            self.failOccurrence("player startup timed out")
+        }
         let app = NotificationCenter.default
         for (name, label) in [(NSApplication.didBecomeActiveNotification, "app active"),
                               (NSApplication.didResignActiveNotification, "app inactive"),
@@ -126,9 +132,13 @@ final class PlayerCoordinator: ObservableObject {
                     self.windowOpen = false
                     self.windowGeneration += 1
                     self.playerWindow = nil
+                    self.readinessGate.abandon()
+                    self.readyGeneration = nil
+                    self.ready = false
                     self.queueState.invalidatePlayback()
                     self.invalidateSeek()
                     self.resetProgress()
+                    self.requireRestart("player window closed; retained playback state cannot be safely re-armed")
                 }
             }.store(in: &subscriptions)
         }
@@ -141,23 +151,33 @@ final class PlayerCoordinator: ObservableObject {
         }
     }
 
-    private func playbackChanged(_ state: YouTubePlayer.PlaybackState) {
+    private func playbackChanged(_ state: Int, generation: Int) {
         guard ready, windowOpen, !recoveryRequired else { return }
-        observedPlaying = state == .playing
-        if state == .playing { intent.observe(true); progressEligible = queueState.pending == nil }
-        if state == .paused || state == .ended { intent.observe(false) }
+        // Generation correlation replaces the former fail-closed second-transition
+        // gate: the bridge tags each callback with the generation the coordinator
+        // issued for that player instance, so a Playing/Ended callback is buffered
+        // or processed only when it names the pending or active occurrence. The
+        // tag attributes to an instance, not to authenticated remote video identity.
+        guard queueState.expects(generation: generation) else {
+            record("stale iframe state \(state) generation \(generation); expected \(queueState.expectedGeneration); rejected")
+            return
+        }
+        record("iframe state \(state) generation \(generation)")
+        observedPlaying = state == 1
+        if state == 1 { intent.observe(true); progressEligible = queueState.pending == nil }
+        if state == 2 || state == 0 { intent.observe(false) }
         publishNowPlaying()
         refreshProgress()
-        status = "Playback: \(state)"
+        status = "Playback: \([ -1: "Unstarted", 0: "Ended", 1: "Playing", 2: "Paused", 3: "Buffering", 5: "Cued" ][state] ?? "Unknown")"
         record(status)
-        if state == .playing { queueState.playing() }
-        if state == .ended {
+        if state == 1 { queueState.playing() }
+        if state == 0 {
             if queueState.ended() {
                 if seekGate.seeking { deferredSeekEnd = true }
                 else if mutationInFlight { mutationGate.deferEnd(mutationContext) }
                 else { advanceNaturally() }
             }
-            else { record("ended ignored or buffered; occurrence attribution unavailable") }
+            else { record("ended generation \(generation) ignored or buffered; no armed playing observation") }
         }
     }
 
@@ -175,10 +195,45 @@ final class PlayerCoordinator: ObservableObject {
         publishNowPlaying()
     }
 
+    // Terminal occurrence failure: the session cannot continue safely, so every
+    // in-flight effect is invalidated and a restart is required. Late command
+    // completions are rejected by their generation and lifecycle guards.
+    private func failOccurrence(_ reason: String) {
+        mutationGate.invalidate()
+        readinessGate.abandon()
+        ready = false
+        readyGeneration = nil
+        playerError = true
+        queueState.invalidatePlayback()
+        invalidateSeek()
+        resetProgress()
+        requireRestart(reason)
+    }
+
+    // Readiness is re-derived whenever the pending or active generation changes;
+    // a ready callback for a superseded generation cannot re-enable controls.
+    private func syncReady() {
+        let nowReady = readyGeneration == queueState.expectedGeneration
+        guard nowReady != ready else { return }
+        ready = nowReady
+        publishNowPlaying()
+    }
+
     private func mutationWatchdog(_ token: Int) -> Task<Void, Never> {
         Task {
             do { try await Task.sleep(nanoseconds: 10_000_000_000) } catch { return }
             if mutationGate.timeout(token) { requireRestart("player mutation stalled") }
+        }
+    }
+
+    // Each issued player generation has a bounded readiness watchdog: a load
+    // that completes without a ready callback requires a restart instead of
+    // leaving controls enabled against an unverified instance.
+    private func readinessWatchdog(_ token: Int, generation: Int) -> Task<Void, Never> {
+        Task {
+            do { try await Task.sleep(nanoseconds: 15_000_000_000) } catch { return }
+            guard windowOpen, !recoveryRequired else { return }
+            if readinessGate.timeout(token) { failOccurrence("player generation \(generation) readiness timed out") }
         }
     }
 
@@ -189,9 +244,14 @@ final class PlayerCoordinator: ObservableObject {
         }
         seekGate.invalidate()
         resetProgress()
+        // The new occurrence is not ready yet; controls stay disabled until its
+        // own ready callback names this generation.
+        syncReady()
         guard let token = mutationGate.begin() else { return }
         mutationInFlight = true
         let watchdog = mutationWatchdog(token)
+        let readinessTicket = readinessGate.arm(generation: request.generation)
+        let readinessTask = readinessTicket.map { readinessWatchdog($0, generation: request.generation) }
         let generation = windowGeneration
         publishNowPlaying()
         record("load requested: \(reason.rawValue), target \(next + 1) \(queue[next].videoID), generation \(request.generation)")
@@ -205,63 +265,39 @@ final class PlayerCoordinator: ObservableObject {
             }
             guard windowOpen, generation == windowGeneration else { return }
             do {
-                try await player.load(source: .video(id: queue[next].videoID))
+                // The request generation is strictly greater than every earlier
+                // occurrence, including retries and duplicate video IDs, so the
+                // bridge accepts it and tags this instance's callbacks with it.
+                try await player.load(videoID: queue[next].videoID, generation: request.generation)
                 guard !recoveryRequired, windowOpen, generation == windowGeneration, queueState.pending?.generation == request.generation else { return }
                 let playingCandidate = queueState.hasBufferedPlaying
                 let buffered = queueState.complete(request, success: true)
+                syncReady()
                 progressEligible = playingCandidate && !buffered && ready && windowOpen
                 publishNowPlaying()
                 refreshProgress()
                 record("load command accepted, generation \(request.generation); not proof of playback")
                 if buffered {
-                    record("processing buffered playing/ended pair (unattributed)")
+                    record("processing buffered playing/ended pair for generation \(request.generation)")
                     mutationGate.deferEnd(mutationContext)
                 }
             } catch {
                 guard !recoveryRequired, windowOpen, generation == windowGeneration, queueState.pending?.generation == request.generation else { return }
+                readinessTask?.cancel()
                 _ = queueState.complete(request, success: false)
-                resetProgress()
-                record("load command failed, generation \(request.generation); target marked failed (details redacted)")
+                // DirectPlayer advances its generation before evaluating the load,
+                // so a failed load leaves the previous instance untrusted and its
+                // controls must never re-enable. Fail closed: quarantine the
+                // pending occurrence like a pending error; there is no manual path
+                // that reuses the old occurrence.
+                failOccurrence("load command failed for generation \(request.generation); target marked failed (details redacted)")
             }
         }
     }
 
-    func play() { command("play", wantsPlayback: true) { try await self.player.play() } }
-    func pause() { command("pause", wantsPlayback: false) { try await self.player.pause() } }
+    func play() { command("play", wantsPlayback: true) { generation in try await self.player.play(generation: generation) } }
+    func pause() { command("pause", wantsPlayback: false) { generation in try await self.player.pause(generation: generation) } }
     func next() { select(queueState.nextTarget) }
-    func captureEmissionProbe() {
-        guard canCaptureEmissionProbe, let token = mutationGate.begin() else { return }
-        mutationInFlight = true
-        let generation = windowGeneration
-        let watchdog = mutationWatchdog(token)
-        publishNowPlaying()
-        Task {
-            defer {
-                watchdog.cancel()
-                let advance = mutationGate.finish(token, current: mutationContext)
-                mutationInFlight = false
-                publishNowPlaying()
-                if advance && windowOpen && ready && !recoveryRequired { advanceNaturally() }
-            }
-            do {
-                let snapshot: String = try await player.evaluate(javaScript: .init("JSON.stringify(window.__p0States || [])"), converter: .typeCast(to: String.self))
-                guard windowOpen, generation == windowGeneration, !recoveryRequired else { return }
-                guard let data = snapshot.data(using: .utf8), let rows = try? JSONSerialization.jsonObject(with: data) as? [[Int]], rows.count <= 100,
-                      rows.allSatisfy({ $0.count == 2 && $0[0] >= 0 && [-1, 0, 1, 2, 3, 5].contains($0[1]) }) else {
-                    record("JS emission probe returned invalid data"); return
-                }
-                let truncation = rows.count == 100 ? "potentially truncated; " : ""
-                record("JS emission probe (\(truncation)page milliseconds:state; last 100): " + rows.map { "\($0[0]):\($0[1])" }.joined(separator: ", "))
-            } catch {
-                guard windowOpen, generation == windowGeneration, !recoveryRequired else { return }
-                record("JS emission probe failed (details redacted)")
-            }
-        }
-    }
-    // Capture does not require a ready player, but shares mutation admission so
-    // an evaluation cannot overlap an outstanding load, command, or seek.
-    // Recovery may hide an invalidated but still-running seek, so it is unsafe.
-    var canCaptureEmissionProbe: Bool { windowOpen && !recoveryRequired && !mutationInFlight && !mutationGate.busy && !mutationGate.restartRequired && !seekGate.seeking && queueState.pending == nil }
     var canTransport: Bool { ready && windowOpen && !recoveryRequired && !mutationInFlight && !seekGate.seeking && queueState.pending == nil }
     var canNext: Bool { windowOpen && (ready || playerError) && !recoveryRequired && !mutationInFlight && !seekGate.seeking && queueState.pending == nil && queueState.nextTarget < queue.count }
 
@@ -271,6 +307,7 @@ final class PlayerCoordinator: ObservableObject {
         guard (expectedOccurrence == nil || expectedOccurrence == occurrence), canSeek, seconds.isFinite, let token = seekGate.begin() else { return }
         let target = min(max(0, seconds), duration)
         let generation = windowGeneration
+        let occurrenceGeneration = queueState.activeGeneration
         queueState.markSeekAssisted()
         progressAdmission.invalidate()
         publishNowPlaying()
@@ -292,7 +329,7 @@ final class PlayerCoordinator: ObservableObject {
             }
             do {
                 guard !recoveryRequired, windowOpen, generation == windowGeneration, seekGate.isActive(token) else { return }
-                try await player.seek(to: Measurement(value: target, unit: UnitDuration.seconds))
+                try await player.seek(to: target, generation: occurrenceGeneration)
                 guard windowOpen, generation == windowGeneration, seekGate.isActive(token) else { return }
                 record("seek command accepted; position awaits observation")
             } catch {
@@ -339,12 +376,15 @@ final class PlayerCoordinator: ObservableObject {
             }
             return
         }
+        // Evaluations name the active occurrence; a load completing mid-poll
+        // changes the bridge generation and rejects the stale evaluation.
+        let occurrenceGeneration = queueState.activeGeneration
         Task {
             defer { progressAdmission.finish(id: ticket.id) }
             do {
-                let time = try await player.getCurrentTime().converted(to: .seconds).value
+                let time = try await player.getCurrentTime(generation: occurrenceGeneration)
                 guard progressAdmission.isCurrent(id: ticket.id, generation: ticket.generation) else { return }
-                let length = try await player.getDuration().converted(to: .seconds).value
+                let length = try await player.getDuration(generation: occurrenceGeneration)
                 guard progressAdmission.isCurrent(id: ticket.id, generation: ticket.generation), ready, windowOpen, !recoveryRequired, progressEligible, queueState.pending == nil, !seekGate.seeking else { return }
                 guard let snapshot = ProgressSnapshot(elapsed: time, duration: length) else {
                     elapsed = 0; duration = 0; publishNowPlaying(); return
@@ -354,10 +394,14 @@ final class PlayerCoordinator: ObservableObject {
                 progressTimeoutLogged = false
                 publishNowPlaying()
             } catch {
-                guard progressAdmission.isCurrent(id: ticket.id, generation: ticket.generation) else { return }
+                // A stale evaluation that fails after a generation advance was
+                // already invalidated above and has no effect. A failure on a
+                // still-current ticket names the active occurrence: a ready
+                // instance that cannot answer a basic evaluation cannot be
+                // trusted for further observations, so the session fails closed.
+                guard progressAdmission.isCurrent(id: ticket.id, generation: ticket.generation), !recoveryRequired, windowOpen else { return }
                 elapsed = 0; duration = 0
-                if !progressTimeoutLogged { record("progress evaluation failed (details redacted)"); progressTimeoutLogged = true }
-                publishNowPlaying()
+                requireRestart("progress evaluation failed for the active occurrence")
             }
         }
     }
@@ -365,7 +409,7 @@ final class PlayerCoordinator: ObservableObject {
     private func publishNowPlaying() {
         let center = MPRemoteCommandCenter.shared()
         let available = canTransport
-        remoteEligibility.update(transport: available, next: canNext, seek: canSeek, generation: windowGeneration)
+        remoteEligibility.update(transport: available, next: canNext, seek: canSeek, window: windowGeneration, occurrence: occurrence)
         center.playCommand.isEnabled = available
         center.pauseCommand.isEnabled = available
         center.togglePlayPauseCommand.isEnabled = available
@@ -392,7 +436,7 @@ final class PlayerCoordinator: ObservableObject {
 
     private func setupRemoteCommands() {
         let center = MPRemoteCommandCenter.shared()
-        func register(_ command: MPRemoteCommand, kind: Int, _ action: @escaping @MainActor (Double?) -> MPRemoteCommandHandlerStatus) {
+        func register(_ command: MPRemoteCommand, kind: Int, _ action: @escaping @MainActor (Double?, Int) -> MPRemoteCommandHandlerStatus) {
             let snapshot = remoteEligibility
             let token = command.addTarget { event in
                 // Never synchronously wait for the main queue from a system callback.
@@ -401,32 +445,40 @@ final class PlayerCoordinator: ObservableObject {
                 let eligibility = snapshot.read()
                 guard kind == 0 ? eligibility.transport : (kind == 1 ? eligibility.next : eligibility.seek && position?.isFinite == true) else { return .commandFailed }
                 Task { @MainActor [weak self] in
-                    guard let self, self.windowOpen, self.windowGeneration == eligibility.generation else { return }
-                    if action(position) != .success { self.record("system command rejected (player unavailable or busy)") }
+                    guard let self else { return }
+                    // The snapshot is bound to the window generation and the
+                    // occurrence; a natural advance or window change between the
+                    // system callback and this task discards the command instead
+                    // of applying it to a superseded player.
+                    guard self.windowOpen, self.windowGeneration == eligibility.window, self.occurrence == eligibility.occurrence else {
+                        self.record("system command discarded; window or occurrence superseded")
+                        return
+                    }
+                    if action(position, eligibility.occurrence) != .success { self.record("system command rejected (player unavailable or busy)") }
                 }
                 return .success
             }
             remoteHandlers.append((command, token))
         }
-        register(center.playCommand, kind: 0) { [weak self] _ in
+        register(center.playCommand, kind: 0) { [weak self] _, _ in
             guard let self, self.canTransport else { return .commandFailed }
             self.play(); return .success
         }
-        register(center.pauseCommand, kind: 0) { [weak self] _ in
+        register(center.pauseCommand, kind: 0) { [weak self] _, _ in
             guard let self, self.canTransport else { return .commandFailed }
             self.pause(); return .success
         }
-        register(center.togglePlayPauseCommand, kind: 0) { [weak self] _ in
+        register(center.togglePlayPauseCommand, kind: 0) { [weak self] _, _ in
             guard let self, self.canTransport else { return .commandFailed }
             if self.intent.wantsPlayback { self.pause() } else { self.play() }; return .success
         }
-        register(center.nextTrackCommand, kind: 1) { [weak self] _ in
+        register(center.nextTrackCommand, kind: 1) { [weak self] _, _ in
             guard let self, self.canNext else { return .commandFailed }
             self.next(); return .success
         }
-        register(center.changePlaybackPositionCommand, kind: 2) { [weak self] position in
+        register(center.changePlaybackPositionCommand, kind: 2) { [weak self] position, boundOccurrence in
             guard let self, self.canSeek, let position, position.isFinite else { return .commandFailed }
-            self.seek(to: position); return .success
+            self.seek(to: position, occurrence: boundOccurrence); return .success
         }
     }
 
@@ -445,10 +497,13 @@ final class PlayerCoordinator: ObservableObject {
         record("player window attached: \(window.windowNumber), occlusion-visible=\(window.occlusionState.contains(.visible)); not a visibility proof")
     }
 
-    private func command(_ name: String, wantsPlayback: Bool, action: @escaping @MainActor () async throws -> Void) {
+    private func command(_ name: String, wantsPlayback: Bool, action: @escaping @MainActor (Int) async throws -> Void) {
         guard canTransport, let mutation = mutationGate.begin() else { return }
         let token = intent.admit(wantsPlayback)
         let generation = windowGeneration
+        // No load can interleave with this mutation (select requires
+        // !mutationInFlight), so the active occurrence cannot change underneath it.
+        let occurrenceGeneration = queueState.activeGeneration
         mutationInFlight = true
         let watchdog = mutationWatchdog(mutation)
         publishNowPlaying()
@@ -462,13 +517,13 @@ final class PlayerCoordinator: ObservableObject {
             }
             guard windowOpen, generation == windowGeneration else { return }
             do {
-                try await action()
+                try await action(occurrenceGeneration)
                 guard !recoveryRequired, windowOpen, generation == windowGeneration else { return }
-                record("\(name) command completed")
+                record("\(name) command completed for generation \(occurrenceGeneration)")
             } catch {
                 guard !recoveryRequired, windowOpen, generation == windowGeneration else { return }
                 intent.failed(token)
-                record("\(name) command failed (details redacted)")
+                record("\(name) command failed for generation \(occurrenceGeneration) (details redacted)")
             }
         }
     }
@@ -483,17 +538,14 @@ final class PlayerCoordinator: ObservableObject {
         if log.count > 500 { log.removeFirst(log.count - 500) }
     }
 
-    private static func errorLabel(_ error: YouTubePlayer.Error) -> String {
-        switch error {
-        case .invalidSource: return "invalid source (2)"
-        case .html5NotSupported: return "HTML5 failure (5)"
-        case .notFound: return "unavailable or private (100)"
-        case .embeddedVideoPlayingNotAllowed: return "embedding prohibited (101/150)"
-        case .missingAPIClientIdentification: return "missing client identification (153)"
-        case .iFrameApiFailedToLoad: return "iframe API failed to load"
-        case .webContentProcessDidTerminate: return "web content process terminated"
-        case .setupFailed: return "setup failed (details redacted)"
-        case .didFailProvisionalNavigation, .didFailNavigation: return "navigation failed (details redacted)"
+    private static func errorLabel(_ code: Int) -> String {
+        switch code {
+        case 2: return "invalid source (2)"
+        case 5: return "HTML5 failure (5)"
+        case 100: return "unavailable or private (100)"
+        case 101, 150: return "embedding prohibited (\(code))"
+        case 153: return "missing client identification (153)"
+        default: return "iframe error (\(code))"
         }
     }
 }
