@@ -1,0 +1,933 @@
+{
+  "tracks": [
+    {
+      "id": "same",
+      "title": "hype",
+      "channelTitle": ""
+    },
+    {
+      "id": "same",
+      "title": "dance",
+      "channelTitle": ""
+    },
+    {
+      "id": "steady",
+      "title": "official",
+      "channelTitle": ""
+    },
+    {
+      "id": "chill",
+      "title": "chill",
+      "channelTitle": ""
+    },
+    {
+      "id": "sad",
+      "title": "sad",
+      "channelTitle": ""
+    },
+    {
+      "id": "unknown",
+      "title": "xyz",
+      "channelTitle": ""
+    }
+  ],
+  "classifier": [
+    {
+      "input": {
+        "title": "DANÇA",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "upbeat",
+        "score": 29,
+        "confidence": 0.5925925925925926,
+        "signals": [
+          "title:upbeat:danca"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "xyz",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": []
+      }
+    },
+    {
+      "input": {
+        "title": "xyz",
+        "channelTitle": "",
+        "categoryId": "10"
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 2,
+        "confidence": 0.15384615384615385,
+        "signals": [
+          "category:10"
+        ]
+      }
+    }
+  ],
+  "orders": [
+    {
+      "length": 9,
+      "random": [
+        0,
+        0,
+        0
+      ],
+      "expectedOccurrences": [
+        6,
+        7,
+        8,
+        3,
+        4,
+        5,
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "length": 10,
+      "random": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expectedOccurrences": [
+        6,
+        0,
+        7,
+        1,
+        8,
+        2,
+        9,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "length": 23,
+      "random": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expectedOccurrences": [
+        6,
+        12,
+        7,
+        13,
+        8,
+        14,
+        9,
+        15,
+        10,
+        16,
+        21,
+        3,
+        20,
+        2,
+        19,
+        1,
+        18,
+        0,
+        22,
+        4,
+        11,
+        17,
+        5
+      ]
+    },
+    {
+      "length": 24,
+      "random": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expectedOccurrences": [
+        6,
+        12,
+        18,
+        7,
+        13,
+        19,
+        8,
+        14,
+        20,
+        9,
+        15,
+        21,
+        10,
+        16,
+        22,
+        3,
+        11,
+        17,
+        2,
+        23,
+        5,
+        1,
+        0,
+        4
+      ]
+    }
+  ],
+  "classifierV1": [
+    {
+      "input": {
+        "title": "DANÇA",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "upbeat",
+        "score": 29,
+        "confidence": 0.5925925925925926,
+        "signals": [
+          "title:upbeat:danca"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "İ DANCE",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "upbeat",
+        "score": 29,
+        "confidence": 0.5925925925925926,
+        "signals": [
+          "title:upbeat:dance"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "DANÇ᪰A",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": []
+      }
+    },
+    {
+      "input": {
+        "title": "GROOVE",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "steady",
+        "score": 29,
+        "confidence": 0.3720930232558139,
+        "signals": [
+          "title:upbeat:groove",
+          "title:steady:groove"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "pump up remix dance",
+        "channelTitle": "sad chill",
+        "description": "slow version official",
+        "tags": [
+          "lofi",
+          "hype"
+        ],
+        "categoryId": " 10 ",
+        "duration": 180
+      },
+      "expected": {
+        "bucket": "hype",
+        "score": 58,
+        "confidence": 0.49612403100775193,
+        "signals": [
+          "title:hype:pump",
+          "title:upbeat:dance",
+          "channelTitle:chill:chill",
+          "channelTitle:melancholy:sad",
+          "description:steady:version",
+          "description:melancholy:slow",
+          "tags:hype:hype",
+          "tags:chill:lofi",
+          "duration:short",
+          "category:10"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "xyz",
+        "channelTitle": "",
+        "duration": 0
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": []
+      }
+    },
+    {
+      "input": {
+        "title": "xyz",
+        "channelTitle": "",
+        "duration": 180
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 7,
+        "confidence": 0.275,
+        "signals": [
+          "duration:short"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "xyz",
+        "channelTitle": "",
+        "duration": 180.001
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 5,
+        "confidence": 0.22222222222222224,
+        "signals": [
+          "duration:mid"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "xyz",
+        "channelTitle": "",
+        "duration": 270
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 5,
+        "confidence": 0.22222222222222224,
+        "signals": [
+          "duration:mid"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "xyz",
+        "channelTitle": "",
+        "duration": 270.001
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 6,
+        "confidence": 0.27027027027027023,
+        "signals": [
+          "duration:long"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "xyz",
+        "channelTitle": "",
+        "duration": 420
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 6,
+        "confidence": 0.27027027027027023,
+        "signals": [
+          "duration:long"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "xyz",
+        "channelTitle": "",
+        "duration": 420.001
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 7,
+        "confidence": 0.275,
+        "signals": [
+          "duration:very-long"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "hype dance",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "upbeat",
+        "score": 29,
+        "confidence": 0.3720930232558139,
+        "signals": [
+          "title:hype:hype",
+          "title:upbeat:dance"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "SADNESS slowed",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "melancholy",
+        "score": 29,
+        "confidence": 0.5925925925925926,
+        "signals": [
+          "title:melancholy:sad"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "xyz",
+        "channelTitle": "",
+        "categoryId": "  10  "
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 2,
+        "confidence": 0.15384615384615385,
+        "signals": [
+          "category:10"
+        ]
+      }
+    },
+    {
+      "input": {
+        "title": "ＦＵＮ",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": []
+      }
+    }
+  ],
+  "v1": [
+    {
+      "name": "normal-empty",
+      "mode": "normal",
+      "tracks": [],
+      "draws": [],
+      "expectedOccurrences": []
+    },
+    {
+      "name": "normal-single",
+      "mode": "normal",
+      "tracks": [
+        {
+          "id": "one",
+          "title": "one",
+          "channelTitle": ""
+        }
+      ],
+      "draws": [],
+      "expectedOccurrences": [
+        0
+      ]
+    },
+    {
+      "name": "normal-boundaries",
+      "mode": "normal",
+      "tracks": [
+        {
+          "id": "same",
+          "title": "a",
+          "channelTitle": ""
+        },
+        {
+          "id": "same",
+          "title": "b",
+          "channelTitle": ""
+        },
+        {
+          "id": "same",
+          "title": "c",
+          "channelTitle": ""
+        },
+        {
+          "id": "same",
+          "title": "d",
+          "channelTitle": ""
+        },
+        {
+          "id": "same",
+          "title": "e",
+          "channelTitle": ""
+        }
+      ],
+      "draws": [
+        0.9999999999999999,
+        0.5,
+        0.3333333333333333,
+        0
+      ],
+      "expectedOccurrences": [
+        3,
+        0,
+        1,
+        2,
+        4
+      ]
+    },
+    {
+      "name": "normal-nonzero",
+      "mode": "normal",
+      "tracks": [
+        {
+          "id": "a",
+          "title": "a",
+          "channelTitle": ""
+        },
+        {
+          "id": "b",
+          "title": "b",
+          "channelTitle": ""
+        },
+        {
+          "id": "c",
+          "title": "c",
+          "channelTitle": ""
+        },
+        {
+          "id": "d",
+          "title": "d",
+          "channelTitle": ""
+        },
+        {
+          "id": "e",
+          "title": "e",
+          "channelTitle": ""
+        },
+        {
+          "id": "f",
+          "title": "f",
+          "channelTitle": ""
+        }
+      ],
+      "draws": [
+        0.2,
+        0.8,
+        0.25,
+        0.75,
+        0.5
+      ],
+      "expectedOccurrences": [
+        0,
+        3,
+        2,
+        5,
+        4,
+        1
+      ]
+    },
+    {
+      "name": "smart-empty",
+      "mode": "smart",
+      "tracks": [],
+      "draws": [],
+      "expectedOccurrences": []
+    },
+    {
+      "name": "smart-single",
+      "mode": "smart",
+      "tracks": [
+        {
+          "id": "chill",
+          "title": "chill",
+          "channelTitle": ""
+        }
+      ],
+      "draws": [],
+      "expectedOccurrences": [
+        0
+      ]
+    },
+    {
+      "name": "smart-tie-unknown",
+      "mode": "smart",
+      "tracks": [
+        {
+          "id": "hype",
+          "title": "hype",
+          "channelTitle": ""
+        },
+        {
+          "id": "sad",
+          "title": "sad",
+          "channelTitle": ""
+        },
+        {
+          "id": "xyz",
+          "title": "xyz",
+          "channelTitle": ""
+        },
+        {
+          "id": "xyz",
+          "title": "xyz",
+          "channelTitle": ""
+        },
+        {
+          "id": "dance",
+          "title": "dance",
+          "channelTitle": ""
+        },
+        {
+          "id": "chill",
+          "title": "chill",
+          "channelTitle": ""
+        },
+        {
+          "id": "official",
+          "title": "official",
+          "channelTitle": ""
+        },
+        {
+          "id": "xyz",
+          "title": "xyz",
+          "channelTitle": ""
+        },
+        {
+          "id": "hype",
+          "title": "hype",
+          "channelTitle": ""
+        },
+        {
+          "id": "sad",
+          "title": "sad",
+          "channelTitle": ""
+        }
+      ],
+      "draws": [
+        0.9,
+        0.2,
+        0.75,
+        0.5
+      ],
+      "expectedOccurrences": [
+        0,
+        8,
+        4,
+        6,
+        2,
+        3,
+        5,
+        7,
+        9,
+        1
+      ]
+    },
+    {
+      "name": "smart-only-unknown",
+      "mode": "smart",
+      "tracks": [
+        {
+          "id": "a",
+          "title": "a",
+          "channelTitle": ""
+        },
+        {
+          "id": "b",
+          "title": "b",
+          "channelTitle": ""
+        },
+        {
+          "id": "c",
+          "title": "c",
+          "channelTitle": ""
+        },
+        {
+          "id": "d",
+          "title": "d",
+          "channelTitle": ""
+        }
+      ],
+      "draws": [
+        0.9999999999999999,
+        0.5,
+        0
+      ],
+      "expectedOccurrences": [
+        2,
+        0,
+        1,
+        3
+      ]
+    },
+    {
+      "name": "smart-mixed",
+      "mode": "smart",
+      "tracks": [
+        {
+          "id": "item-0",
+          "title": "hype",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-1",
+          "title": "dance",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-2",
+          "title": "official",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-3",
+          "title": "chill",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-4",
+          "title": "sad",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-5",
+          "title": "xyz",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-6",
+          "title": "hype",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-7",
+          "title": "dance",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-8",
+          "title": "official",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-9",
+          "title": "chill",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-10",
+          "title": "sad",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-11",
+          "title": "xyz",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-12",
+          "title": "hype",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-13",
+          "title": "dance",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-14",
+          "title": "official",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-15",
+          "title": "chill",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-16",
+          "title": "sad",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-17",
+          "title": "xyz",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-18",
+          "title": "hype",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-19",
+          "title": "dance",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-20",
+          "title": "official",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-21",
+          "title": "chill",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-22",
+          "title": "sad",
+          "channelTitle": ""
+        },
+        {
+          "id": "item-23",
+          "title": "xyz",
+          "channelTitle": ""
+        }
+      ],
+      "draws": [
+        0.01,
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        0.99,
+        0.13,
+        0.37,
+        0.51,
+        0.74,
+        0.95,
+        0.42,
+        0.66,
+        0.23,
+        0.87,
+        0.31,
+        0.57,
+        0.79
+      ],
+      "expectedOccurrences": [
+        6,
+        12,
+        18,
+        1,
+        7,
+        19,
+        20,
+        14,
+        8,
+        9,
+        3,
+        21,
+        22,
+        10,
+        4,
+        15,
+        5,
+        17,
+        2,
+        23,
+        11,
+        13,
+        0,
+        16
+      ]
+    },
+    {
+      "name": "smart-nearest-tie",
+      "mode": "smart",
+      "tracks": [
+        {
+          "id": "official",
+          "title": "official",
+          "channelTitle": ""
+        },
+        {
+          "id": "sad",
+          "title": "sad",
+          "channelTitle": ""
+        },
+        {
+          "id": "dance",
+          "title": "dance",
+          "channelTitle": ""
+        },
+        {
+          "id": "sad",
+          "title": "sad",
+          "channelTitle": ""
+        },
+        {
+          "id": "dance",
+          "title": "dance",
+          "channelTitle": ""
+        },
+        {
+          "id": "xyz",
+          "title": "xyz",
+          "channelTitle": ""
+        }
+      ],
+      "draws": [
+        0.5,
+        0.9999999999999999
+      ],
+      "expectedOccurrences": [
+        1,
+        5,
+        0,
+        2,
+        4,
+        3
+      ]
+    }
+  ]
+}

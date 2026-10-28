@@ -132,7 +132,7 @@ Use a separate versioned JSON exchange format, shared by browser and Mac:
 - Do not deduplicate repeated video occurrences by YouTube ID or confuse `LocalPlayEvent.videoId` with a YouTube ID.
 - Export a consistent IndexedDB snapshot. Exclude credentials, media, transient playback progress, daily-suggestion cache, and active queue/UI preferences in v1; explain these exclusions in the UI.
 - Validate file size/count limits, schema, IDs, dates, referential integrity, and strings before committing. Future/unknown major versions fail safely. Define explicit migrations as the format evolves.
-- Default import is a previewed merge by stable record IDs: repeated imports are idempotent; identical records are ignored, missing records added, conflicting records remain unchanged with an explicit summary. Preserve intentional repeated occurrences with different IDs.
+- Default import is a previewed merge with verified occurrence continuity or explicit evidence-backed user confirmation; equal IDs alone do not establish continuity. Repeated imports are idempotent only when mappings remain safe; identical records are ignored, missing records added, conflicting records remain unchanged with an explicit summary. Preserve intentional repeated occurrences with different IDs.
 - Omit/report orphan history without silently attaching it to unrelated videos. Invalid input must not partially replace the existing library.
 - Native export produces the same portable format. Browser restore/import can be a later addition; browser export and native import/export are required initially.
 
@@ -197,6 +197,10 @@ No phase is implemented by saving this document. `ship` should read this file, p
 - Add Smart classifier/ordering and queue-identity fixtures. Inject reproducible random inputs for cross-language comparisons; cover unknown metadata, Unicode normalization, repeated occurrences, and 10/24-track wave boundaries.
 - Define owner auth errors, local/cloud deletion distinctions, and transfer validation/merge behavior before separate clients implement them.
 - **Validation owner:** parent; @fast-generic runs relevant Vitest checks. No live YouTube quota is required for fixtures.
+
+P1 contract artifacts live in `shared/contracts/` and portable JSON vectors in `shared/fixtures/`. Existing handler examples are explicitly separate from proposed owner API and transfer v1. The proposed merge specifies stable-ID reconciliation, orphan omission/reporting and atomic transactions; neither an importer nor transactional behavior is implemented by these vectors. Existing browser video keys are composite and duplicate YouTube occurrences overwritten by IndexedDB cannot be recovered. Local delete can leave orphan history; cloud unlink is distinct. Shuffle vectors use specified injected draws and occurrence identities; Swift parity remains unverified. P1 does not resolve P0 hidden/minimized playback or YouTube policy questions.
+
+P1 transfer integration gate: all matched occurrences, including equal legacy composite IDs and cross-device copies, require verified continuity or an explicit evidence-backed user mapping; V1 supplies no trusted provenance by default; ambiguous history stays unmapped with non-destructive recovery. Both clients must consume the transfer and sync vectors. Before shipping transfer, every destructive refresh route, including re-import of an existing playlist, must atomically preserve/remap occurrence and history references or be blocked without writes; current browser sync does not meet this requirement. IndexedDB optional own `undefined` maps to wire absence before validation; null and malformed values remain errors. These are proposed requirements, not implemented behavior.
 
 ### P2 — Shared owner authentication, bookmark database, and API protection
 
