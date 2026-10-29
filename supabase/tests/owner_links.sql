@@ -21,6 +21,13 @@ begin
      or pg_has_role('authenticated', 'tubeshuffle_link_executor', 'SET') then
     raise exception 'client can inherit or set executor role';
   end if;
+  if exists (select 1 from pg_catalog.pg_roles where rolname = 'tubeshuffle_link_executor'
+      and (rolsuper or rolbypassrls or rolcanlogin))
+     or exists (select 1 from pg_catalog.pg_auth_members where member = 'tubeshuffle_link_executor'::regrole)
+     or not has_schema_privilege('authenticated', 'auth', 'USAGE')
+     or not has_function_privilege('authenticated', 'auth.uid()', 'EXECUTE') then
+    raise exception 'unexpected executor role or auth access';
+  end if;
   if has_schema_privilege('tubeshuffle_link_executor', 'public', 'CREATE')
      or has_table_privilege('tubeshuffle_link_executor', 'private.approved_owner', 'INSERT')
      or has_table_privilege('tubeshuffle_link_executor', 'public.playlist_links', 'DELETE')

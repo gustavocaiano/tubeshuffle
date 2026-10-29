@@ -1,6 +1,8 @@
 # Owner links database
 
-The initial migration was applied to the TubeShuffle project on 2026-10-29 through the Supabase Management API and recorded as version `20261029131212`. The recorded SQL was verified to match the local migration exactly. The owner pin is not yet configured; live authorization and deployment gates remain open.
+The initial migration was applied to the TubeShuffle project on 2026-10-29 through the Supabase Management API and recorded as version `20261029131212`. The recorded SQL was verified to match the local migration exactly. The verified Google account has been pinned in the database; matching production server configuration and live authorization and deployment gates remain open.
+
+The follow-on owner-RPC correction was applied on 2026-10-29 through the Management API and recorded as version `20261029170816`; the recorded SQL was verified against the local migration. User-approved testing against the existing project does not establish live gateway/JWT claim isolation, direct Data API security or production readiness.
 
 Apply the migration only to an approved Supabase project using an administrative migration role capable of creating roles and assigning function ownership. It creates no owner pin. Verify a Google identity out of band, then, with protected traffic blocked, an administrator may insert exactly one verified UUID into `private.approved_owner (singleton, user_id)` and configure the same UUID as the server pin. Never expose the private schema in the Data API. Rotate by blocking traffic, changing both pins administratively, testing old and new sessions, then reopening; deleting/recreating an account requires re-verification. Do not put UUIDs or credentials in scripts or logs.
 
