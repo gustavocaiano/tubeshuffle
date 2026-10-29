@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,13 +20,14 @@ import type { LocalPlaylist } from "@/types/playlist";
 interface PlaylistCardProps {
   playlist: LocalPlaylist;
   onDelete: (id: string) => void;
-  onSync: (id: string) => void;
 }
 
-export function PlaylistCard({ playlist, onDelete, onSync }: PlaylistCardProps) {
+export function PlaylistCard({ playlist, onDelete }: PlaylistCardProps) {
   const hideThumbnails = useUiPreferencesStore((state) => state.hideThumbnails);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
+    <>
     <Card className="group overflow-hidden rounded-[1.75rem] border-white/10 bg-white/[0.055] text-white shadow-2xl shadow-black/20 transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.08] hover:shadow-black/40">
       <div className="relative aspect-video overflow-hidden bg-white/10">
         {playlist.thumbnail && !hideThumbnails ? (
@@ -73,6 +76,7 @@ export function PlaylistCard({ playlist, onDelete, onSync }: PlaylistCardProps) 
               <Button
                 variant="ghost"
                 size="icon"
+                aria-label={`Actions for ${playlist.title}`}
                 className="h-8 w-8 shrink-0 text-white/70 hover:bg-white/10 hover:text-white"
               >
                 <MoreVertical className="h-4 w-4" />
@@ -85,13 +89,13 @@ export function PlaylistCard({ playlist, onDelete, onSync }: PlaylistCardProps) 
                   Shuffle & Play
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onSync(playlist.id)}>
+              <DropdownMenuItem disabled>
                 <RefreshCw className="mr-2 h-4 w-4" />
-                Sync with YouTube
+                Sync with YouTube (unavailable)
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-red-300 focus:text-red-200"
-                onClick={() => onDelete(playlist.id)}
+                onSelect={() => setConfirmDelete(true)}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
@@ -113,5 +117,20 @@ export function PlaylistCard({ playlist, onDelete, onSync }: PlaylistCardProps) 
         </div>
       </CardContent>
     </Card>
+    <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete this playlist?</DialogTitle>
+          <DialogDescription>
+            Deleting “{playlist.title}” makes its associated watch history unusable and omits it from exports. Reimporting the playlist cannot recover that history.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+          <Button className="bg-red-700 text-white hover:bg-red-600" onClick={() => { setConfirmDelete(false); onDelete(playlist.id); }}>Delete playlist</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

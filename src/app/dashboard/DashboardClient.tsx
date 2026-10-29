@@ -18,6 +18,7 @@ import { ImageOff, Music, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useUiPreferencesStore } from "@/stores/ui-preferences-store";
 import { AccountPanel } from "@/components/playlist/AccountPanel";
+import { ExportLibrary } from "./ExportLibrary";
 
 const Navbar = dynamic(
   () => import("@/components/layouts/Navbar").then((module) => module.Navbar),
@@ -38,15 +39,6 @@ export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
     mutationFn: (id: string) => playlistRepository.deletePlaylist(id),
     onSuccess: () => {
       toast.success("Playlist deleted");
-      queryClient.invalidateQueries({ queryKey: ["playlists"] });
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
-
-  const syncMutation = useMutation({
-    mutationFn: (id: string) => playlistRepository.syncPlaylist(id),
-    onSuccess: () => {
-      toast.success("Playlist synced with YouTube");
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -79,6 +71,7 @@ export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
               </div>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
+              <ExportLibrary />
               <Button
                 variant="outline"
                 onClick={toggleHideThumbnails}
@@ -143,7 +136,6 @@ export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
                   key={playlist.id}
                   playlist={playlist}
                   onDelete={(id) => deleteMutation.mutate(id)}
-                  onSync={(id) => syncMutation.mutate(id)}
                 />
               ))}
             </div>
