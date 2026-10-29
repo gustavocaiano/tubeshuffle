@@ -28,7 +28,7 @@ enum LibraryStorageKey {
     var updatedAt: String
 
     init(_ value: LibraryPlaylist) {
-        id = value.id.rawValue; key = LibraryStorageKey.encode(id)
+        id = value.id.rawValue; key = LibraryStorageKey.encode(value.id.rawValue)
         youtubeId = value.youtubeId; title = value.title; detail = value.description
         thumbnail = value.thumbnail; channelTitle = value.channelTitle; videoCount = value.videoCount
         createdAt = value.createdAt; updatedAt = value.updatedAt
@@ -59,8 +59,8 @@ enum LibraryStorageKey {
     var publishedAt: String?
 
     init(_ value: LibraryOccurrence) {
-        id = value.id.rawValue; key = LibraryStorageKey.encode(id)
-        playlistId = value.playlistId.rawValue; playlistKey = LibraryStorageKey.encode(playlistId)
+        id = value.id.rawValue; key = LibraryStorageKey.encode(value.id.rawValue)
+        playlistId = value.playlistId.rawValue; playlistKey = LibraryStorageKey.encode(value.playlistId.rawValue)
         youtubeId = value.youtubeId; title = value.title; channelTitle = value.channelTitle
         thumbnail = value.thumbnail; duration = value.duration; position = value.position
         viewCount = value.viewCount; likeCount = value.likeCount; detail = value.description
@@ -86,9 +86,9 @@ enum LibraryStorageKey {
     var completed: Bool
 
     init(_ value: LibraryHistoryEvent) {
-        id = value.id.rawValue; key = LibraryStorageKey.encode(id)
-        playlistId = value.playlistId.rawValue; playlistKey = LibraryStorageKey.encode(playlistId)
-        videoId = value.videoId.rawValue; videoKey = LibraryStorageKey.encode(videoId)
+        id = value.id.rawValue; key = LibraryStorageKey.encode(value.id.rawValue)
+        playlistId = value.playlistId.rawValue; playlistKey = LibraryStorageKey.encode(value.playlistId.rawValue)
+        videoId = value.videoId.rawValue; videoKey = LibraryStorageKey.encode(value.videoId.rawValue)
         watchedAt = value.watchedAt; watchedSeconds = value.watchedSeconds; completed = value.completed
     }
     var value: LibraryHistoryEvent {
