@@ -6,6 +6,14 @@ import vectors from "../../shared/fixtures/smart.json";
 afterEach(() => vi.restoreAllMocks());
 
 describe("shuffle-v1 portable corpus against TypeScript", () => {
+  it.each(vectors.classifierDifferential)("differential classifier: $name", ({ input, expected }) => {
+    const result = classifyEnergyTrack(input);
+    expect(result.bucket).toBe(expected.bucket);
+    expect(result.score).toBe(expected.score);
+    expect(result.signals).toEqual(expected.signals);
+    expect(Math.abs(result.confidence - expected.confidence)).toBeLessThanOrEqual(1e-12);
+  });
+
   it.each(vectors.classifierV1)("classifies $input.title", ({ input, expected }) => {
     const result = classifyEnergyTrack(input);
     expect(result.bucket).toBe(expected.bucket);

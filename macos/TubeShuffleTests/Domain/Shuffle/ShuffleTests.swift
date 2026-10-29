@@ -5,7 +5,13 @@ import XCTest
 final class ShuffleTests: XCTestCase {
     private struct Corpus: Decodable {
         let classifierV1: [ClassifierCase]
+        let classifierDifferential: [DifferentialCase]
         let v1: [OrderCase]
+    }
+    private struct DifferentialCase: Decodable {
+        let name: String
+        let input: EnergyTrackInput
+        let expected: TrackEnergyProfile
     }
     private struct ClassifierCase: Decodable {
         let input: EnergyTrackInput
@@ -30,7 +36,18 @@ final class ShuffleTests: XCTestCase {
             XCTAssertEqual(actual.bucket, vector.expected.bucket, vector.input.title)
             XCTAssertEqual(actual.score, vector.expected.score, vector.input.title)
             XCTAssertEqual(actual.confidence, vector.expected.confidence, accuracy: 1e-12, vector.input.title)
-            XCTAssertEqual(actual.signals, vector.expected.signals, vector.input.title)
+            XCTAssertEqual(actual.signals.map { Array($0.utf16) }, vector.expected.signals.map { Array($0.utf16) }, vector.input.title)
+        }
+    }
+
+    func testDifferentialClassifierVectors() throws {
+        for vector in try corpus().classifierDifferential {
+            let actual = ShuffleV1.classify(vector.input)
+            XCTAssertEqual(actual.bucket, vector.expected.bucket, vector.name)
+            XCTAssertEqual(actual.score, vector.expected.score, vector.name)
+            XCTAssertEqual(actual.confidence, vector.expected.confidence, accuracy: 1e-12, vector.name)
+            // Swift String equality is canonically equivalent, unlike JS's UTF-16 equality.
+            XCTAssertEqual(actual.signals.map { Array($0.utf16) }, vector.expected.signals.map { Array($0.utf16) }, vector.name)
         }
     }
 

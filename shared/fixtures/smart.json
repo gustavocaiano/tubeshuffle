@@ -212,6 +212,381 @@
       ]
     }
   ],
+  "classifierDifferential": [
+    {
+      "name": "composed cedilla",
+      "input": {
+        "title": "DANÇA",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "upbeat",
+        "score": 29,
+        "confidence": 0.5925925925925926,
+        "signals": [
+          "title:upbeat:danca"
+        ]
+      }
+    },
+    {
+      "name": "decomposed cedilla",
+      "input": {
+        "title": "DANÇA",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "upbeat",
+        "score": 29,
+        "confidence": 0.5925925925925926,
+        "signals": [
+          "title:upbeat:danca"
+        ]
+      }
+    },
+    {
+      "name": "composed acute in term",
+      "input": {
+        "title": "HÝPE",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "hype",
+        "score": 29,
+        "confidence": 0.5925925925925926,
+        "signals": [
+          "title:hype:hype"
+        ]
+      }
+    },
+    {
+      "name": "decomposed acute in term",
+      "input": {
+        "title": "HÝPE",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "hype",
+        "score": 29,
+        "confidence": 0.5925925925925926,
+        "signals": [
+          "title:hype:hype"
+        ]
+      }
+    },
+    {
+      "name": "combining range lower boundary",
+      "input": {
+        "title": "HỲPE",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "hype",
+        "score": 29,
+        "confidence": 0.5925925925925926,
+        "signals": [
+          "title:hype:hype"
+        ]
+      }
+    },
+    {
+      "name": "combining range upper boundary",
+      "input": {
+        "title": "HYͯPE",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "hype",
+        "score": 29,
+        "confidence": 0.5925925925925926,
+        "signals": [
+          "title:hype:hype"
+        ]
+      }
+    },
+    {
+      "name": "mark above range interrupts literal",
+      "input": {
+        "title": "HY᪰PE",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": []
+      }
+    },
+    {
+      "name": "mark below range interrupts literal",
+      "input": {
+        "title": "HY˿PE",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": []
+      }
+    },
+    {
+      "name": "supplementary mark interrupts literal",
+      "input": {
+        "title": "HY𝅥PE",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": []
+      }
+    },
+    {
+      "name": "mark after literal leaves match",
+      "input": {
+        "title": "HYPE᪰",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "hype",
+        "score": 29,
+        "confidence": 0.5925925925925926,
+        "signals": [
+          "title:hype:hype"
+        ]
+      }
+    },
+    {
+      "name": "kelvin sign canonically decomposes in term",
+      "input": {
+        "title": "PHONK",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "hype",
+        "score": 29,
+        "confidence": 0.5925925925925926,
+        "signals": [
+          "title:hype:phonk"
+        ]
+      }
+    },
+    {
+      "name": "long s is not case folded into ascii",
+      "input": {
+        "title": "ſad",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": []
+      }
+    },
+    {
+      "name": "dotted capital I decomposition",
+      "input": {
+        "title": "CHİLL",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "chill",
+        "score": 29,
+        "confidence": 0.5925925925925926,
+        "signals": [
+          "title:chill:chill"
+        ]
+      }
+    },
+    {
+      "name": "compatibility ligature not expanded",
+      "input": {
+        "title": "ofﬁcial",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": []
+      }
+    },
+    {
+      "name": "literal substring and rule order",
+      "input": {
+        "title": "unhappy groove slowed",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "melancholy",
+        "score": 29,
+        "confidence": 0.3720930232558139,
+        "signals": [
+          "title:upbeat:happy",
+          "title:steady:groove",
+          "title:melancholy:slow"
+        ]
+      }
+    },
+    {
+      "name": "space literal does not match nbsp",
+      "input": {
+        "title": "sped up",
+        "channelTitle": ""
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": []
+      }
+    },
+    {
+      "name": "joined tags introduce literal space",
+      "input": {
+        "title": "",
+        "channelTitle": "",
+        "tags": [
+          "sped",
+          "up"
+        ]
+      },
+      "expected": {
+        "bucket": "hype",
+        "score": 19,
+        "confidence": 0.48837209302325574,
+        "signals": [
+          "tags:hype:sped up"
+        ]
+      }
+    },
+    {
+      "name": "all ecmascript trim characters",
+      "input": {
+        "title": "",
+        "channelTitle": "",
+        "categoryId": "\t\n\u000b\f\r                  　﻿10﻿　\t"
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 2,
+        "confidence": 0.15384615384615385,
+        "signals": [
+          "category:10"
+        ]
+      }
+    },
+    {
+      "name": "non ecmascript whitespace retained",
+      "input": {
+        "title": "",
+        "channelTitle": "",
+        "categoryId": "10"
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": [
+          "category:10"
+        ]
+      }
+    },
+    {
+      "name": "zero width space retained",
+      "input": {
+        "title": "",
+        "channelTitle": "",
+        "categoryId": "​10​"
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": [
+          "category:​10​"
+        ]
+      }
+    },
+    {
+      "name": "category composed exact signal",
+      "input": {
+        "title": "",
+        "channelTitle": "",
+        "categoryId": " é "
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": [
+          "category:é"
+        ]
+      }
+    },
+    {
+      "name": "category decomposed exact signal",
+      "input": {
+        "title": "",
+        "channelTitle": "",
+        "categoryId": " é "
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": [
+          "category:é"
+        ]
+      }
+    },
+    {
+      "name": "non-bmp category exact signal",
+      "input": {
+        "title": "",
+        "channelTitle": "",
+        "categoryId": " 🎵 "
+      },
+      "expected": {
+        "bucket": "unknown",
+        "score": 0,
+        "confidence": 0,
+        "signals": [
+          "category:🎵"
+        ]
+      }
+    },
+    {
+      "name": "all fields normalized independently",
+      "input": {
+        "title": "DANÇA",
+        "channelTitle": "HÝPE",
+        "description": "ch᪰ill",
+        "tags": [
+          "SAD",
+          "groove"
+        ],
+        "duration": 180,
+        "categoryId": "﻿10 "
+      },
+      "expected": {
+        "bucket": "upbeat",
+        "score": 61,
+        "confidence": 0.5714285714285714,
+        "signals": [
+          "title:upbeat:danca",
+          "channelTitle:hype:hype",
+          "tags:upbeat:groove",
+          "tags:steady:groove",
+          "tags:melancholy:sad",
+          "duration:short",
+          "category:10"
+        ]
+      }
+    }
+  ],
   "classifierV1": [
     {
       "input": {
