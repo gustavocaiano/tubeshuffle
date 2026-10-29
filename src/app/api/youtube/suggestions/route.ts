@@ -42,10 +42,11 @@ type ValidatedSuggestionsRequest = {
   refreshToken?: string;
 };
 
-type ApiError = {
-  status: number;
-  message: string;
-};
+class ApiError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
 
 type SearchItem = {
   id?: { videoId?: string };
@@ -95,14 +96,14 @@ async function fetchYouTubeJson<T>(
     const upstreamCode = payload.error?.code ?? response.status;
 
     if (upstreamCode === 403) {
-      throw { status: 502, message: "YouTube API request rejected or quota exceeded" } satisfies ApiError;
+      throw new ApiError(502, "YouTube API request rejected or quota exceeded");
     }
 
     if (upstreamCode === 429) {
-      throw { status: 429, message: "YouTube API rate limit exceeded" } satisfies ApiError;
+      throw new ApiError(429, "YouTube API rate limit exceeded");
     }
 
-    throw { status: 502, message: payload.error?.message ?? "YouTube API request failed" } satisfies ApiError;
+    throw new ApiError(502, "YouTube API request failed");
   }
 
   return payload as T;
@@ -183,7 +184,7 @@ function assertRateLimit(clientKey: string): void {
   }
 
   if (current.count >= RATE_LIMIT_MAX_REQUESTS) {
-    throw { status: 429, message: "Daily suggestions are temporarily rate limited" } satisfies ApiError;
+    throw new ApiError(429, "Daily suggestions are temporarily rate limited");
   }
 
   current.count += 1;
@@ -191,13 +192,13 @@ function assertRateLimit(clientKey: string): void {
 
 function validateBody(body: unknown): ValidatedSuggestionsRequest {
   if (!isRecord(body)) {
-    throw { status: 400, message: "Invalid suggestions request body" } satisfies ApiError;
+    throw new ApiError(400, "Invalid suggestions request body");
   }
 
   const input = body as SuggestionsRequest;
   const playlistId = typeof input.playlistId === "string" ? input.playlistId.trim() : "";
   if (!playlistId || playlistId.length > 120) {
-    throw { status: 400, message: "Missing or invalid playlist id" } satisfies ApiError;
+    throw new ApiError(400, "Missing or invalid playlist id");
   }
 
   const seeds = Array.isArray(input.seeds)
@@ -211,7 +212,7 @@ function validateBody(body: unknown): ValidatedSuggestionsRequest {
         .slice(0, MAX_SEEDS)
     : [];
   if (seeds.length === 0) {
-    throw { status: 400, message: "At least one suggestion seed is required" } satisfies ApiError;
+    throw new ApiError(400, "At least one suggestion seed is required");
   }
 
   return {
@@ -587,14 +588,8 @@ async function handlePost(request: Request) {
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "status" in error &&
-      "message" in error
-    ) {
-      const { status, message } = error as ApiError;
-      return jsonError(status, message);
+    if (error instanceof ApiError) {
+      return jsonError(error.status, error.message);
     }
 
     return jsonError(500, "Unexpected server error");
