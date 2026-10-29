@@ -128,6 +128,23 @@ final class APIClientTests: XCTestCase {
         XCTAssertTrue(called)
     }
 
+    func testClientRejectsLateSuccessfulTransportCompletionAfterCancellation() async throws {
+        let started = expectation(description: "transport started")
+        let finished = expectation(description: "client finished")
+        let transport = ControlledTransport(started: started)
+        let client = try APIClient(origin: URL(string: "https://example.test")!, transport: transport)
+        let task = Task {
+            defer { finished.fulfill() }
+            do { _ = try await client.links(); XCTFail("cancelled client returned late success") }
+            catch { XCTAssertTrue(error is CancellationError, "Expected CancellationError, got \(error)") }
+        }
+        defer { task.cancel(); transport.complete() }
+        await fulfillment(of: [started], timeout: 5)
+        task.cancel()
+        transport.complete()
+        await fulfillment(of: [finished], timeout: 5)
+    }
+
     func testConcurrentTransportUseAndCleanup() async throws {
         var adapter: URLSessionAPITransport? = URLSessionAPITransport(protocolClasses: [SuccessfulProtocol.self])
         weak var weakAdapter = adapter
@@ -159,6 +176,42 @@ final class APIClientTests: XCTestCase {
             stub.handler = { self.response($0, 503, "", headers: ["Retry-After": value]) }
             do { _ = try await client.links(); XCTFail("expected status error") }
             catch { XCTAssertEqual(error as? APIClientError, .http(status: 503, retryAfter: nil, kind: .unknown)) }
+        }
+    }
+}
+
+// Ignores cancellation deliberately so the client must reject a late 200 itself.
+private final class ControlledTransport: APITransport {
+    private let lock = NSLock()
+    private let started: XCTestExpectation
+    private var continuation: CheckedContinuation<(Data, URLResponse), Error>?
+    private var request: URLRequest?
+    private var released = false
+
+    init(started: XCTestExpectation) { self.started = started }
+
+    func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        try await withCheckedThrowingContinuation { continuation in
+            lock.lock()
+            self.request = request
+            self.continuation = continuation
+            let shouldRelease = released
+            lock.unlock()
+            started.fulfill()
+            if shouldRelease { complete() }
+        }
+    }
+
+    func complete() {
+        lock.lock()
+        released = true
+        let continuation = self.continuation
+        let request = self.request
+        self.continuation = nil
+        lock.unlock()
+        if let continuation = continuation, let request = request {
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            continuation.resume(returning: (Data(#"{"links":[]}"#.utf8), response))
         }
     }
 }
