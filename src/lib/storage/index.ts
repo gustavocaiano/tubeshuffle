@@ -15,7 +15,6 @@ import {
   ensureStorageMigrationMeta,
   getStorageMigrationMeta,
   markMigratedFromLegacy,
-  migrateLegacyIndexedDb,
   type StorageMigrationMeta,
 } from "@/lib/storage/storage-migrations";
 
@@ -41,7 +40,6 @@ function completeRequest<T>(request: IDBRequest<T>): Promise<T> {
 function completeTransaction(transaction: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB transaction failed."));
     transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB transaction aborted."));
   });
 }
@@ -67,11 +65,6 @@ export async function initializeStorage(): Promise<IDBDatabase> {
   }
 
   const db = await dbPromise;
-  try {
-    await migrateLegacyIndexedDb(db);
-  } catch (error) {
-    console.warn("Legacy IndexedDB migration skipped:", error);
-  }
   await ensureStorageMigrationMeta(db);
   return db;
 }
@@ -161,23 +154,53 @@ export async function getLocalPlaylist(id: string): Promise<LocalPlaylistBundle 
 
 export async function saveLocalPlaylist(bundle: LocalPlaylistBundle): Promise<void> {
   const db = await initializeStorage();
-  const transaction = db.transaction([STORE_PLAYLISTS, STORE_VIDEOS], "readwrite");
+  const transaction = db.transaction([STORE_PLAYLISTS, STORE_VIDEOS, STORE_PLAY_HISTORY], "readwrite");
   const playlistStore = transaction.objectStore(STORE_PLAYLISTS);
   const videosStore = transaction.objectStore(STORE_VIDEOS);
+  const historyStore = transaction.objectStore(STORE_PLAY_HISTORY);
   const playlistIndex = videosStore.index("playlistId");
+  const done = completeTransaction(transaction);
+  void done.catch(() => {});
 
-  playlistStore.put(bundle.playlist);
+  try {
+    // Check both identities inside the write transaction, so another tab cannot
+    // insert a matching playlist between this check and the subsequent writes.
+    const ids = new Set<string>();
+    for (const video of bundle.videos) {
+      if (video.playlistId !== bundle.playlist.id || ids.has(video.id)) {
+        throw new Error("Cannot import playlist: invalid or duplicate video identity. No data was changed.");
+      }
+      ids.add(video.id);
+    }
+    const [existingId, existingYouTubeId, orphanVideo, orphanHistory, ...existingVideoIds] = await Promise.all([
+      completeRequest(playlistStore.getKey(bundle.playlist.id)),
+      completeRequest(playlistStore.index("youtubeId").getKey(bundle.playlist.youtubeId)),
+      completeRequest(playlistIndex.getKey(bundle.playlist.id)),
+      completeRequest(historyStore.index("playlistId").getKey(bundle.playlist.id)),
+      ...bundle.videos.map((video) => completeRequest(videosStore.getKey(video.id))),
+      ...bundle.videos.map((video) => completeRequest(historyStore.index("videoId").getKey(video.id))),
+    ]);
+    if (existingId !== undefined || existingYouTubeId !== undefined) {
+      throw new Error(
+        "Syncing or reimporting an existing playlist is temporarily blocked to protect your watch history. Keep your library unchanged and retry when safe sync is available."
+      );
+    }
 
-  const existingVideos = (await completeRequest(playlistIndex.getAll(bundle.playlist.id))) as LocalVideo[];
-  for (const video of existingVideos) {
-    videosStore.delete(video.id);
+    if (orphanVideo !== undefined || orphanHistory !== undefined || existingVideoIds.some((id) => id !== undefined)) {
+      throw new Error("Cannot import playlist: existing video data collides with this import. No data was changed.");
+    }
+
+    playlistStore.add(bundle.playlist);
+    for (const video of bundle.videos) {
+      videosStore.add(video);
+    }
+
+    await done;
+  } catch (error) {
+    try { transaction.abort(); } catch { /* Already completed or aborted. */ }
+    await done.catch(() => {});
+    throw error;
   }
-
-  for (const video of bundle.videos) {
-    videosStore.put(video);
-  }
-
-  await completeTransaction(transaction);
 }
 
 export async function deleteLocalPlaylist(id: string): Promise<void> {
