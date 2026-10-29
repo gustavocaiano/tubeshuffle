@@ -7,6 +7,12 @@ import smart from "../../shared/fixtures/smart.json";
 import existing from "../../shared/fixtures/existing-api.json";
 import transfer from "../../shared/fixtures/transfer-v1.json";
 
+// These fixtures exercise the wire contract after owner authorization.
+vi.mock("@/lib/server/owner-guard", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/server/owner-guard")>(),
+  guardOwner: async () => null,
+}));
+
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe("portable Smart fixtures", () => {
@@ -35,7 +41,7 @@ describe("portable Smart fixtures", () => {
 describe("existing wire examples without upstream calls", () => {
   it("returns the actual invalid playlist response", async () => {
     vi.stubEnv("YOUTUBE_API_KEY", "synthetic-test-value");
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Unexpected upstream request"));
     const response = await GET(new Request("http://localhost/api/youtube/playlist?playlistId=short"));
     const fixture = existing.errors.find((e) => e.endpoint === "playlist" && e.status === 400)!;
     expect(response.status).toBe(fixture.status);
@@ -60,7 +66,7 @@ describe("existing wire examples without upstream calls", () => {
   });
   it("returns the actual empty-seeds response", async () => {
     vi.stubEnv("YOUTUBE_API_KEY", "synthetic-test-value");
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Unexpected upstream request"));
     const response = await POST(new Request("http://localhost/api/youtube/suggestions", { method: "POST", body: JSON.stringify({ playlistId: "local-id", seeds: [] }) }));
     const fixture = existing.errors.find((e) => e.endpoint === "suggestions" && e.status === 400)!;
     expect(response.status).toBe(fixture.status);

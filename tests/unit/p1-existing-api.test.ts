@@ -3,6 +3,12 @@ import { GET } from "@/app/api/youtube/playlist/route";
 import { POST } from "@/app/api/youtube/suggestions/route";
 import fixture from "../../shared/fixtures/existing-api.json";
 
+// Exercise the existing handler responses independently of owner authorization.
+vi.mock("@/lib/server/owner-guard", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/server/owner-guard")>(),
+  guardOwner: async () => null,
+}));
+
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
 const playlistRequest = () => new Request("http://localhost/api/youtube/playlist?playlistId=PL123456789");
 const suggestionRequest = (body: unknown, headers: Record<string, string> = {}) => new Request(

@@ -481,7 +481,7 @@ function toSuggestedVideo(
   };
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const apiKey = process.env.YOUTUBE_API_KEY;
     if (!apiKey) {
@@ -600,3 +600,14 @@ export async function POST(request: Request) {
     return jsonError(500, "Unexpected server error");
   }
 }
+
+export async function POST(request: Request) {
+  const { guardOwner, noStore } = await import("@/lib/server/owner-guard");
+  const denied = await guardOwner(request, "mutation");
+  return denied ?? noStore(await handlePost(request));
+}
+
+function methodNotAllowed() {
+  return new Response(null, { status: 405, headers: { Allow: "POST", "Cache-Control": "private, no-store" } });
+}
+export { methodNotAllowed as GET, methodNotAllowed as PUT, methodNotAllowed as PATCH, methodNotAllowed as DELETE, methodNotAllowed as OPTIONS, methodNotAllowed as HEAD };

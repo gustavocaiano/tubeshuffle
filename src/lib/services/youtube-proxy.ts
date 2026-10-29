@@ -1,4 +1,5 @@
 import type { YouTubePlaylistData } from "@/types/playlist";
+import { responseError } from "./account-client";
 
 export async function fetchPlaylistDataFromProxy(
   playlistId: string
@@ -7,21 +8,14 @@ export async function fetchPlaylistDataFromProxy(
     `/api/youtube/playlist?playlistId=${encodeURIComponent(playlistId)}`,
     {
       method: "GET",
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", "x-tubeshuffle-intent": "playlist" },
     }
   );
 
+  if (!response.ok) throw await responseError(response);
   const payload = (await response.json()) as
     | YouTubePlaylistData
     | { data?: YouTubePlaylistData; error?: string };
-
-  if (!response.ok) {
-    const message =
-      "error" in payload && payload.error
-        ? payload.error
-        : `YouTube proxy request failed: ${response.status}`;
-    throw new Error(message);
-  }
 
   if ("data" in payload && payload.data) {
     return payload.data;
