@@ -87,6 +87,56 @@ private final class RequestCounter: @unchecked Sendable {
     }
 }
 
+// The transport accepts exactly one synthetic endpoint and never falls through to networking.
+private final class StubTransport: @unchecked Sendable {
+    enum Endpoint { case logout, refresh }
+    private let lock = NSLock()
+    private var accepted = 0
+    private var rejected = 0
+    private var validRefreshBody = false
+    let endpoint: Endpoint
+    init(_ endpoint: Endpoint) { self.endpoint = endpoint }
+    var counts: (Int, Int) { lock.lock(); defer { lock.unlock() }; return (accepted, rejected) }
+    var sawExpectedRefreshBody: Bool { lock.lock(); defer { lock.unlock() }; return validRefreshBody }
+
+    func fetch(_ request: URLRequest) throws -> (Data, URLResponse) {
+        let components = request.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }
+        let expectedPath = endpoint == .logout ? "/logout" : "/token"
+        let expectedQuery = endpoint == .logout ? URLQueryItem(name: "scope", value: "local")
+            : URLQueryItem(name: "grant_type", value: "refresh_token")
+        let authorizationOK = endpoint != .logout || request.value(forHTTPHeaderField: "Authorization") == "Bearer synthetic-access"
+        let refreshBodyOK: Bool
+        if endpoint == .refresh, let body = request.httpBody,
+           let json = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] {
+            refreshBodyOK = json["refresh_token"] as? String == "synthetic-refresh"
+        } else {
+            refreshBodyOK = endpoint != .refresh
+        }
+        if endpoint == .refresh {
+            lock.lock(); validRefreshBody = refreshBodyOK; lock.unlock()
+        }
+        guard let url = request.url, url.scheme == "https", url.host == "example.invalid",
+              request.httpMethod == "POST", components?.path == expectedPath,
+              components?.queryItems == [expectedQuery], authorizationOK, refreshBodyOK else {
+            lock.lock(); rejected += 1; lock.unlock()
+            throw URLError(.unsupportedURL)
+        }
+        lock.lock(); accepted += 1; lock.unlock()
+        let body: Data
+        if endpoint == .refresh {
+            body = Data("""
+            {"access_token":"synthetic-rotated-access","token_type":"bearer","expires_in":3600,
+             "expires_at":4102444800,"refresh_token":"synthetic-rotated-refresh",
+             "user":{"id":"00000000-0000-0000-0000-000000000001","aud":"synthetic",
+             "app_metadata":{},"user_metadata":{},"created_at":"2020-01-01T00:00:00Z",
+             "updated_at":"2020-01-01T00:00:00Z"}}
+            """.utf8)
+        } else { body = Data() }
+        return (body, HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil,
+                                      headerFields: ["Content-Type": "application/json"])!)
+    }
+}
+
 // Release is idempotent and also works before the writer installs its continuation.
 @MainActor
 private final class WriterLatch {
@@ -131,9 +181,7 @@ final class AuthStorageProbeTests: XCTestCase {
         AuthClient(url: URL(string: "https://example.invalid")!, storageKey: key, localStorage: storage,
                    fetch: { _ in try counter.reject() }, autoRefreshToken: false)
     }
-    // AuthClient probes exercise currentSession reads/migration and OAuth URL
-    // generation's verifier write. They do not exercise SDK session writes,
-    // SDK session deletion, verifier retrieval/removal, or SDK sign-out.
+    // Recorder generations are temporal markers, not operation-scoped attribution.
     func testCurrentSessionAndSwallowedReadFailure() throws {
         let (backend, storage, key, requests) = makeStorage()
         try storage.store(key: key, value: sessionData())
@@ -184,6 +232,96 @@ final class AuthStorageProbeTests: XCTestCase {
         XCTAssertNotNil(try storage.retrieve(key: "\(key)-code-verifier"))
         XCTAssertTrue(storage.failures.isEmpty)
         XCTAssertEqual(requests.requests, 0)
+    }
+
+    func testSDKLocalSignOutRecordsSwallowedRemoveFailureAndControl() async throws {
+        for fails in [true, false] {
+            let finished = expectation(description: "synthetic sign-out finished")
+            var result: Result<Void, Error>?
+            let task = Task { @MainActor in
+              defer { finished.fulfill() }
+              do {
+            let (backend, storage, key, _) = makeStorage()
+            let verifier = "\(key)-code-verifier"
+            let original = try sessionData()
+            try storage.store(key: key, value: original)
+            try storage.store(key: verifier, value: Data("synthetic-verifier".utf8))
+            let transport = StubTransport(.logout)
+            let auth = AuthClient(url: URL(string: "https://example.invalid")!, storageKey: key,
+                                  localStorage: storage, fetch: { try transport.fetch($0) }, autoRefreshToken: false)
+            storage.nextGeneration()
+            backend.fail(.delete, key: key, enabled: fails)
+            defer {
+                backend.fail(.delete, key: key, enabled: false)
+                for item in [key, legacy, verifier] { try? storage.remove(key: item) }
+            }
+            try await auth.signOut(scope: .local)
+            XCTAssertEqual(transport.counts.0, 1)
+            XCTAssertEqual(transport.counts.1, 0)
+            XCTAssertEqual(storage.failures.contains { $0.operation == .remove && $0.generation == 1 }, fails)
+            if fails {
+                XCTAssertTrue(try storage.retrieve(key: key) == original)
+            } else {
+                XCTAssertNil(try storage.retrieve(key: key))
+            }
+            // Observe the SDK result before our cleanup without assuming verifier policy.
+            let verifierAfterSignOut = try storage.retrieve(key: verifier)
+            XCTAssertTrue(verifierAfterSignOut == nil || verifierAfterSignOut == Data("synthetic-verifier".utf8))
+            backend.fail(.delete, key: key, enabled: false)
+            for item in [key, legacy, verifier] { try storage.remove(key: item) }
+            for item in [key, legacy, verifier] { XCTAssertNil(try storage.retrieve(key: item)) }
+              result = .success(())
+              } catch { result = .failure(error) }
+            }
+            await fulfillment(of: [finished], timeout: 2)
+            guard let result else { task.cancel(); return }
+            try result.get()
+        }
+    }
+
+    func testSDKRefreshRecordsSwallowedStoreFailureAndControl() async throws {
+        for fails in [true, false] {
+            let finished = expectation(description: "synthetic refresh finished")
+            var result: Result<Void, Error>?
+            let task = Task { @MainActor in
+              defer { finished.fulfill() }
+              do {
+            let (backend, storage, key, _) = makeStorage()
+            let original = try sessionData()
+            try storage.store(key: key, value: original)
+            let transport = StubTransport(.refresh)
+            let auth = AuthClient(url: URL(string: "https://example.invalid")!, storageKey: key,
+                                  localStorage: storage, fetch: { try transport.fetch($0) }, autoRefreshToken: false)
+            storage.nextGeneration()
+            backend.fail(.write, key: key, enabled: fails)
+            defer {
+                backend.fail(.write, key: key, enabled: false)
+                for item in [key, legacy, "\(key)-code-verifier"] { try? storage.remove(key: item) }
+            }
+            let rotated = try await auth.refreshSession()
+            XCTAssertTrue(rotated.accessToken == "synthetic-rotated-access")
+            XCTAssertTrue(rotated.refreshToken == "synthetic-rotated-refresh")
+            XCTAssertEqual(transport.counts.0, 1)
+            XCTAssertEqual(transport.counts.1, 0)
+            XCTAssertEqual(storage.failures.contains { $0.operation == .store && $0.generation == 1 }, fails)
+            XCTAssertTrue(transport.sawExpectedRefreshBody)
+            if fails {
+                XCTAssertTrue(try storage.retrieve(key: key) == original)
+                XCTAssertTrue(auth.currentSession?.accessToken == "synthetic-access")
+            } else {
+                XCTAssertTrue(auth.currentSession?.accessToken == "synthetic-rotated-access")
+                let persisted = try XCTUnwrap(storage.retrieve(key: key))
+                let decoded = try JSONDecoder().decode(Session.self, from: persisted)
+                XCTAssertTrue(decoded.accessToken == "synthetic-rotated-access")
+                XCTAssertTrue(decoded.refreshToken == "synthetic-rotated-refresh")
+            }
+              result = .success(())
+              } catch { result = .failure(error) }
+            }
+            await fulfillment(of: [finished], timeout: 2)
+            guard let result else { task.cancel(); return }
+            try result.get()
+        }
     }
 
     // This uses a synthetic writer and gate invalidation, not AuthClient sign-out
