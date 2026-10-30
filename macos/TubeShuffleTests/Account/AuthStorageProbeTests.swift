@@ -381,14 +381,19 @@ final class AuthStorageProbeTests: XCTestCase {
 
     func testOwnedServiceReportsRemoteFailureSeparatelyFromLocalCleanup() async throws {
         try await bounded { [self] in
-        let (_, storage, key, requests) = makeStorage()
+        let (_, storage, key, _) = makeStorage()
         try storage.store(key: key, value: sessionData())
         try storage.store(key: legacy, value: sessionData())
         try storage.store(key: "\(key)-code-verifier", value: Data("synthetic".utf8))
-        let service = OwnedSyntheticAuth(storage: storage, key: key, fetch: { _ in try requests.reject() })
+        let transport = StubTransport(.logout)
+        let service = OwnedSyntheticAuth(storage: storage, key: key, fetch: { request in
+            _ = try transport.fetch(request)
+            throw URLError(.unsupportedURL) // Non-retryable in the pinned SDK.
+        })
         let result = try await service.signOut()
         XCTAssertEqual(result.remote, .sdkFailed)
-        XCTAssertEqual(requests.requests, 1)
+        XCTAssertEqual(transport.counts.0, 1)
+        XCTAssertEqual(transport.counts.1, 0)
         for item in [key, legacy, "\(key)-code-verifier"] {
             XCTAssertNil(try storage.retrieve(key: item))
         }
@@ -416,20 +421,27 @@ final class AuthStorageProbeTests: XCTestCase {
 
     func testOwnedReportsRemoteAndCleanupFailureTogether() async throws {
         try await bounded { [self] in
-            let (backend, storage, key, requests) = makeStorage()
+            let (backend, storage, key, _) = makeStorage()
             try storage.store(key: key, value: sessionData())
             try storage.store(key: legacy, value: sessionData())
-            let service = OwnedSyntheticAuth(storage: storage, key: key, fetch: { _ in try requests.reject() })
+            let transport = StubTransport(.logout)
+            let service = OwnedSyntheticAuth(storage: storage, key: key, fetch: { request in
+                _ = try transport.fetch(request)
+                throw URLError(.unsupportedURL) // Non-retryable in the pinned SDK.
+            })
             backend.fail(.delete, key: legacy, enabled: true)
             defer { backend.fail(.delete, key: legacy, enabled: false) }
             do { _ = try await service.signOut(); XCTFail("cleanup failure must be reported") }
             catch { XCTAssertEqual(error as? AuthOperationGate.Failure, .invalidationFailed) }
             XCTAssertEqual(service.lastRemote, .sdkFailed)
-            XCTAssertEqual(requests.requests, 1)
+            XCTAssertEqual(transport.counts.0, 1)
+            XCTAssertEqual(transport.counts.1, 0)
             XCTAssertNotNil(try storage.retrieve(key: legacy))
             backend.fail(.delete, key: legacy, enabled: false)
             _ = try await service.signOut()
             XCTAssertNil(try storage.retrieve(key: legacy))
+            XCTAssertEqual(transport.counts.0, 1)
+            XCTAssertEqual(transport.counts.1, 0)
         }
     }
     // Recorder generations are temporal markers, not operation-scoped attribution.
