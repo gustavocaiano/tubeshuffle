@@ -80,6 +80,56 @@ private final class RecordingStorage: AuthLocalStorage, @unchecked Sendable {
     }
 }
 
+// Test-only allowlist for the pinned SDK's configured session and PKCE keys.
+// It deliberately disables all legacy session migrations, including old formats
+// under the configured key. Observations contain no key, data, or underlying error.
+private final class ScopedSessionStorage: AuthLocalStorage, @unchecked Sendable {
+    enum ReadOutcome: Equatable { case absent, corrupt, underlyingFailure }
+    enum PolicyError: Error { case denied, corrupt, readFailed }
+    private let inner: any AuthLocalStorage
+    private let sessionKey: String
+    private let verifierKey: String
+    private let lock = NSLock()
+    private var recorded: [ReadOutcome] = []
+
+    init(inner: any AuthLocalStorage, sessionKey: String) {
+        precondition(!sessionKey.isEmpty && sessionKey != "supabase.session")
+        self.inner = inner
+        self.sessionKey = sessionKey
+        self.verifierKey = "\(sessionKey)-code-verifier"
+    }
+
+    var outcomes: [ReadOutcome] { lock.lock(); defer { lock.unlock() }; return recorded }
+    private func record(_ outcome: ReadOutcome) {
+        lock.lock(); defer { lock.unlock() }; recorded.append(outcome)
+    }
+    func store(key: String, value: Data) throws {
+        guard key == sessionKey || key == verifierKey else { throw PolicyError.denied }
+        try inner.store(key: key, value: value)
+    }
+    func retrieve(key: String) throws -> Data? {
+        if key == "supabase.session" { return nil }
+        guard key == sessionKey || key == verifierKey else { throw PolicyError.denied }
+        let data: Data?
+        do { data = try inner.retrieve(key: key) }
+        catch {
+            if key == sessionKey { record(.underlyingFailure) }
+            throw PolicyError.readFailed
+        }
+        guard key == sessionKey else { return data }
+        guard let data else { record(.absent); return nil }
+        guard (try? JSONDecoder().decode(Session.self, from: data)) != nil else {
+            record(.corrupt)
+            throw PolicyError.corrupt
+        }
+        return data
+    }
+    func remove(key: String) throws {
+        guard key == sessionKey || key == verifierKey else { throw PolicyError.denied }
+        try inner.remove(key: key)
+    }
+}
+
 private final class RequestCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var count = 0
@@ -503,6 +553,132 @@ final class AuthStorageProbeTests: XCTestCase {
         XCTAssertTrue(storage.failures.contains { $0.operation == .retrieve && $0.generation == 1 })
         XCTAssertEqual(requests.requests, 0)
     }
+
+    func testScopedStorageCurrentSessionOutcomesWithoutNetwork() throws {
+        for outcome in [ScopedSessionStorage.ReadOutcome.absent, .corrupt, .underlyingFailure] {
+            let (backend, raw, key, requests) = makeStorage()
+            let scoped = ScopedSessionStorage(inner: raw, sessionKey: key)
+            if outcome == .corrupt { try raw.store(key: key, value: Data("not-json".utf8)) }
+            if outcome == .underlyingFailure { backend.fail(.read, key: key, enabled: true) }
+            let auth = AuthClient(url: URL(string: "https://example.invalid")!, storageKey: key,
+                                  localStorage: scoped, fetch: { _ in try requests.reject() },
+                                  autoRefreshToken: false)
+            XCTAssertNil(auth.currentSession)
+            XCTAssertFalse(scoped.outcomes.isEmpty)
+            XCTAssertTrue(scoped.outcomes.allSatisfy { $0 == outcome })
+            XCTAssertEqual(requests.requests, 0)
+        }
+    }
+
+    func testScopedStorageBlocksLegacyMigrationAndOtherNamespaces() throws {
+        let (_, raw, key, requests) = makeStorage()
+        let legacyData = try sessionData(accessToken: "synthetic-legacy")
+        let configuredData = try sessionData()
+        let other = "supabase.auth.token"
+        let marker = Data([0, 255, 1, 128])
+        try raw.store(key: legacy, value: legacyData)
+        try raw.store(key: other, value: marker)
+        let scoped = ScopedSessionStorage(inner: raw, sessionKey: key)
+        let auth = AuthClient(url: URL(string: "https://example.invalid")!, storageKey: key,
+                              localStorage: scoped, fetch: { _ in try requests.reject() },
+                              autoRefreshToken: false)
+        XCTAssertNil(auth.currentSession)
+        XCTAssertTrue(try raw.retrieve(key: legacy) == legacyData)
+        XCTAssertNil(try raw.retrieve(key: key))
+        try raw.store(key: key, value: configuredData)
+        XCTAssertTrue(auth.currentSession?.accessToken == "synthetic-access")
+        XCTAssertTrue(try raw.retrieve(key: legacy) == legacyData)
+        XCTAssertNotNil(try raw.retrieve(key: key))
+        XCTAssertNil(try scoped.retrieve(key: legacy))
+        for denied in [legacy, other, "supabase.auth.token-code-verifier", "unrelated"] {
+            XCTAssertThrowsError(try scoped.store(key: denied, value: marker))
+            XCTAssertThrowsError(try scoped.remove(key: denied))
+            if denied != legacy { XCTAssertThrowsError(try scoped.retrieve(key: denied)) }
+        }
+        XCTAssertTrue(try raw.retrieve(key: other) == marker)
+        XCTAssertTrue(try raw.retrieve(key: legacy) == legacyData)
+        let verifier = "\(key)-code-verifier"
+        try scoped.store(key: verifier, value: marker)
+        XCTAssertTrue(try scoped.retrieve(key: verifier) == marker)
+        XCTAssertTrue(try raw.retrieve(key: verifier) == marker)
+        XCTAssertEqual(requests.requests, 0)
+    }
+
+    func testScopedStorageRejectsOldSessionEnvelopeBeforeMigration() throws {
+        let (_, raw, key, requests) = makeStorage()
+        let session = try sessionData()
+        let object = try JSONSerialization.jsonObject(with: session)
+        let envelope = try JSONSerialization.data(withJSONObject: ["session": object, "expiration_date": 0])
+        try raw.store(key: key, value: envelope)
+        let scoped = ScopedSessionStorage(inner: raw, sessionKey: key)
+        let auth = AuthClient(url: URL(string: "https://example.invalid")!, storageKey: key,
+                              localStorage: scoped, fetch: { _ in try requests.reject() },
+                              autoRefreshToken: false)
+        XCTAssertNil(auth.currentSession)
+        XCTAssertFalse(scoped.outcomes.isEmpty)
+        XCTAssertTrue(scoped.outcomes.allSatisfy { $0 == .corrupt })
+        XCTAssertTrue(try raw.retrieve(key: key) == envelope)
+        XCTAssertEqual(requests.requests, 0)
+    }
+
+    func testScopedStorageAllowsSDKPKCEVerifierWithoutNetwork() throws {
+        let (_, raw, key, requests) = makeStorage()
+        let scoped = ScopedSessionStorage(inner: raw, sessionKey: key)
+        let auth = AuthClient(url: URL(string: "https://example.invalid")!, flowType: .pkce,
+                              storageKey: key, localStorage: scoped,
+                              fetch: { _ in try requests.reject() }, autoRefreshToken: false)
+        let url = try auth.getOAuthSignInURL(provider: .google)
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        XCTAssertTrue(query.contains { $0.name == "code_challenge" && !($0.value ?? "").isEmpty })
+        XCTAssertTrue(query.contains { $0.name == "code_challenge_method" && $0.value == "s256" })
+        XCTAssertTrue((try raw.retrieve(key: "\(key)-code-verifier"))?.isEmpty == false)
+        XCTAssertNil(try raw.retrieve(key: "supabase.auth.token-code-verifier"))
+        XCTAssertTrue(raw.failures.isEmpty)
+        XCTAssertEqual(requests.requests, 0)
+    }
+
+    func testOldDirectSessionStringDatesBlockedByScopeButMigratedBySDK() throws {
+        let created = Date(timeIntervalSince1970: 1_577_836_800)
+        let updated = Date(timeIntervalSince1970: 1_609_459_200)
+        let user = User(id: UUID(), appMetadata: [:], userMetadata: [:], aud: "synthetic",
+                        createdAt: created, updatedAt: updated)
+        let session = Session(accessToken: "synthetic-access", tokenType: "bearer", expiresIn: 3600,
+                              expiresAt: 4_102_444_800, refreshToken: "synthetic-refresh", user: user)
+        // v2.55.5's old direct format uses its Supabase encoder/decoder; the
+        // current SessionStorage uses Foundation's default encoder/decoder.
+        let oldData = try AuthClient.Configuration.jsonEncoder.encode(session)
+        let object = try XCTUnwrap(try JSONSerialization.jsonObject(with: oldData) as? [String: Any])
+        let userObject = try XCTUnwrap(object["user"] as? [String: Any])
+        XCTAssertTrue(userObject["created_at"] is String)
+        XCTAssertTrue(userObject["updated_at"] is String)
+        let oldDecoded = try AuthClient.Configuration.jsonDecoder.decode(Session.self, from: oldData)
+        XCTAssertEqual(oldDecoded.user.createdAt, created)
+        XCTAssertEqual(oldDecoded.user.updatedAt, updated)
+        XCTAssertThrowsError(try JSONDecoder().decode(Session.self, from: oldData))
+
+        let (_, raw, key, requests) = makeStorage()
+        try raw.store(key: key, value: oldData)
+        let scoped = ScopedSessionStorage(inner: raw, sessionKey: key)
+        let scopedAuth = AuthClient(url: URL(string: "https://example.invalid")!, storageKey: key,
+                                    localStorage: scoped, fetch: { _ in try requests.reject() },
+                                    autoRefreshToken: false)
+        XCTAssertNil(scopedAuth.currentSession)
+        XCTAssertFalse(scoped.outcomes.isEmpty)
+        XCTAssertTrue(scoped.outcomes.allSatisfy { $0 == .corrupt })
+        XCTAssertTrue(try raw.retrieve(key: key) == oldData)
+
+        // Without the policy, useDefaultEncoder migrates the same bytes.
+        let unscopedAuth = client(raw, key, requests)
+        let migrated = try XCTUnwrap(unscopedAuth.currentSession)
+        XCTAssertEqual(migrated.user.createdAt, created)
+        XCTAssertEqual(migrated.user.updatedAt, updated)
+        let persisted = try XCTUnwrap(raw.retrieve(key: key))
+        let decoded = try JSONDecoder().decode(Session.self, from: persisted)
+        XCTAssertEqual(decoded.user.createdAt, created)
+        XCTAssertEqual(decoded.user.updatedAt, updated)
+        XCTAssertEqual(requests.requests, 0)
+    }
+
     func testLegacyMigrationAndDestinationWriteFailure() throws {
         let (backend, storage, key, requests) = makeStorage()
         try storage.store(key: legacy, value: sessionData())
