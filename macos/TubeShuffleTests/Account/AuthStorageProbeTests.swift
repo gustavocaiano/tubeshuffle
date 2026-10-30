@@ -241,9 +241,9 @@ final class AuthStorageProbeTests: XCTestCase {
             let task = Task { @MainActor in
               defer { finished.fulfill() }
               do {
-            let (backend, storage, key, _) = makeStorage()
+            let (backend, storage, key, _) = self.makeStorage()
             let verifier = "\(key)-code-verifier"
-            let original = try sessionData()
+            let original = try self.sessionData()
             try storage.store(key: key, value: original)
             try storage.store(key: verifier, value: Data("synthetic-verifier".utf8))
             let transport = StubTransport(.logout)
@@ -253,7 +253,7 @@ final class AuthStorageProbeTests: XCTestCase {
             backend.fail(.delete, key: key, enabled: fails)
             defer {
                 backend.fail(.delete, key: key, enabled: false)
-                for item in [key, legacy, verifier] { try? storage.remove(key: item) }
+                for item in [key, self.legacy, verifier] { try? storage.remove(key: item) }
             }
             try await auth.signOut(scope: .local)
             XCTAssertEqual(transport.counts.0, 1)
@@ -268,8 +268,8 @@ final class AuthStorageProbeTests: XCTestCase {
             let verifierAfterSignOut = try storage.retrieve(key: verifier)
             XCTAssertTrue(verifierAfterSignOut == nil || verifierAfterSignOut == Data("synthetic-verifier".utf8))
             backend.fail(.delete, key: key, enabled: false)
-            for item in [key, legacy, verifier] { try storage.remove(key: item) }
-            for item in [key, legacy, verifier] { XCTAssertNil(try storage.retrieve(key: item)) }
+            for item in [key, self.legacy, verifier] { try storage.remove(key: item) }
+            for item in [key, self.legacy, verifier] { XCTAssertNil(try storage.retrieve(key: item)) }
               result = .success(())
               } catch { result = .failure(error) }
             }
@@ -286,8 +286,8 @@ final class AuthStorageProbeTests: XCTestCase {
             let task = Task { @MainActor in
               defer { finished.fulfill() }
               do {
-            let (backend, storage, key, _) = makeStorage()
-            let original = try sessionData()
+            let (backend, storage, key, _) = self.makeStorage()
+            let original = try self.sessionData()
             try storage.store(key: key, value: original)
             let transport = StubTransport(.refresh)
             let auth = AuthClient(url: URL(string: "https://example.invalid")!, storageKey: key,
@@ -296,7 +296,7 @@ final class AuthStorageProbeTests: XCTestCase {
             backend.fail(.write, key: key, enabled: fails)
             defer {
                 backend.fail(.write, key: key, enabled: false)
-                for item in [key, legacy, "\(key)-code-verifier"] { try? storage.remove(key: item) }
+                for item in [key, self.legacy, "\(key)-code-verifier"] { try? storage.remove(key: item) }
             }
             let rotated = try await auth.refreshSession()
             XCTAssertTrue(rotated.accessToken == "synthetic-rotated-access")
@@ -386,10 +386,10 @@ final class AuthStorageProbeTests: XCTestCase {
             do { try await gate.run {}; XCTFail("admission must remain closed") }
             catch { XCTAssertEqual(error as? AuthOperationGate.Failure, .admissionClosed) }
             XCTAssertTrue(storage.failures.contains { $0.operation == .remove && $0.generation == 1 })
-            backend.fail(.delete, key: legacy, enabled: false)
+            backend.fail(.delete, key: self.legacy, enabled: false)
             do {
                 try await gate.signOutLocally()
-                for item in [key, legacy, verifier] { XCTAssertNil(try storage.retrieve(key: item)) }
+                for item in [key, self.legacy, verifier] { XCTAssertNil(try storage.retrieve(key: item)) }
                 try await gate.run {}
             } catch { XCTFail("retry failed: \(error)") }
         }
