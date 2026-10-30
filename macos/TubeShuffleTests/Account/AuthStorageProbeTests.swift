@@ -262,10 +262,10 @@ private final class WriterLatch {
 @MainActor
 final class AuthStorageProbeTests: XCTestCase {
     private let legacy = "supabase.session"
-    private func sessionData() throws -> Data {
+    private func sessionData(accessToken: String = "synthetic-access") throws -> Data {
         let user = User(id: UUID(), appMetadata: [:], userMetadata: [:], aud: "synthetic",
                         createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0))
-        let session = Session(accessToken: "synthetic-access", tokenType: "bearer", expiresIn: 3600,
+        let session = Session(accessToken: accessToken, tokenType: "bearer", expiresIn: 3600,
                               expiresAt: Date().timeIntervalSince1970 + 3600,
                               refreshToken: "synthetic-refresh", user: user)
         return try JSONEncoder().encode(session)
@@ -422,9 +422,12 @@ final class AuthStorageProbeTests: XCTestCase {
     func testOwnedReportsRemoteAndCleanupFailureTogether() async throws {
         try await bounded { [self] in
             let (backend, storage, key, _) = makeStorage()
-            try storage.store(key: key, value: sessionData())
-            try storage.store(key: legacy, value: sessionData())
-            let transport = StubTransport(.logout)
+            let legacyToken = "synthetic-legacy-access"
+            try storage.store(key: key, value: sessionData(accessToken: "synthetic-configured-access"))
+            try storage.store(key: legacy, value: sessionData(accessToken: legacyToken))
+            try storage.store(key: "\(key)-code-verifier", value: Data("synthetic-verifier".utf8))
+            // Every session read migrates the surviving legacy value over the configured key.
+            let transport = StubTransport(.logout, bearer: legacyToken)
             let service = OwnedSyntheticAuth(storage: storage, key: key, fetch: { request in
                 _ = try transport.fetch(request)
                 throw URLError(.unsupportedURL) // Non-retryable in the pinned SDK.
@@ -436,10 +439,54 @@ final class AuthStorageProbeTests: XCTestCase {
             XCTAssertEqual(service.lastRemote, .sdkFailed)
             XCTAssertEqual(transport.counts.0, 1)
             XCTAssertEqual(transport.counts.1, 0)
-            XCTAssertNotNil(try storage.retrieve(key: legacy))
+            XCTAssertTrue(try storage.retrieve(key: key) == nil)
+            XCTAssertTrue(try storage.retrieve(key: legacy) != nil)
+            do { try await service.restore(); XCTFail("admission must remain closed") }
+            catch { XCTAssertEqual(error as? AuthOperationGate.Failure, .admissionClosed) }
             backend.fail(.delete, key: legacy, enabled: false)
-            _ = try await service.signOut()
-            XCTAssertNil(try storage.retrieve(key: legacy))
+            let retry = try await service.signOut()
+            XCTAssertEqual(retry.remote, .sdkFailed)
+            XCTAssertEqual(transport.counts.0, 2)
+            XCTAssertEqual(transport.counts.1, 0)
+            for item in [key, legacy, "\(key)-code-verifier"] {
+                XCTAssertTrue(try storage.retrieve(key: item) == nil)
+            }
+            try storage.store(key: key, value: sessionData())
+            try await service.restore()
+            XCTAssertEqual(transport.counts.0, 2)
+            XCTAssertEqual(transport.counts.1, 0)
+        }
+    }
+
+    func testOwnedCleanupRetryWithoutLegacyDoesNotRequestAgain() async throws {
+        try await bounded { [self] in
+            let (backend, storage, key, _) = makeStorage()
+            let verifier = "\(key)-code-verifier"
+            try storage.store(key: key, value: sessionData())
+            try storage.store(key: verifier, value: Data("synthetic-verifier".utf8))
+            let transport = StubTransport(.logout)
+            let service = OwnedSyntheticAuth(storage: storage, key: key, fetch: { request in
+                _ = try transport.fetch(request)
+                throw URLError(.unsupportedURL)
+            })
+            backend.fail(.delete, key: verifier, enabled: true)
+            defer { backend.fail(.delete, key: verifier, enabled: false) }
+            do { _ = try await service.signOut(); XCTFail("cleanup failure must be reported") }
+            catch { XCTAssertEqual(error as? AuthOperationGate.Failure, .invalidationFailed) }
+            XCTAssertEqual(service.lastRemote, .sdkFailed)
+            XCTAssertTrue(try storage.retrieve(key: key) == nil)
+            XCTAssertTrue(try storage.retrieve(key: legacy) == nil)
+            XCTAssertTrue(try storage.retrieve(key: verifier) != nil)
+            XCTAssertEqual(transport.counts.0, 1)
+            XCTAssertEqual(transport.counts.1, 0)
+            do { try await service.restore(); XCTFail("admission must remain closed") }
+            catch { XCTAssertEqual(error as? AuthOperationGate.Failure, .admissionClosed) }
+            backend.fail(.delete, key: verifier, enabled: false)
+            let retry = try await service.signOut()
+            XCTAssertEqual(retry.remote, .sdkReturned) // No session means no remote attempt.
+            for item in [key, legacy, verifier] { XCTAssertTrue(try storage.retrieve(key: item) == nil) }
+            try storage.store(key: key, value: sessionData())
+            try await service.restore()
             XCTAssertEqual(transport.counts.0, 1)
             XCTAssertEqual(transport.counts.1, 0)
         }
