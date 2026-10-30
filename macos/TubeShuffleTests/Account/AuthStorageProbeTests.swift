@@ -47,6 +47,8 @@ private final class SyntheticBackend: KeychainBackend, @unchecked Sendable {
 // Only operation, coarse category and generation are retained, never keys/errors/data.
 // Generation is sampled when a failure is recorded: it is a temporal marker, not
 // an operation-scoped token, so concurrent operations may share a generation.
+// Count-based attribution is valid only with exclusive access: no unrelated SDK
+// entry points or external writers may touch this instance during an operation.
 private final class RecordingStorage: AuthLocalStorage, @unchecked Sendable {
     struct Failure: Equatable {
         enum Operation { case store, retrieve, remove }
@@ -59,6 +61,7 @@ private final class RecordingStorage: AuthLocalStorage, @unchecked Sendable {
     private let lock = NSLock()
     private var recorded: [Failure] = []
     private var currentGeneration = 0
+    var onStore: (@Sendable (String, Data) -> Void)?
     init(_ inner: KeychainAuthLocalStorage) { self.inner = inner }
     func nextGeneration() { lock.lock(); defer { lock.unlock() }; currentGeneration += 1 }
     var failures: [Failure] { lock.lock(); defer { lock.unlock() }; return recorded }
@@ -67,7 +70,7 @@ private final class RecordingStorage: AuthLocalStorage, @unchecked Sendable {
         recorded.append(Failure(operation: operation, category: .storage, generation: currentGeneration))
     }
     func store(key: String, value: Data) throws {
-        do { try inner.store(key: key, value: value) } catch { record(.store); throw error }
+        do { try inner.store(key: key, value: value); onStore?(key, value) } catch { record(.store); throw error }
     }
     func retrieve(key: String) throws -> Data? {
         do { return try inner.retrieve(key: key) } catch { record(.retrieve); throw error }
@@ -87,6 +90,101 @@ private final class RequestCounter: @unchecked Sendable {
     }
 }
 
+// Test-only ownership boundary. This is not a cross-process or crash fence.
+// v2.55.5 refresh creates an unstructured task, but its public refresh/session
+// awaits that task through its synchronous storage update. Do not add SDK entry
+// points without re-establishing that property; cancellation is not a deadline.
+@MainActor
+private final class OwnedSyntheticAuth {
+    enum Failure: Error, Equatable { case operation, storage }
+    // A normal SDK return is not proof of revocation: it can skip the request
+    // without a session and treats certain HTTP errors as success.
+    enum Remote: Equatable { case sdkReturned, sdkFailed }
+    struct SignOutResult: Equatable { let remote: Remote }
+    private let storage: RecordingStorage
+    private let key: String
+    private let client: AuthClient
+    private final class State {
+        var remote: Remote = .sdkFailed
+    }
+    private let state: State
+    private let gate: AuthOperationGate
+    private let cancelled: (@Sendable () -> Void)?
+    var lastRemote: Remote { state.remote }
+
+    init(storage: RecordingStorage, key: String,
+         cancelled: (@Sendable () -> Void)? = nil,
+         beforeCleanup: (@MainActor () -> Void)? = nil,
+         fetch: @escaping @Sendable (URLRequest) async throws -> (Data, URLResponse)) {
+        self.storage = storage
+        self.key = key
+        self.cancelled = cancelled
+        let client = AuthClient(url: URL(string: "https://example.invalid")!, storageKey: key,
+                                localStorage: storage, fetch: fetch, autoRefreshToken: false)
+        self.client = client
+        let state = State()
+        self.state = state
+        // The gate owns these dependencies, not the owner itself: no owner/gate cycle.
+        gate = AuthOperationGate {
+            beforeCleanup?()
+            let before = storage.failures.count
+            do { try await client.signOut(scope: .local); state.remote = .sdkReturned }
+            catch { state.remote = .sdkFailed }
+            var failed = storage.failures.count != before
+            for item in [key, "supabase.session", "\(key)-code-verifier"] {
+                do { try storage.remove(key: item) } catch { failed = true }
+            }
+            for item in [key, "supabase.session", "\(key)-code-verifier"] {
+                do { if try storage.retrieve(key: item) != nil { failed = true } }
+                catch { failed = true }
+            }
+            if failed { throw Failure.storage }
+        }
+    }
+
+    private func perform(_ operation: @escaping @MainActor () async throws -> Void) async throws {
+        try await gate.run { [storage, cancelled] in
+            try await withTaskCancellationHandler {
+            let before = storage.failures.count
+            var failed = false
+            do { try await operation() } catch { failed = true }
+            if storage.failures.count != before { throw Failure.storage }
+            if failed { throw Failure.operation }
+            } onCancel: { cancelled?() }
+        }
+    }
+    func restore() async throws { try await perform { [client] in _ = try await client.session } }
+    func refresh() async throws { try await perform { [client] in _ = try await client.refreshSession() } }
+    func signOut() async throws -> SignOutResult {
+        try await gate.signOutLocally()
+        return SignOutResult(remote: state.remote)
+    }
+}
+
+// The continuation deliberately ignores cancellation, as can a network transport.
+private actor DelayedRefreshTransport {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var released = false
+    private let started: XCTestExpectation
+    private let refresh = StubTransport(.refresh)
+    private let logout = StubTransport(.logout, bearer: "synthetic-rotated-access")
+    var logoutCounts: (Int, Int) { logout.counts }
+    init(started: XCTestExpectation) { self.started = started }
+    func fetch(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        if request.url?.path == "/token" {
+            // Validate before blocking, and never fall through to a real network.
+            let response = try refresh.fetch(request)
+            await withCheckedContinuation { pending in
+                if released { pending.resume() } else { continuation = pending }
+                started.fulfill()
+            }
+            return response
+        }
+        return try logout.fetch(request)
+    }
+    func release() { released = true; continuation?.resume(); continuation = nil }
+}
+
 // The transport accepts exactly one synthetic endpoint and never falls through to networking.
 private final class StubTransport: @unchecked Sendable {
     enum Endpoint { case logout, refresh }
@@ -95,7 +193,8 @@ private final class StubTransport: @unchecked Sendable {
     private var rejected = 0
     private var validRefreshBody = false
     let endpoint: Endpoint
-    init(_ endpoint: Endpoint) { self.endpoint = endpoint }
+    private let bearer: String
+    init(_ endpoint: Endpoint, bearer: String = "synthetic-access") { self.endpoint = endpoint; self.bearer = bearer }
     var counts: (Int, Int) { lock.lock(); defer { lock.unlock() }; return (accepted, rejected) }
     var sawExpectedRefreshBody: Bool { lock.lock(); defer { lock.unlock() }; return validRefreshBody }
 
@@ -104,7 +203,7 @@ private final class StubTransport: @unchecked Sendable {
         let expectedPath = endpoint == .logout ? "/logout" : "/token"
         let expectedQuery = endpoint == .logout ? URLQueryItem(name: "scope", value: "local")
             : URLQueryItem(name: "grant_type", value: "refresh_token")
-        let authorizationOK = endpoint != .logout || request.value(forHTTPHeaderField: "Authorization") == "Bearer synthetic-access"
+        let authorizationOK = endpoint != .logout || request.value(forHTTPHeaderField: "Authorization") == "Bearer \(bearer)"
         let refreshBodyOK: Bool
         if endpoint == .refresh, let body = request.httpBody,
            let json = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] {
@@ -180,6 +279,158 @@ final class AuthStorageProbeTests: XCTestCase {
     private func client(_ storage: RecordingStorage, _ key: String, _ counter: RequestCounter) -> AuthClient {
         AuthClient(url: URL(string: "https://example.invalid")!, storageKey: key, localStorage: storage,
                    fetch: { _ in try counter.reject() }, autoRefreshToken: false)
+    }
+
+    // Timeout bounds the test's wait, not the lifetime of an SDK task that ignores cancellation.
+    private func bounded(_ operation: @escaping @MainActor () async throws -> Void) async throws {
+        let finished = expectation(description: "owned probe finished")
+        var result: Result<Void, Error>?
+        let task = Task { @MainActor in
+            do { try await operation(); result = .success(()) }
+            catch { result = .failure(error) }
+            finished.fulfill()
+        }
+        await fulfillment(of: [finished], timeout: 5)
+        guard let result else { task.cancel(); throw URLError(.timedOut) }
+        try result.get()
+    }
+
+    func testOwnedRefreshDrainsBeforeCleanupAndRetry() async throws {
+        try await bounded { [self] in
+        let (backend, storage, key, _) = makeStorage()
+        try storage.store(key: key, value: sessionData())
+        try storage.store(key: "\(key)-code-verifier", value: Data("synthetic".utf8))
+        try storage.store(key: legacy, value: sessionData())
+        let started = expectation(description: "refresh reached synthetic transport")
+        let cancelled = expectation(description: "gate requested refresh cancellation")
+        let rotatedWritten = expectation(description: "rotated session persisted")
+        var sawRotatedBeforeCleanup = false
+        storage.onStore = { writtenKey, data in
+            guard writtenKey == key, let session = try? JSONDecoder().decode(Session.self, from: data),
+                  session.accessToken == "synthetic-rotated-access" else { return }
+            rotatedWritten.fulfill()
+        }
+        let transport = DelayedRefreshTransport(started: started)
+        let service = OwnedSyntheticAuth(storage: storage, key: key,
+            cancelled: { cancelled.fulfill() }, beforeCleanup: {
+                if let data = try? storage.retrieve(key: key),
+                   let session = try? JSONDecoder().decode(Session.self, from: data) {
+                    sawRotatedBeforeCleanup = session.accessToken == "synthetic-rotated-access"
+                }
+            }, fetch: { try await transport.fetch($0) })
+        let refreshDone = expectation(description: "refresh completed")
+        var refreshResult: Result<Void, Error>?
+        let refresh = Task {
+            defer { refreshDone.fulfill() }
+            do { try await service.refresh(); refreshResult = .success(()) }
+            catch { refreshResult = .failure(error) }
+        }
+        defer { refresh.cancel(); Task { await transport.release() } }
+        await fulfillment(of: [started], timeout: 2)
+        backend.fail(.delete, key: legacy, enabled: true)
+        let finished = expectation(description: "signout completed")
+        var outcome: Result<OwnedSyntheticAuth.SignOutResult, Error>?
+        let logout = Task {
+            do { outcome = .success(try await service.signOut()) }
+            catch { outcome = .failure(error) }
+            finished.fulfill()
+        }
+        defer { logout.cancel(); backend.fail(.delete, key: legacy, enabled: false) }
+        await fulfillment(of: [cancelled], timeout: 2)
+        do { try await service.restore(); XCTFail("admission must already be closed") }
+        catch { XCTAssertEqual(error as? AuthOperationGate.Failure, .admissionClosed) }
+        XCTAssertNotNil(try storage.retrieve(key: key))
+        await transport.release()
+        await fulfillment(of: [rotatedWritten, refreshDone, finished], timeout: 2)
+        XCTAssertTrue(sawRotatedBeforeCleanup)
+        let logoutCounts = await transport.logoutCounts
+        XCTAssertEqual(logoutCounts.0, 1)
+        XCTAssertEqual(logoutCounts.1, 0)
+        XCTAssertEqual(service.lastRemote, .sdkReturned)
+        guard let refreshResult else { return XCTFail("refresh did not finish") }
+        try refreshResult.get()
+        guard let outcome else { return XCTFail("signout did not finish") }
+        switch outcome {
+        case .success: XCTFail("cleanup failure must be reported")
+        case .failure(let error): XCTAssertEqual(error as? AuthOperationGate.Failure, .invalidationFailed)
+        }
+        do { try await service.restore(); XCTFail("admission must remain closed") }
+        catch { XCTAssertEqual(error as? AuthOperationGate.Failure, .admissionClosed) }
+        backend.fail(.delete, key: legacy, enabled: false)
+        _ = try await service.signOut()
+        for item in [key, legacy, "\(key)-code-verifier"] {
+            XCTAssertNil(try storage.retrieve(key: item))
+        }
+        }
+    }
+
+    func testOwnedServiceDetectsSwallowedSDKStorageFailure() async throws {
+        try await bounded { [self] in
+        let (backend, storage, key, _) = makeStorage()
+        try storage.store(key: key, value: sessionData())
+        let transport = StubTransport(.refresh)
+        let service = OwnedSyntheticAuth(storage: storage, key: key, fetch: { try transport.fetch($0) })
+        backend.fail(.write, key: key, enabled: true)
+        defer { backend.fail(.write, key: key, enabled: false) }
+        do { try await service.refresh(); XCTFail("swallowed write must fail") }
+        catch { XCTAssertEqual(error as? OwnedSyntheticAuth.Failure, .storage) }
+        XCTAssertEqual(transport.counts.0, 1)
+        XCTAssertEqual(transport.counts.1, 0)
+        }
+    }
+
+    func testOwnedServiceReportsRemoteFailureSeparatelyFromLocalCleanup() async throws {
+        try await bounded { [self] in
+        let (_, storage, key, requests) = makeStorage()
+        try storage.store(key: key, value: sessionData())
+        try storage.store(key: legacy, value: sessionData())
+        try storage.store(key: "\(key)-code-verifier", value: Data("synthetic".utf8))
+        let service = OwnedSyntheticAuth(storage: storage, key: key, fetch: { _ in try requests.reject() })
+        let result = try await service.signOut()
+        XCTAssertEqual(result.remote, .sdkFailed)
+        XCTAssertEqual(requests.requests, 1)
+        for item in [key, legacy, "\(key)-code-verifier"] {
+            XCTAssertNil(try storage.retrieve(key: item))
+        }
+        }
+    }
+
+    func testOwnedCleanupReportsVerificationReadFailure() async throws {
+        try await bounded { [self] in
+            let (backend, storage, key, requests) = makeStorage()
+            try storage.store(key: key, value: sessionData())
+            let service = OwnedSyntheticAuth(storage: storage, key: key, fetch: { _ in try requests.reject() })
+            // The legacy key is read during verification, after all removals.
+            backend.fail(.read, key: legacy, enabled: true)
+            defer { backend.fail(.read, key: legacy, enabled: false) }
+            do { _ = try await service.signOut(); XCTFail("verification failure must close admission") }
+            catch { XCTAssertEqual(error as? AuthOperationGate.Failure, .invalidationFailed) }
+            XCTAssertTrue(storage.failures.contains { $0.operation == .retrieve })
+            do { try await service.restore(); XCTFail("admission must remain closed") }
+            catch { XCTAssertEqual(error as? AuthOperationGate.Failure, .admissionClosed) }
+            backend.fail(.read, key: legacy, enabled: false)
+            _ = try await service.signOut()
+            XCTAssertNil(try storage.retrieve(key: legacy))
+        }
+    }
+
+    func testOwnedReportsRemoteAndCleanupFailureTogether() async throws {
+        try await bounded { [self] in
+            let (backend, storage, key, requests) = makeStorage()
+            try storage.store(key: key, value: sessionData())
+            try storage.store(key: legacy, value: sessionData())
+            let service = OwnedSyntheticAuth(storage: storage, key: key, fetch: { _ in try requests.reject() })
+            backend.fail(.delete, key: legacy, enabled: true)
+            defer { backend.fail(.delete, key: legacy, enabled: false) }
+            do { _ = try await service.signOut(); XCTFail("cleanup failure must be reported") }
+            catch { XCTAssertEqual(error as? AuthOperationGate.Failure, .invalidationFailed) }
+            XCTAssertEqual(service.lastRemote, .sdkFailed)
+            XCTAssertEqual(requests.requests, 1)
+            XCTAssertNotNil(try storage.retrieve(key: legacy))
+            backend.fail(.delete, key: legacy, enabled: false)
+            _ = try await service.signOut()
+            XCTAssertNil(try storage.retrieve(key: legacy))
+        }
     }
     // Recorder generations are temporal markers, not operation-scoped attribution.
     func testCurrentSessionAndSwallowedReadFailure() throws {
