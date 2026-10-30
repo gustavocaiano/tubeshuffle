@@ -265,7 +265,7 @@ async function fetchPlaylistData(playlistId: string, apiKey: string): Promise<Yo
   };
 }
 
-export async function GET(request: Request) {
+async function handleGet(request: Request) {
   try {
     const apiKey = process.env.YOUTUBE_API_KEY;
     if (!apiKey) {
@@ -289,3 +289,14 @@ export async function GET(request: Request) {
     return jsonError(500, "Unexpected server error");
   }
 }
+
+export async function GET(request: Request) {
+  const { guardOwner, noStore } = await import("@/lib/server/owner-guard");
+  const denied = await guardOwner(request, "read");
+  return denied ?? noStore(await handleGet(request));
+}
+
+function methodNotAllowed() {
+  return new Response(null, { status: 405, headers: { Allow: "GET", "Cache-Control": "private, no-store" } });
+}
+export { methodNotAllowed as POST, methodNotAllowed as PUT, methodNotAllowed as PATCH, methodNotAllowed as DELETE, methodNotAllowed as OPTIONS, methodNotAllowed as HEAD };

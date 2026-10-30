@@ -1,0 +1,515 @@
+TubeShuffle — Next Mac test: one foreground run only
+Date: 2026-10-28 UTC; branch t3/macos-app; commit db6e04d9448fa7bb881a99e6865883385e9f183b
+macOS 27.0.1 (26A434); Xcode 26.6 (17F113); arm64 native build succeeded.
+Only README section Next Mac test was read for the protocol; no other scenarios or state checks were run.
+Fresh process; one Play; no seek, Pause, Next, minimize or hide during observation. Capture state probe pressed once after item 2 ended.
+Owner audio confirmation: pending.
+Outcome: natural load 1->2 accepted; second Ended received and ignored by queue; no item 3 request.
+Final requested/accepted/natural-observed totals: 1/1/0; last accepted item 2.
+Native raw onStateChange sequence: 3,1,0,3,0.
+JS callback probe: -1,3,1,0,-1,3,1,0 (8 rows, below 100-row truncation threshold).
+JS Playing callback recorded after load 2 has no matching native raw Playing event. Suggests delivery/processing loss; does not prove the responsible layer, video identity, or absence of probe effects.
+Window remained unminimized/unhidden with occlusion-visible true throughout playback; active/inactive app changes are preserved below, so continuous application focus is not established.
+App quit only after log capture; collector stopped.
+Full native records 1..500 retained without capture gaps; progress events included. No credentials or personal URLs.
+
+#1 2026-10-28T18:03:58.222Z +0.005s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | Session started; bundle com.tubeshuffle.playbacklab
+#2 2026-10-28T18:03:58.482Z +0.264s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | player state: Waiting for player
+#3 2026-10-28T18:03:58.639Z +0.422s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | app active
+#4 2026-10-28T18:03:58.693Z +0.475s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | player window attached: 9476, occlusion-visible=false; not a visibility proof
+#5 2026-10-28T18:03:58.709Z +0.492s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | window occlusion changed; window 9476, occlusion-visible=true, miniaturized=false
+#6 2026-10-28T18:03:59.307Z +1.089s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onIframeApiReady, data none
+#7 2026-10-28T18:03:59.567Z +1.350s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | app inactive
+#8 2026-10-28T18:03:59.586Z +1.369s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | window occlusion changed; window 9476, occlusion-visible=false, miniaturized=false
+#9 2026-10-28T18:03:59.698Z +1.481s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onReady, data none
+#10 2026-10-28T18:03:59.700Z +1.483s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | player state: Player ready
+#11 2026-10-28T18:04:56.928Z +58.711s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | app active
+#12 2026-10-28T18:04:56.955Z +58.738s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | window occlusion changed; window 9476, occlusion-visible=true, miniaturized=false
+#13 2026-10-28T18:04:57.570Z +59.353s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | play command completed
+#14 2026-10-28T18:04:57.603Z +59.386s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onStateChange, data 3
+#15 2026-10-28T18:04:57.605Z +59.388s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | Playback: Buffering
+#16 2026-10-28T18:04:57.768Z +59.551s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoDataChange, data non-numeric redacted
+#17 2026-10-28T18:04:58.325Z +60.107s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoDataChange, data non-numeric redacted
+#18 2026-10-28T18:04:59.020Z +60.802s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onPlaybackQualityChange, data non-numeric redacted
+#19 2026-10-28T18:04:59.087Z +60.870s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoDataChange, data non-numeric redacted
+#20 2026-10-28T18:04:59.175Z +60.958s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoDataChange, data non-numeric redacted
+#21 2026-10-28T18:04:59.478Z +61.261s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onStateChange, data 1
+#22 2026-10-28T18:04:59.482Z +61.265s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | Playback: Playing
+#23 2026-10-28T18:04:59.670Z +61.452s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#24 2026-10-28T18:04:59.686Z +61.468s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | app inactive
+#25 2026-10-28T18:04:59.920Z +61.702s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#26 2026-10-28T18:05:00.173Z +61.956s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#27 2026-10-28T18:05:00.426Z +62.208s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#28 2026-10-28T18:05:00.675Z +62.458s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#29 2026-10-28T18:05:00.924Z +62.707s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#30 2026-10-28T18:05:01.176Z +62.959s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#31 2026-10-28T18:05:01.427Z +63.209s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#32 2026-10-28T18:05:01.677Z +63.460s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#33 2026-10-28T18:05:01.926Z +63.709s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#34 2026-10-28T18:05:02.180Z +63.963s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#35 2026-10-28T18:05:02.431Z +64.214s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#36 2026-10-28T18:05:02.678Z +64.461s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#37 2026-10-28T18:05:02.926Z +64.709s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#38 2026-10-28T18:05:03.178Z +64.961s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#39 2026-10-28T18:05:03.431Z +65.214s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#40 2026-10-28T18:05:03.681Z +65.464s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#41 2026-10-28T18:05:03.930Z +65.713s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#42 2026-10-28T18:05:04.182Z +65.965s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#43 2026-10-28T18:05:04.431Z +66.214s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#44 2026-10-28T18:05:04.686Z +66.469s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#45 2026-10-28T18:05:04.934Z +66.717s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#46 2026-10-28T18:05:05.185Z +66.968s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#47 2026-10-28T18:05:05.435Z +67.218s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#48 2026-10-28T18:05:05.683Z +67.466s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#49 2026-10-28T18:05:05.935Z +67.718s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#50 2026-10-28T18:05:06.190Z +67.973s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#51 2026-10-28T18:05:06.435Z +68.218s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#52 2026-10-28T18:05:06.685Z +68.468s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#53 2026-10-28T18:05:06.937Z +68.720s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#54 2026-10-28T18:05:07.188Z +68.971s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#55 2026-10-28T18:05:07.440Z +69.223s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#56 2026-10-28T18:05:07.690Z +69.472s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#57 2026-10-28T18:05:07.941Z +69.724s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#58 2026-10-28T18:05:08.189Z +69.971s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#59 2026-10-28T18:05:08.441Z +70.224s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#60 2026-10-28T18:05:08.693Z +70.476s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#61 2026-10-28T18:05:08.943Z +70.725s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#62 2026-10-28T18:05:09.194Z +70.977s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#63 2026-10-28T18:05:09.445Z +71.227s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#64 2026-10-28T18:05:09.694Z +71.476s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#65 2026-10-28T18:05:09.944Z +71.727s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#66 2026-10-28T18:05:10.195Z +71.978s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#67 2026-10-28T18:05:10.445Z +72.228s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#68 2026-10-28T18:05:10.693Z +72.476s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#69 2026-10-28T18:05:10.944Z +72.727s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#70 2026-10-28T18:05:11.194Z +72.977s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#71 2026-10-28T18:05:11.445Z +73.228s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#72 2026-10-28T18:05:11.494Z +73.276s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | app active
+#73 2026-10-28T18:05:11.694Z +73.477s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#74 2026-10-28T18:05:11.946Z +73.729s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#75 2026-10-28T18:05:12.196Z +73.978s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#76 2026-10-28T18:05:12.446Z +74.229s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#77 2026-10-28T18:05:12.697Z +74.479s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#78 2026-10-28T18:05:12.947Z +74.729s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#79 2026-10-28T18:05:13.197Z +74.980s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#80 2026-10-28T18:05:13.212Z +74.995s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | app inactive
+#81 2026-10-28T18:05:13.449Z +75.231s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#82 2026-10-28T18:05:13.699Z +75.481s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#83 2026-10-28T18:05:13.950Z +75.733s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#84 2026-10-28T18:05:14.203Z +75.986s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#85 2026-10-28T18:05:14.453Z +76.235s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#86 2026-10-28T18:05:14.706Z +76.488s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#87 2026-10-28T18:05:14.956Z +76.738s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#88 2026-10-28T18:05:15.206Z +76.988s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#89 2026-10-28T18:05:15.455Z +77.237s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#90 2026-10-28T18:05:15.705Z +77.488s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#91 2026-10-28T18:05:15.954Z +77.737s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#92 2026-10-28T18:05:16.205Z +77.988s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#93 2026-10-28T18:05:16.456Z +78.239s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#94 2026-10-28T18:05:16.706Z +78.489s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#95 2026-10-28T18:05:16.956Z +78.739s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#96 2026-10-28T18:05:17.208Z +78.991s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#97 2026-10-28T18:05:17.460Z +79.243s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#98 2026-10-28T18:05:17.710Z +79.493s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#99 2026-10-28T18:05:17.959Z +79.742s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#100 2026-10-28T18:05:18.210Z +79.993s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#101 2026-10-28T18:05:18.461Z +80.244s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#102 2026-10-28T18:05:18.712Z +80.495s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#103 2026-10-28T18:05:18.962Z +80.744s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#104 2026-10-28T18:05:19.211Z +80.994s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#105 2026-10-28T18:05:19.462Z +81.245s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#106 2026-10-28T18:05:19.714Z +81.496s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#107 2026-10-28T18:05:19.963Z +81.746s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#108 2026-10-28T18:05:20.215Z +81.997s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#109 2026-10-28T18:05:20.462Z +82.244s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#110 2026-10-28T18:05:20.717Z +82.500s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#111 2026-10-28T18:05:20.968Z +82.750s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#112 2026-10-28T18:05:21.216Z +82.999s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#113 2026-10-28T18:05:21.467Z +83.250s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#114 2026-10-28T18:05:21.718Z +83.500s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#115 2026-10-28T18:05:21.969Z +83.752s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#116 2026-10-28T18:05:22.220Z +84.003s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#117 2026-10-28T18:05:22.470Z +84.253s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#118 2026-10-28T18:05:22.720Z +84.503s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#119 2026-10-28T18:05:22.971Z +84.754s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#120 2026-10-28T18:05:23.222Z +85.005s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#121 2026-10-28T18:05:23.473Z +85.256s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#122 2026-10-28T18:05:23.721Z +85.504s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#123 2026-10-28T18:05:23.972Z +85.754s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#124 2026-10-28T18:05:24.221Z +86.003s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#125 2026-10-28T18:05:24.471Z +86.253s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#126 2026-10-28T18:05:24.721Z +86.503s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#127 2026-10-28T18:05:24.970Z +86.753s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#128 2026-10-28T18:05:25.221Z +87.004s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#129 2026-10-28T18:05:25.472Z +87.255s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#130 2026-10-28T18:05:25.722Z +87.504s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#131 2026-10-28T18:05:25.973Z +87.755s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#132 2026-10-28T18:05:26.231Z +88.014s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#133 2026-10-28T18:05:26.478Z +88.261s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#134 2026-10-28T18:05:26.726Z +88.508s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#135 2026-10-28T18:05:26.978Z +88.761s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#136 2026-10-28T18:05:27.233Z +89.015s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#137 2026-10-28T18:05:27.478Z +89.261s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#138 2026-10-28T18:05:27.728Z +89.511s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#139 2026-10-28T18:05:27.980Z +89.763s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#140 2026-10-28T18:05:28.233Z +90.016s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#141 2026-10-28T18:05:28.481Z +90.264s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#142 2026-10-28T18:05:28.730Z +90.513s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#143 2026-10-28T18:05:28.981Z +90.763s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#144 2026-10-28T18:05:29.231Z +91.014s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#145 2026-10-28T18:05:29.484Z +91.267s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#146 2026-10-28T18:05:29.734Z +91.517s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#147 2026-10-28T18:05:29.984Z +91.767s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#148 2026-10-28T18:05:30.233Z +92.015s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#149 2026-10-28T18:05:30.485Z +92.267s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#150 2026-10-28T18:05:30.734Z +92.517s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#151 2026-10-28T18:05:30.986Z +92.769s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#152 2026-10-28T18:05:31.235Z +93.017s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#153 2026-10-28T18:05:31.487Z +93.270s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#154 2026-10-28T18:05:31.737Z +93.520s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#155 2026-10-28T18:05:31.990Z +93.773s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#156 2026-10-28T18:05:32.238Z +94.021s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#157 2026-10-28T18:05:32.492Z +94.275s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#158 2026-10-28T18:05:32.743Z +94.526s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#159 2026-10-28T18:05:32.993Z +94.776s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#160 2026-10-28T18:05:33.243Z +95.025s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#161 2026-10-28T18:05:33.495Z +95.278s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#162 2026-10-28T18:05:33.747Z +95.529s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#163 2026-10-28T18:05:33.995Z +95.778s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#164 2026-10-28T18:05:34.247Z +96.030s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#165 2026-10-28T18:05:34.498Z +96.281s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#166 2026-10-28T18:05:34.748Z +96.531s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#167 2026-10-28T18:05:34.999Z +96.782s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#168 2026-10-28T18:05:35.249Z +97.032s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#169 2026-10-28T18:05:35.500Z +97.283s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#170 2026-10-28T18:05:35.751Z +97.534s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#171 2026-10-28T18:05:36.002Z +97.785s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#172 2026-10-28T18:05:36.253Z +98.036s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#173 2026-10-28T18:05:36.502Z +98.285s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#174 2026-10-28T18:05:36.728Z +98.511s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onLoadProgress, data 1
+#175 2026-10-28T18:05:36.751Z +98.534s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#176 2026-10-28T18:05:37.005Z +98.788s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#177 2026-10-28T18:05:37.075Z +98.858s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onLoadProgress, data 1
+#178 2026-10-28T18:05:37.255Z +99.037s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#179 2026-10-28T18:05:37.505Z +99.288s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#180 2026-10-28T18:05:37.755Z +99.538s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#181 2026-10-28T18:05:38.007Z +99.790s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#182 2026-10-28T18:05:38.257Z +100.039s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#183 2026-10-28T18:05:38.509Z +100.292s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#184 2026-10-28T18:05:38.758Z +100.540s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#185 2026-10-28T18:05:39.009Z +100.792s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#186 2026-10-28T18:05:39.258Z +101.040s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#187 2026-10-28T18:05:39.508Z +101.291s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#188 2026-10-28T18:05:39.760Z +101.543s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#189 2026-10-28T18:05:40.012Z +101.795s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#190 2026-10-28T18:05:40.260Z +102.043s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#191 2026-10-28T18:05:40.513Z +102.296s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#192 2026-10-28T18:05:40.763Z +102.546s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#193 2026-10-28T18:05:41.011Z +102.794s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#194 2026-10-28T18:05:41.264Z +103.046s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#195 2026-10-28T18:05:41.515Z +103.297s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#196 2026-10-28T18:05:41.765Z +103.547s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#197 2026-10-28T18:05:42.015Z +103.798s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#198 2026-10-28T18:05:42.266Z +104.048s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#199 2026-10-28T18:05:42.516Z +104.299s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#200 2026-10-28T18:05:42.766Z +104.549s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#201 2026-10-28T18:05:43.015Z +104.798s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#202 2026-10-28T18:05:43.267Z +105.050s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#203 2026-10-28T18:05:43.518Z +105.301s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#204 2026-10-28T18:05:43.769Z +105.552s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#205 2026-10-28T18:05:44.019Z +105.801s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#206 2026-10-28T18:05:44.269Z +106.051s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#207 2026-10-28T18:05:44.517Z +106.300s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#208 2026-10-28T18:05:44.768Z +106.551s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#209 2026-10-28T18:05:45.019Z +106.801s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#210 2026-10-28T18:05:45.269Z +107.052s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#211 2026-10-28T18:05:45.520Z +107.303s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#212 2026-10-28T18:05:45.771Z +107.554s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#213 2026-10-28T18:05:46.020Z +107.803s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#214 2026-10-28T18:05:46.271Z +108.053s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#215 2026-10-28T18:05:46.525Z +108.307s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#216 2026-10-28T18:05:46.774Z +108.557s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#217 2026-10-28T18:05:47.025Z +108.808s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#218 2026-10-28T18:05:47.277Z +109.059s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#219 2026-10-28T18:05:47.528Z +109.311s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#220 2026-10-28T18:05:47.778Z +109.560s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#221 2026-10-28T18:05:48.029Z +109.812s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#222 2026-10-28T18:05:48.278Z +110.061s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#223 2026-10-28T18:05:48.530Z +110.313s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#224 2026-10-28T18:05:48.779Z +110.562s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#225 2026-10-28T18:05:49.030Z +110.812s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#226 2026-10-28T18:05:49.281Z +111.064s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#227 2026-10-28T18:05:49.530Z +111.313s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#228 2026-10-28T18:05:49.781Z +111.564s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#229 2026-10-28T18:05:50.033Z +111.816s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#230 2026-10-28T18:05:50.283Z +112.065s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#231 2026-10-28T18:05:50.534Z +112.317s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#232 2026-10-28T18:05:50.784Z +112.566s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#233 2026-10-28T18:05:51.034Z +112.817s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#234 2026-10-28T18:05:51.285Z +113.068s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#235 2026-10-28T18:05:51.536Z +113.319s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#236 2026-10-28T18:05:51.786Z +113.569s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#237 2026-10-28T18:05:52.036Z +113.819s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#238 2026-10-28T18:05:52.288Z +114.071s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#239 2026-10-28T18:05:52.538Z +114.321s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#240 2026-10-28T18:05:52.788Z +114.570s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#241 2026-10-28T18:05:53.042Z +114.824s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#242 2026-10-28T18:05:53.290Z +115.072s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#243 2026-10-28T18:05:53.539Z +115.322s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#244 2026-10-28T18:05:53.789Z +115.572s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#245 2026-10-28T18:05:54.041Z +115.823s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#246 2026-10-28T18:05:54.290Z +116.073s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#247 2026-10-28T18:05:54.541Z +116.324s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#248 2026-10-28T18:05:54.792Z +116.574s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#249 2026-10-28T18:05:55.042Z +116.825s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#250 2026-10-28T18:05:55.293Z +117.076s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#251 2026-10-28T18:05:55.544Z +117.326s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#252 2026-10-28T18:05:55.793Z +117.576s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#253 2026-10-28T18:05:56.045Z +117.827s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#254 2026-10-28T18:05:56.297Z +118.079s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#255 2026-10-28T18:05:56.547Z +118.329s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#256 2026-10-28T18:05:56.797Z +118.579s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#257 2026-10-28T18:05:57.046Z +118.828s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#258 2026-10-28T18:05:57.298Z +119.081s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#259 2026-10-28T18:05:57.548Z +119.331s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#260 2026-10-28T18:05:57.800Z +119.582s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#261 2026-10-28T18:05:58.050Z +119.833s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#262 2026-10-28T18:05:58.301Z +120.084s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#263 2026-10-28T18:05:58.551Z +120.334s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#264 2026-10-28T18:05:58.801Z +120.584s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#265 2026-10-28T18:05:59.053Z +120.835s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#266 2026-10-28T18:05:59.303Z +121.086s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#267 2026-10-28T18:05:59.554Z +121.336s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#268 2026-10-28T18:05:59.803Z +121.585s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#269 2026-10-28T18:06:00.054Z +121.837s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#270 2026-10-28T18:06:00.305Z +122.088s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#271 2026-10-28T18:06:00.556Z +122.339s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#272 2026-10-28T18:06:00.805Z +122.588s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#273 2026-10-28T18:06:01.056Z +122.839s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#274 2026-10-28T18:06:01.307Z +123.090s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#275 2026-10-28T18:06:01.557Z +123.340s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#276 2026-10-28T18:06:01.807Z +123.590s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#277 2026-10-28T18:06:02.058Z +123.840s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#278 2026-10-28T18:06:02.309Z +124.092s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#279 2026-10-28T18:06:02.560Z +124.342s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#280 2026-10-28T18:06:02.810Z +124.592s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#281 2026-10-28T18:06:03.060Z +124.843s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#282 2026-10-28T18:06:03.312Z +125.094s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#283 2026-10-28T18:06:03.562Z +125.345s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#284 2026-10-28T18:06:03.813Z +125.596s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#285 2026-10-28T18:06:04.063Z +125.846s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#286 2026-10-28T18:06:04.314Z +126.097s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#287 2026-10-28T18:06:04.565Z +126.347s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#288 2026-10-28T18:06:04.814Z +126.597s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#289 2026-10-28T18:06:05.063Z +126.846s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#290 2026-10-28T18:06:05.316Z +127.099s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#291 2026-10-28T18:06:05.566Z +127.349s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#292 2026-10-28T18:06:05.816Z +127.598s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#293 2026-10-28T18:06:06.068Z +127.850s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#294 2026-10-28T18:06:06.316Z +128.099s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#295 2026-10-28T18:06:06.569Z +128.352s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#296 2026-10-28T18:06:06.818Z +128.601s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#297 2026-10-28T18:06:07.070Z +128.852s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#298 2026-10-28T18:06:07.319Z +129.102s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#299 2026-10-28T18:06:07.571Z +129.354s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#300 2026-10-28T18:06:07.821Z +129.604s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#301 2026-10-28T18:06:08.072Z +129.855s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#302 2026-10-28T18:06:08.324Z +130.106s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#303 2026-10-28T18:06:08.573Z +130.356s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#304 2026-10-28T18:06:08.824Z +130.607s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#305 2026-10-28T18:06:09.075Z +130.857s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#306 2026-10-28T18:06:09.325Z +131.108s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#307 2026-10-28T18:06:09.578Z +131.360s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#308 2026-10-28T18:06:09.830Z +131.612s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#309 2026-10-28T18:06:10.077Z +131.860s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#310 2026-10-28T18:06:10.329Z +132.111s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#311 2026-10-28T18:06:10.578Z +132.360s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#312 2026-10-28T18:06:10.829Z +132.611s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#313 2026-10-28T18:06:11.078Z +132.861s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#314 2026-10-28T18:06:11.328Z +133.111s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#315 2026-10-28T18:06:11.579Z +133.361s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#316 2026-10-28T18:06:11.829Z +133.611s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#317 2026-10-28T18:06:12.080Z +133.863s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#318 2026-10-28T18:06:12.330Z +134.113s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#319 2026-10-28T18:06:12.579Z +134.362s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#320 2026-10-28T18:06:12.830Z +134.612s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#321 2026-10-28T18:06:13.083Z +134.865s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#322 2026-10-28T18:06:13.331Z +135.114s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#323 2026-10-28T18:06:13.584Z +135.366s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#324 2026-10-28T18:06:13.833Z +135.615s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#325 2026-10-28T18:06:14.083Z +135.866s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#326 2026-10-28T18:06:14.335Z +136.118s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#327 2026-10-28T18:06:14.585Z +136.367s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#328 2026-10-28T18:06:14.835Z +136.618s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#329 2026-10-28T18:06:15.086Z +136.869s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#330 2026-10-28T18:06:15.336Z +137.119s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#331 2026-10-28T18:06:15.589Z +137.372s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#332 2026-10-28T18:06:15.838Z +137.621s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#333 2026-10-28T18:06:16.089Z +137.872s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#334 2026-10-28T18:06:16.339Z +138.122s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#335 2026-10-28T18:06:16.590Z +138.372s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#336 2026-10-28T18:06:16.840Z +138.623s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#337 2026-10-28T18:06:17.090Z +138.873s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#338 2026-10-28T18:06:17.341Z +139.124s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#339 2026-10-28T18:06:17.592Z +139.375s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#340 2026-10-28T18:06:17.842Z +139.625s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#341 2026-10-28T18:06:18.093Z +139.876s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#342 2026-10-28T18:06:18.343Z +140.125s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#343 2026-10-28T18:06:18.594Z +140.376s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#344 2026-10-28T18:06:18.844Z +140.626s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#345 2026-10-28T18:06:19.093Z +140.876s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#346 2026-10-28T18:06:19.345Z +141.127s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#347 2026-10-28T18:06:19.596Z +141.378s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#348 2026-10-28T18:06:19.845Z +141.628s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#349 2026-10-28T18:06:20.096Z +141.879s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#350 2026-10-28T18:06:20.347Z +142.130s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#351 2026-10-28T18:06:20.596Z +142.378s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#352 2026-10-28T18:06:20.848Z +142.630s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#353 2026-10-28T18:06:21.098Z +142.880s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#354 2026-10-28T18:06:21.351Z +143.133s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#355 2026-10-28T18:06:21.601Z +143.384s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#356 2026-10-28T18:06:21.851Z +143.633s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#357 2026-10-28T18:06:22.101Z +143.884s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#358 2026-10-28T18:06:22.354Z +144.136s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#359 2026-10-28T18:06:22.604Z +144.387s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#360 2026-10-28T18:06:22.854Z +144.636s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#361 2026-10-28T18:06:23.105Z +144.888s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#362 2026-10-28T18:06:23.355Z +145.137s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#363 2026-10-28T18:06:23.605Z +145.388s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#364 2026-10-28T18:06:23.855Z +145.638s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#365 2026-10-28T18:06:24.106Z +145.888s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#366 2026-10-28T18:06:24.357Z +146.140s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#367 2026-10-28T18:06:24.607Z +146.390s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#368 2026-10-28T18:06:24.857Z +146.639s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#369 2026-10-28T18:06:25.108Z +146.890s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#370 2026-10-28T18:06:25.362Z +147.145s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#371 2026-10-28T18:06:25.609Z +147.392s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#372 2026-10-28T18:06:25.858Z +147.641s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#373 2026-10-28T18:06:26.108Z +147.891s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#374 2026-10-28T18:06:26.360Z +148.142s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#375 2026-10-28T18:06:26.610Z +148.393s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#376 2026-10-28T18:06:26.860Z +148.643s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#377 2026-10-28T18:06:27.112Z +148.894s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#378 2026-10-28T18:06:27.361Z +149.144s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#379 2026-10-28T18:06:27.613Z +149.396s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#380 2026-10-28T18:06:27.863Z +149.645s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#381 2026-10-28T18:06:28.113Z +149.896s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#382 2026-10-28T18:06:28.364Z +150.147s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#383 2026-10-28T18:06:28.615Z +150.398s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#384 2026-10-28T18:06:28.864Z +150.647s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#385 2026-10-28T18:06:29.115Z +150.898s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#386 2026-10-28T18:06:29.365Z +151.148s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#387 2026-10-28T18:06:29.616Z +151.399s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#388 2026-10-28T18:06:29.866Z +151.648s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#389 2026-10-28T18:06:30.117Z +151.899s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#390 2026-10-28T18:06:30.368Z +152.151s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#391 2026-10-28T18:06:30.619Z +152.402s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#392 2026-10-28T18:06:30.868Z +152.650s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#393 2026-10-28T18:06:31.121Z +152.903s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#394 2026-10-28T18:06:31.372Z +153.154s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#395 2026-10-28T18:06:31.622Z +153.404s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#396 2026-10-28T18:06:31.871Z +153.654s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#397 2026-10-28T18:06:32.122Z +153.905s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#398 2026-10-28T18:06:32.372Z +154.155s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#399 2026-10-28T18:06:32.623Z +154.406s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#400 2026-10-28T18:06:32.873Z +154.655s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#401 2026-10-28T18:06:33.123Z +154.906s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#402 2026-10-28T18:06:33.373Z +155.155s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#403 2026-10-28T18:06:33.622Z +155.405s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#404 2026-10-28T18:06:33.759Z +155.541s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | event onStateChange, data 0
+#405 2026-10-28T18:06:33.764Z +155.547s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | Playback: Ended
+#406 2026-10-28T18:06:33.765Z +155.547s | last accepted 1/6 ScMzIvxBSi4 | requested 1 accepted 0 natural-observed 0 | load requested: natural, target 2 jNQXAC9IVRw, generation 1
+#407 2026-10-28T18:06:33.798Z +155.581s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | load command accepted, generation 1; not proof of playback
+#408 2026-10-28T18:06:33.838Z +155.620s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onStateChange, data 3
+#409 2026-10-28T18:06:33.860Z +155.643s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | Playback: Buffering
+#410 2026-10-28T18:06:33.997Z +155.779s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoDataChange, data non-numeric redacted
+#411 2026-10-28T18:06:34.025Z +155.808s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onApiChange, data none
+#412 2026-10-28T18:06:34.158Z +155.941s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onPlaybackQualityChange, data non-numeric redacted
+#413 2026-10-28T18:06:34.190Z +155.973s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoDataChange, data non-numeric redacted
+#414 2026-10-28T18:06:34.195Z +155.978s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoDataChange, data non-numeric redacted
+#415 2026-10-28T18:06:34.218Z +156.000s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onLoadProgress, data 1
+#416 2026-10-28T18:06:34.435Z +156.218s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#417 2026-10-28T18:06:34.542Z +156.325s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onLoadProgress, data 1
+#418 2026-10-28T18:06:34.683Z +156.466s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#419 2026-10-28T18:06:34.749Z +156.531s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoDataChange, data non-numeric redacted
+#420 2026-10-28T18:06:34.936Z +156.718s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#421 2026-10-28T18:06:35.187Z +156.970s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#422 2026-10-28T18:06:35.440Z +157.223s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#423 2026-10-28T18:06:35.686Z +157.468s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#424 2026-10-28T18:06:35.941Z +157.723s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#425 2026-10-28T18:06:36.191Z +157.974s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#426 2026-10-28T18:06:36.444Z +158.226s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#427 2026-10-28T18:06:36.692Z +158.475s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#428 2026-10-28T18:06:36.944Z +158.727s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#429 2026-10-28T18:06:37.198Z +158.981s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#430 2026-10-28T18:06:37.454Z +159.237s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#431 2026-10-28T18:06:37.707Z +159.489s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#432 2026-10-28T18:06:37.957Z +159.739s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#433 2026-10-28T18:06:38.207Z +159.990s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#434 2026-10-28T18:06:38.454Z +160.236s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#435 2026-10-28T18:06:38.708Z +160.490s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#436 2026-10-28T18:06:38.958Z +160.741s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#437 2026-10-28T18:06:39.208Z +160.991s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#438 2026-10-28T18:06:39.459Z +161.242s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#439 2026-10-28T18:06:39.708Z +161.490s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#440 2026-10-28T18:06:39.960Z +161.742s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#441 2026-10-28T18:06:40.210Z +161.993s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#442 2026-10-28T18:06:40.461Z +162.244s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#443 2026-10-28T18:06:40.710Z +162.493s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#444 2026-10-28T18:06:40.961Z +162.743s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#445 2026-10-28T18:06:41.208Z +162.990s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#446 2026-10-28T18:06:41.461Z +163.244s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#447 2026-10-28T18:06:41.709Z +163.492s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#448 2026-10-28T18:06:41.756Z +163.538s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | app active
+#449 2026-10-28T18:06:41.960Z +163.742s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#450 2026-10-28T18:06:42.210Z +163.993s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#451 2026-10-28T18:06:42.461Z +164.244s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#452 2026-10-28T18:06:42.712Z +164.494s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#453 2026-10-28T18:06:42.962Z +164.745s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#454 2026-10-28T18:06:43.218Z +165.000s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#455 2026-10-28T18:06:43.468Z +165.250s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#456 2026-10-28T18:06:43.714Z +165.497s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#457 2026-10-28T18:06:43.964Z +165.746s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#458 2026-10-28T18:06:44.214Z +165.996s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#459 2026-10-28T18:06:44.465Z +166.247s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#460 2026-10-28T18:06:44.714Z +166.497s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#461 2026-10-28T18:06:44.968Z +166.751s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#462 2026-10-28T18:06:45.217Z +166.999s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#463 2026-10-28T18:06:45.466Z +167.249s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#464 2026-10-28T18:06:45.717Z +167.499s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#465 2026-10-28T18:06:45.973Z +167.755s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#466 2026-10-28T18:06:46.219Z +168.002s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#467 2026-10-28T18:06:46.469Z +168.251s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#468 2026-10-28T18:06:46.719Z +168.501s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#469 2026-10-28T18:06:46.969Z +168.751s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#470 2026-10-28T18:06:47.220Z +169.002s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#471 2026-10-28T18:06:47.471Z +169.254s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#472 2026-10-28T18:06:47.724Z +169.507s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#473 2026-10-28T18:06:47.974Z +169.756s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#474 2026-10-28T18:06:48.226Z +170.008s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#475 2026-10-28T18:06:48.475Z +170.258s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#476 2026-10-28T18:06:48.728Z +170.511s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#477 2026-10-28T18:06:48.974Z +170.756s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#478 2026-10-28T18:06:49.225Z +171.008s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#479 2026-10-28T18:06:49.476Z +171.258s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#480 2026-10-28T18:06:49.725Z +171.507s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#481 2026-10-28T18:06:49.976Z +171.759s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#482 2026-10-28T18:06:50.227Z +172.010s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#483 2026-10-28T18:06:50.477Z +172.260s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#484 2026-10-28T18:06:50.728Z +172.510s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#485 2026-10-28T18:06:50.978Z +172.761s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#486 2026-10-28T18:06:51.229Z +173.012s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#487 2026-10-28T18:06:51.481Z +173.263s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#488 2026-10-28T18:06:51.730Z +173.512s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#489 2026-10-28T18:06:51.982Z +173.765s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#490 2026-10-28T18:06:52.234Z +174.017s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#491 2026-10-28T18:06:52.486Z +174.269s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#492 2026-10-28T18:06:52.735Z +174.518s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#493 2026-10-28T18:06:52.984Z +174.766s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#494 2026-10-28T18:06:53.234Z +175.017s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onVideoProgress, data non-numeric redacted
+#495 2026-10-28T18:06:53.439Z +175.221s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | event onStateChange, data 0
+#496 2026-10-28T18:06:53.445Z +175.228s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | Playback: Ended
+#497 2026-10-28T18:06:53.445Z +175.228s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | ended ignored or buffered; occurrence attribution unavailable
+#498 2026-10-28T18:06:57.969Z +179.752s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | app inactive
+#499 2026-10-28T18:07:17.549Z +199.331s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | window occlusion changed; window 9476, occlusion-visible=false, miniaturized=false
+#500 2026-10-28T18:07:25.292Z +207.075s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | JS emission probe (page milliseconds:state; last 100): 58682:-1, 58683:3, 60558:1, 154837:0, 154917:-1, 154917:3, 155515:1, 174516:0

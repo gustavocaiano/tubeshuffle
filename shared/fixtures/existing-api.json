@@ -1,0 +1,151 @@
+{
+  "playlist": {
+    "request": {
+      "method": "GET",
+      "path": "/api/youtube/playlist?playlistId=PL123456789"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "id": "PL123456789",
+        "title": "Sample",
+        "description": null,
+        "thumbnail": null,
+        "channelTitle": null,
+        "videoCount": 2,
+        "videos": [
+          {
+            "id": "abcdefghijk",
+            "title": "Track",
+            "channelTitle": "Artist",
+            "thumbnail": "",
+            "duration": 0,
+            "position": 0
+          },
+          {
+            "id": "abcdefghijk",
+            "title": "Track",
+            "channelTitle": "Artist",
+            "thumbnail": "",
+            "duration": 0,
+            "position": 1
+          }
+        ]
+      }
+    }
+  },
+  "playlistPopulatedVideo": {
+    "id": "abcdefghijk",
+    "title": "Track",
+    "channelTitle": "Unknown",
+    "thumbnail": "",
+    "duration": 180,
+    "position": 0,
+    "viewCount": 1234,
+    "likeCount": 56,
+    "description": "About",
+    "tags": ["tag"],
+    "categoryId": "10",
+    "publishedAt": "2020-01-02T00:00:00Z"
+  },
+  "suggestions": {
+    "request": {
+      "method": "POST",
+      "path": "/api/youtube/suggestions",
+      "body": {
+        "playlistId": "local-id",
+        "dateKey": "2026-10-28",
+        "seeds": [
+          {
+            "title": "Track",
+            "channelTitle": "Artist"
+          }
+        ],
+        "excludeVideoIds": []
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "playlistId": "local-id",
+        "generatedAt": "2026-10-28T00:00:00.000Z",
+        "dateKey": "2026-10-28",
+        "query": "artist similar songs music",
+        "quotaCost": 401,
+        "suggestions": [
+          {
+            "id": "candidate01",
+            "youtubeId": "candidate01",
+            "title": "Artist Song",
+            "channelTitle": "Artist",
+            "thumbnail": "https://example.test/thumb.jpg",
+            "duration": 180,
+            "url": "https://www.youtube.com/watch?v=candidate01",
+            "reason": "Weighted toward this playlist's artists, channels, and similar signals",
+            "query": "artist similar songs music",
+            "publishedAt": "2020-01-02T00:00:00Z",
+            "viewCount": 1234
+          }
+        ]
+      }
+    }
+  },
+  "errors": [
+    {
+      "endpoint": "playlist",
+      "status": 400,
+      "body": {
+        "error": "Invalid playlist id format"
+      }
+    },
+    {
+      "endpoint": "playlist",
+      "status": 404,
+      "body": {
+        "error": "Playlist not found"
+      }
+    },
+    {
+      "endpoint": "playlist",
+      "status": 422,
+      "body": {
+        "error": "Playlist exceeds supported import size"
+      }
+    },
+    {
+      "endpoint": "playlist",
+      "status": 502,
+      "body": {
+        "error": "YouTube API request rejected"
+      }
+    },
+    {
+      "endpoint": "suggestions",
+      "status": 400,
+      "body": {
+        "error": "At least one suggestion seed is required"
+      }
+    },
+    {
+      "endpoint": "suggestions",
+      "status": 413,
+      "body": {
+        "error": "Suggestions request is too large"
+      }
+    },
+    {
+      "endpoint": "suggestions",
+      "status": 429,
+      "body": {
+        "error": "Daily suggestions are temporarily rate limited"
+      }
+    },
+    {
+      "endpoint": "both",
+      "status": 500,
+      "body": {
+        "error": "Server configuration error"
+      }
+    }
+  ]
+}

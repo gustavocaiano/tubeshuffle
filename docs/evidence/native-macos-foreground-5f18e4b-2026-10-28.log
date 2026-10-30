@@ -1,0 +1,51 @@
+TubeShuffle — teste único em primeiro plano
+Commit: 5f18e4be8e8da40f7908482a60b48a965c0d4ccc; branch: t3/macos-app
+Compilação arm64: sucesso; macOS 27.0.1 (26A434); Xcode 26.6 (17F113).
+Play uma vez; sem procurar, pausar, saltar, minimizar ou ocultar durante o teste.
+O utilizador confirmou áudio nos três vídeos e as duas transições naturais.
+1→2: 19:44:41 UTC; 2→3: 19:45:01 UTC. Último estado registado: #41 2026-10-28T19:45:28.445Z +146.491s | last accepted 3/6 dQw4w9WgXcQ | requested 2 accepted 2 natural-observed 2 | window occlusion changed; window 10049, occlusion-visible=false, miniaturized=false
+Erros/timeout/restart encontrados: 0.
+Limitação: janela marcada como coberta de 19:43:18 a 19:43:57 UTC durante o primeiro vídeo; foi ativada antes de ambas as transições. O estado de oclusão não prova visibilidade real.
+O log foi copiado antes de sair. Não foram executados outros testes.
+
+#1 2026-10-28T19:43:01.957Z +0.003s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | Session started; bundle com.tubeshuffle.playbacklab
+#2 2026-10-28T19:43:02.171Z +0.217s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | app active
+#3 2026-10-28T19:43:02.227Z +0.273s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | player window attached: 10049, occlusion-visible=false; not a visibility proof
+#4 2026-10-28T19:43:02.244Z +0.290s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | window occlusion changed; window 10049, occlusion-visible=true, miniaturized=false
+#5 2026-10-28T19:43:04.173Z +2.220s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | iframe API ready
+#6 2026-10-28T19:43:04.521Z +2.567s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | Player ready
+#7 2026-10-28T19:43:06.126Z +4.172s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | play command completed for generation 1
+#8 2026-10-28T19:43:06.157Z +4.204s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | iframe state -1 generation 1
+#9 2026-10-28T19:43:06.158Z +4.204s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | Playback: Unstarted
+#10 2026-10-28T19:43:06.160Z +4.206s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | iframe state 3 generation 1
+#11 2026-10-28T19:43:06.160Z +4.206s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | Playback: Buffering
+#12 2026-10-28T19:43:06.975Z +5.022s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | iframe state 1 generation 1
+#13 2026-10-28T19:43:06.976Z +5.022s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | Playback: Playing
+#14 2026-10-28T19:43:12.932Z +10.978s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | app inactive
+#15 2026-10-28T19:43:18.531Z +16.578s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | window occlusion changed; window 10049, occlusion-visible=false, miniaturized=false
+#16 2026-10-28T19:43:57.651Z +55.697s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | app active
+#17 2026-10-28T19:43:57.676Z +55.723s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | window occlusion changed; window 10049, occlusion-visible=true, miniaturized=false
+#18 2026-10-28T19:44:41.274Z +99.320s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | iframe state 0 generation 1
+#19 2026-10-28T19:44:41.275Z +99.321s | last accepted 1/6 ScMzIvxBSi4 | requested 0 accepted 0 natural-observed 0 | Playback: Ended
+#20 2026-10-28T19:44:41.275Z +99.321s | last accepted 1/6 ScMzIvxBSi4 | requested 1 accepted 0 natural-observed 0 | load requested: natural, target 2 jNQXAC9IVRw, generation 2
+#21 2026-10-28T19:44:41.291Z +99.337s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | load command accepted, generation 2; not proof of playback
+#22 2026-10-28T19:44:41.763Z +99.810s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | Player ready
+#23 2026-10-28T19:44:41.804Z +99.851s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | iframe state -1 generation 2
+#24 2026-10-28T19:44:41.805Z +99.851s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | Playback: Unstarted
+#25 2026-10-28T19:44:41.807Z +99.853s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | iframe state 3 generation 2
+#26 2026-10-28T19:44:41.807Z +99.853s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | Playback: Buffering
+#27 2026-10-28T19:44:42.371Z +100.417s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | iframe state 1 generation 2
+#28 2026-10-28T19:44:42.371Z +100.417s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 0 | Playback: Playing
+#29 2026-10-28T19:45:01.371Z +119.417s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 1 | iframe state 0 generation 2
+#30 2026-10-28T19:45:01.371Z +119.417s | last accepted 2/6 jNQXAC9IVRw | requested 1 accepted 1 natural-observed 1 | Playback: Ended
+#31 2026-10-28T19:45:01.371Z +119.418s | last accepted 2/6 jNQXAC9IVRw | requested 2 accepted 1 natural-observed 1 | load requested: natural, target 3 dQw4w9WgXcQ, generation 3
+#32 2026-10-28T19:45:01.382Z +119.428s | last accepted 3/6 dQw4w9WgXcQ | requested 2 accepted 2 natural-observed 1 | load command accepted, generation 3; not proof of playback
+#33 2026-10-28T19:45:01.627Z +119.673s | last accepted 3/6 dQw4w9WgXcQ | requested 2 accepted 2 natural-observed 1 | Player ready
+#34 2026-10-28T19:45:01.636Z +119.683s | last accepted 3/6 dQw4w9WgXcQ | requested 2 accepted 2 natural-observed 1 | iframe state -1 generation 3
+#35 2026-10-28T19:45:01.637Z +119.683s | last accepted 3/6 dQw4w9WgXcQ | requested 2 accepted 2 natural-observed 1 | Playback: Unstarted
+#36 2026-10-28T19:45:01.637Z +119.683s | last accepted 3/6 dQw4w9WgXcQ | requested 2 accepted 2 natural-observed 1 | iframe state 3 generation 3
+#37 2026-10-28T19:45:01.637Z +119.683s | last accepted 3/6 dQw4w9WgXcQ | requested 2 accepted 2 natural-observed 1 | Playback: Buffering
+#38 2026-10-28T19:45:02.196Z +120.243s | last accepted 3/6 dQw4w9WgXcQ | requested 2 accepted 2 natural-observed 1 | iframe state 1 generation 3
+#39 2026-10-28T19:45:02.197Z +120.243s | last accepted 3/6 dQw4w9WgXcQ | requested 2 accepted 2 natural-observed 1 | Playback: Playing
+#40 2026-10-28T19:45:05.447Z +123.494s | last accepted 3/6 dQw4w9WgXcQ | requested 2 accepted 2 natural-observed 2 | app inactive
+#41 2026-10-28T19:45:28.445Z +146.491s | last accepted 3/6 dQw4w9WgXcQ | requested 2 accepted 2 natural-observed 2 | window occlusion changed; window 10049, occlusion-visible=false, miniaturized=false
