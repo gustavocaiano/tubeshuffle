@@ -11,6 +11,12 @@ private final class SyntheticBackend: KeychainBackend, @unchecked Sendable {
     private let lock = NSLock()
     private var values: [String: Data] = [:]
     private var failures: [Operation: Set<String>] = [:]
+    private var accesses: [Operation: [String: Int]] = [:]
+
+    func accessCount(_ operation: Operation, key: String) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        return accesses[operation]?[key] ?? 0
+    }
 
     func fail(_ operation: Operation, key: String, enabled: Bool) {
         lock.lock(); defer { lock.unlock() }
@@ -19,6 +25,7 @@ private final class SyntheticBackend: KeychainBackend, @unchecked Sendable {
     }
     func add(service: String, key: String, value: Data) -> OSStatus {
         lock.lock(); defer { lock.unlock() }
+        accesses[.write, default: [:]][key, default: 0] += 1
         if failures[.write, default: []].contains(key) { return errSecNotAvailable }
         if values[key] != nil { return errSecDuplicateItem }
         values[key] = value
@@ -26,6 +33,7 @@ private final class SyntheticBackend: KeychainBackend, @unchecked Sendable {
     }
     func update(service: String, key: String, value: Data) -> OSStatus {
         lock.lock(); defer { lock.unlock() }
+        accesses[.write, default: [:]][key, default: 0] += 1
         if failures[.write, default: []].contains(key) { return errSecNotAvailable }
         guard values[key] != nil else { return errSecItemNotFound }
         values[key] = value
@@ -33,14 +41,21 @@ private final class SyntheticBackend: KeychainBackend, @unchecked Sendable {
     }
     func read(service: String, key: String) -> (OSStatus, Data?) {
         lock.lock(); defer { lock.unlock() }
+        accesses[.read, default: [:]][key, default: 0] += 1
         if failures[.read, default: []].contains(key) { return (errSecNotAvailable, nil) }
         guard let value = values[key] else { return (errSecItemNotFound, nil) }
         return (errSecSuccess, value)
     }
     func delete(service: String, key: String) -> OSStatus {
         lock.lock(); defer { lock.unlock() }
+        accesses[.delete, default: [:]][key, default: 0] += 1
         if failures[.delete, default: []].contains(key) { return errSecNotAvailable }
         return values.removeValue(forKey: key) == nil ? errSecItemNotFound : errSecSuccess
+    }
+    // Test instrumentation, not an AuthLocalStorage access.
+    func matches(_ key: String, _ expected: Data?) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return values[key] == expected
     }
 }
 
@@ -137,6 +152,131 @@ private final class RequestCounter: @unchecked Sendable {
     func reject() throws -> (Data, URLResponse) {
         lock.lock(); count += 1; lock.unlock()
         throw URLError(.notConnectedToInternet)
+    }
+}
+
+// A separate, closed owner for the scoped policy. The older probes below
+// intentionally exercise unscoped SDK behavior and are not this boundary.
+// This only fences work in this process, not crashes, other processes, or Keychain.
+@MainActor
+private final class ScopedSyntheticOwner {
+    enum Scenario { case valid, absent, corrupt, readFailure, deleteSession, deleteVerifier, verifySession, verifyVerifier }
+    enum Restore: Equatable { case present, absent, corrupt, failed }
+    enum CleanupFailure: Error { case storage }
+    struct CleanupObservation {
+        let sessionRemoved: Bool
+        let verifierRemoved: Bool
+        let markerUnchanged: Bool
+        let hiddenLegacyUnchanged: Bool
+        let unownedAccesses: Int
+        let sessionDeletes: Int
+        let verifierDeletes: Int
+        let sessionReads: Int
+        let verifierReads: Int
+        let requests: Int
+    }
+    private let backend: SyntheticBackend
+    private let storage: ScopedSessionStorage
+    private let client: AuthClient
+    private let counter: RequestCounter
+    private let key: String
+    private let gate: AuthOperationGate
+    private static let markerKey = "unrelated.marker"
+    private static let legacyKey = "supabase.session"
+    private static let marker = Data([0, 255, 1, 128])
+    private static let legacy = Data([255, 0, 42, 7])
+
+    init(scenario: Scenario) throws {
+        let backend = SyntheticBackend()
+        let raw = KeychainAuthLocalStorage(service: "synthetic-only", backend: backend)
+        let key = "test.synthetic.\(UUID().uuidString)"
+        try raw.store(key: Self.markerKey, value: Self.marker)
+        try raw.store(key: Self.legacyKey, value: Self.legacy)
+        switch scenario {
+        case .valid, .readFailure, .deleteSession, .deleteVerifier, .verifySession, .verifyVerifier:
+            let user = User(id: UUID(), appMetadata: [:], userMetadata: [:], aud: "synthetic",
+                            createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0))
+            let session = Session(accessToken: "synthetic-access", tokenType: "bearer", expiresIn: 3600,
+                                  expiresAt: Date().timeIntervalSince1970 + 3600,
+                                  refreshToken: "synthetic-refresh", user: user)
+            try raw.store(key: key, value: JSONEncoder().encode(session))
+        case .corrupt: try raw.store(key: key, value: Data("not-json".utf8))
+        case .absent: break
+        }
+        try raw.store(key: "\(key)-code-verifier", value: Data("synthetic-verifier".utf8))
+        if scenario == .readFailure { backend.fail(.read, key: key, enabled: true) }
+        let scoped = ScopedSessionStorage(inner: raw, sessionKey: key)
+        let counter = RequestCounter()
+        self.backend = backend
+        self.storage = scoped
+        self.counter = counter
+        self.key = key
+        self.client = AuthClient(url: URL(string: "https://example.invalid")!, storageKey: key,
+                                 localStorage: scoped, fetch: { _ in try counter.reject() },
+                                 autoRefreshToken: false)
+        var firstCleanup = true
+        self.gate = AuthOperationGate {
+            let verifier = "\(key)-code-verifier"
+            let injected: (SyntheticBackend.Operation, String)?
+            if firstCleanup {
+                switch scenario {
+                case .deleteSession: injected = (.delete, key)
+                case .deleteVerifier: injected = (.delete, verifier)
+                case .verifySession: injected = (.read, key)
+                case .verifyVerifier: injected = (.read, verifier)
+                default: injected = nil
+                }
+            } else { injected = nil }
+            firstCleanup = false
+            if let injected { backend.fail(injected.0, key: injected.1, enabled: true) }
+            defer { if let injected { backend.fail(injected.0, key: injected.1, enabled: false) } }
+            var failed = false
+            for item in [key, verifier] {
+                do { try scoped.remove(key: item) } catch { failed = true }
+            }
+            for item in [key, verifier] {
+                do { if try scoped.retrieve(key: item) != nil { failed = true } }
+                catch { failed = true }
+            }
+            if failed { throw CleanupFailure.storage }
+        }
+    }
+
+    func restore() async throws -> Restore {
+        let result: Restore = try await gate.run { [client, storage] in
+            let before = storage.outcomes.count
+            if client.currentSession != nil { return .present }
+            let outcomes = Array(storage.outcomes.dropFirst(before))
+            if outcomes.contains(.underlyingFailure) { return .failed }
+            if outcomes.contains(.corrupt) { return .corrupt }
+            if outcomes.contains(.absent) { return .absent }
+            return .failed
+        }
+        backend.fail(.read, key: key, enabled: false)
+        return result
+    }
+
+    func cleanupLocally() async throws -> CleanupObservation {
+        try await gate.signOutLocally()
+        return observation()
+    }
+
+    func observation() -> CleanupObservation {
+        CleanupObservation(
+            sessionRemoved: backend.matches(key, nil),
+            verifierRemoved: backend.matches("\(key)-code-verifier", nil),
+            markerUnchanged: backend.matches(Self.markerKey, Self.marker),
+            hiddenLegacyUnchanged: backend.matches(Self.legacyKey, Self.legacy),
+            unownedAccesses: [Self.markerKey, Self.legacyKey].reduce(0) {
+                // Seeding through KeychainAuthLocalStorage may try update then add.
+                $0 + backend.accessCount(.read, key: $1) + backend.accessCount(.delete, key: $1)
+                    + backend.accessCount(.write, key: $1) - 2
+            },
+            sessionDeletes: backend.accessCount(.delete, key: key),
+            verifierDeletes: backend.accessCount(.delete, key: "\(key)-code-verifier"),
+            sessionReads: backend.accessCount(.read, key: key),
+            verifierReads: backend.accessCount(.read, key: "\(key)-code-verifier"),
+            requests: counter.requests)
     }
 }
 
@@ -311,6 +451,92 @@ private final class WriterLatch {
 
 @MainActor
 final class AuthStorageProbeTests: XCTestCase {
+    func testScopedOwnerPreservesUnownedBytesAndCleansOnlyOwnedKeys() async throws {
+        try await bounded {
+        let owner = try ScopedSyntheticOwner(scenario: .valid)
+        let restored = try await owner.restore()
+        XCTAssertEqual(restored, .present)
+        let result = try await owner.cleanupLocally()
+        XCTAssertTrue(result.sessionRemoved)
+        XCTAssertTrue(result.verifierRemoved)
+        XCTAssertTrue(result.markerUnchanged)
+        XCTAssertTrue(result.hiddenLegacyUnchanged)
+        XCTAssertEqual(result.requests, 0)
+        let afterCleanup = try await owner.restore()
+        XCTAssertEqual(afterCleanup, .absent)
+        let final = owner.observation()
+        XCTAssertEqual(final.requests, 0)
+        XCTAssertEqual(final.unownedAccesses, 0)
+        }
+    }
+
+    func testScopedOwnerDistinguishesAbsentAndCorruptWithoutNetwork() async throws {
+        try await bounded {
+        for (scenario, expected) in [(ScopedSyntheticOwner.Scenario.absent, ScopedSyntheticOwner.Restore.absent),
+                                     (.corrupt, .corrupt), (.readFailure, .failed)] {
+            let owner = try ScopedSyntheticOwner(scenario: scenario)
+            let restored = try await owner.restore()
+            XCTAssertEqual(restored, expected)
+            let result = try await owner.cleanupLocally()
+            XCTAssertTrue(result.sessionRemoved)
+            XCTAssertTrue(result.verifierRemoved)
+            XCTAssertTrue(result.markerUnchanged)
+            XCTAssertTrue(result.hiddenLegacyUnchanged)
+            XCTAssertEqual(result.requests, 0)
+            let afterCleanup = try await owner.restore()
+            XCTAssertEqual(afterCleanup, .absent)
+            let final = owner.observation()
+            XCTAssertEqual(final.requests, 0)
+            XCTAssertEqual(final.unownedAccesses, 0)
+        }
+        }
+    }
+
+    func testScopedCleanupFailuresKeepAdmissionClosedUntilVerifiedRetry() async throws {
+        try await bounded {
+            for scenario in [ScopedSyntheticOwner.Scenario.deleteSession, .deleteVerifier,
+                             .verifySession, .verifyVerifier] {
+                let owner = try ScopedSyntheticOwner(scenario: scenario)
+                let before = owner.observation()
+                do {
+                    _ = try await owner.cleanupLocally()
+                    XCTFail("cleanup failure must be reported")
+                } catch {
+                    XCTAssertEqual(error as? AuthOperationGate.Failure, .invalidationFailed)
+                }
+                let failed = owner.observation()
+                XCTAssertEqual(failed.sessionDeletes - before.sessionDeletes, 1)
+                XCTAssertEqual(failed.verifierDeletes - before.verifierDeletes, 1)
+                XCTAssertEqual(failed.sessionReads - before.sessionReads, 1)
+                XCTAssertEqual(failed.verifierReads - before.verifierReads, 1)
+                XCTAssertTrue(failed.markerUnchanged)
+                XCTAssertTrue(failed.hiddenLegacyUnchanged)
+                XCTAssertEqual(failed.unownedAccesses, 0)
+                XCTAssertEqual(failed.requests, 0)
+                do {
+                    _ = try await owner.restore()
+                    XCTFail("admission must remain closed")
+                } catch {
+                    XCTAssertEqual(error as? AuthOperationGate.Failure, .admissionClosed)
+                }
+                let retry = try await owner.cleanupLocally()
+                XCTAssertTrue(retry.sessionRemoved)
+                XCTAssertTrue(retry.verifierRemoved)
+                XCTAssertEqual(retry.sessionDeletes - failed.sessionDeletes, 1)
+                XCTAssertEqual(retry.verifierDeletes - failed.verifierDeletes, 1)
+                XCTAssertEqual(retry.sessionReads - failed.sessionReads, 1)
+                XCTAssertEqual(retry.verifierReads - failed.verifierReads, 1)
+                let afterRetry = try await owner.restore()
+                XCTAssertEqual(afterRetry, .absent)
+                let final = owner.observation()
+                XCTAssertTrue(final.markerUnchanged)
+                XCTAssertTrue(final.hiddenLegacyUnchanged)
+                XCTAssertEqual(final.unownedAccesses, 0)
+                XCTAssertEqual(final.requests, 0)
+            }
+        }
+    }
+
     private let legacy = "supabase.session"
     private func sessionData(accessToken: String = "synthetic-access") throws -> Data {
         let user = User(id: UUID(), appMetadata: [:], userMetadata: [:], aud: "synthetic",
