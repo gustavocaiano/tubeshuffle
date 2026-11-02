@@ -31,6 +31,7 @@ class AccountBuildConfigTests(unittest.TestCase):
         self.assertRegex(initializer.group(1),
                          r'#if DEBUG && LOCAL_OAUTH_DIAGNOSTIC\s+'
                          r'if ProcessInfo\.processInfo\.arguments\.contains\("--local-oauth-diagnostic"\) \{\s+'
+                         r'LocalOAuthDiagnosticOutput\.emit\(\.ready\)\s+'
                          r'return AccountViewModel\(factory: \{ try LocalOAuthDiagnosticService\(window: \$0\) \}\)\s+'
                          r'\}\s+#endif\s+return AccountViewModel\(\)')
         self.assertEqual(app.count('LocalOAuthDiagnosticService(window:'), 1)
@@ -50,7 +51,7 @@ class AccountBuildConfigTests(unittest.TestCase):
             self.assertNotIn(forbidden, app)
 
     def test_temporary_diagnostic_symbols_are_guarded(self):
-        for relative in ("TubeShuffle/Account/TransientSupabaseAccount.swift",
+        for relative in ("TubeShuffle/App/TubeShuffleApp.swift", "TubeShuffle/Account/TransientSupabaseAccount.swift",
                          "TubeShuffleTests/Account/TransientSupabaseAccountTests.swift"):
             stack = []
             for line in (ROOT / relative).read_text().splitlines():
@@ -61,7 +62,7 @@ class AccountBuildConfigTests(unittest.TestCase):
                     stack[-1] = False
                 elif directive == "#endif":
                     stack.pop()
-                elif re.search(r'LocalOAuthDiagnostic(?:Configuration|Service)|DiagnosticEvent|diagnosticSink|\[DEBUG-native-oauth\]', line):
+                elif re.search(r'LocalOAuthDiagnostic(?:Configuration|Service|Output)|DiagnosticEvent|diagnosticSink|\[DEBUG-native-oauth\]', line):
                     self.assertIn(True, stack, f"unguarded diagnostic in {relative}: {line}")
             self.assertFalse(stack)
 

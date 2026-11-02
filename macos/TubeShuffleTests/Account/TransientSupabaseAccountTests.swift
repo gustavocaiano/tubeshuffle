@@ -1,11 +1,33 @@
 import Auth
 import AppKit
 import Foundation
+import Darwin
 import XCTest
 @testable import TubeShuffle
 
 #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
 final class LocalOAuthDiagnosticConfigurationTests: XCTestCase {
+    func testDiagnosticOutputIsImmediateAndContainsOnlyFixedNames() throws {
+        XCTAssertEqual(Set(TransientSupabaseAccount.DiagnosticEvent.allCases.map(\.rawValue)), Set([
+            "ready", "preparation_failed", "browser_failed", "browser_cancelled", "browser_missing_callback",
+            "callback_received", "callback_rejected", "correlation_rejected", "provider_rejected",
+            "exchange_started", "exchange_failed", "exchange_succeeded", "flow_interrupted"
+        ]))
+        let channel = Pipe()
+        let readFD = channel.fileHandleForReading.fileDescriptor
+        XCTAssertGreaterThanOrEqual(fcntl(readFD, F_SETFL, O_NONBLOCK), 0)
+        for event in TransientSupabaseAccount.DiagnosticEvent.allCases {
+            LocalOAuthDiagnosticOutput.emit(event, to: channel.fileHandleForWriting.fileDescriptor)
+            var buffer = [UInt8](repeating: 0, count: 256)
+            let count = read(readFD, &buffer, buffer.count)
+            XCTAssertGreaterThan(count, 0, "output must be available before closing the writer")
+            guard count > 0 else { continue }
+            XCTAssertEqual(String(decoding: buffer.prefix(count), as: UTF8.self),
+                           "[DEBUG-native-oauth] \(event.rawValue)\n")
+            XCTAssertTrue(event.rawValue.range(of: "^[a-z_]+$", options: .regularExpression) != nil)
+        }
+    }
+
     func testPrivateRuntimeFileFailsClosed() throws {
         let manager = FileManager.default
         let directory = manager.temporaryDirectory.appendingPathComponent(UUID().uuidString)

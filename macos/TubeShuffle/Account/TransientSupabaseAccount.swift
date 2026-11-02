@@ -5,6 +5,16 @@ import Security
 import Darwin
 
 #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+enum LocalOAuthDiagnosticOutput {
+    static func emit(_ event: TransientSupabaseAccount.DiagnosticEvent, to fd: Int32 = STDOUT_FILENO) {
+        let bytes = Array("[DEBUG-native-oauth] \(event.rawValue)\n".utf8)
+        // Bypass stdio buffering when stdout is a pipe. No provider data is accepted.
+        bytes.withUnsafeBytes { buffer in
+            _ = Darwin.write(fd, buffer.baseAddress!, buffer.count)
+        }
+    }
+}
+
 /// Private, opt-in diagnostic configuration. The file contains only the modern
 /// publishable key, never a URL or a privileged credential.
 enum LocalOAuthDiagnosticConfiguration {
@@ -54,8 +64,8 @@ final class LocalOAuthDiagnosticService: TemporaryAccountService {
         account = try TransientSupabaseAccount(authURL: origin.appendingPathComponent("auth/v1"),
             trustedProjectOrigin: origin, publishableKey: key,
             baseRedirect: LocalOAuthDiagnosticConfiguration.redirect, browser: TransientAuthBrowser(anchor: window))
-        account.diagnosticSink = { attempt, event in
-            print("[DEBUG-native-oauth] \(attempt.uuidString) \(event.rawValue)")
+        account.diagnosticSink = { _, event in
+            LocalOAuthDiagnosticOutput.emit(event)
         }
     }
 
@@ -73,7 +83,8 @@ final class TransientSupabaseAccount {
     enum Failure: Error { case busy, randomUnavailable, invalidConfiguration, authorizationFailed }
     #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
     // Temporary, closed vocabulary: never attach error descriptions, URLs or credentials.
-    enum DiagnosticEvent: String {
+    enum DiagnosticEvent: String, CaseIterable {
+        case ready
         case preparationFailed = "preparation_failed", browserFailed = "browser_failed"
         case browserCancelled = "browser_cancelled", browserMissingCallback = "browser_missing_callback"
         case callbackReceived = "callback_received", callbackRejected = "callback_rejected"
