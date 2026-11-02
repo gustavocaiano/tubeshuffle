@@ -1,5 +1,26 @@
+import Foundation
 import XCTest
 @testable import TubeShuffle
+
+// Test-target-only bridge: this synthetic label assumes server traversal completion;
+// it does not exercise pagination or prove a consistent server snapshot.
+@MainActor
+private struct APIAccountLinkService: AccountLinkService {
+    let client: APIClient
+
+    func list(bearer: String) async throws -> AccountLinkPage {
+        let response = try await client.links(bearer: bearer)
+        return AccountLinkPage(links: response.links, completeness: .serverTraversalCompleteNonSnapshot)
+    }
+
+    func save(_ playlistID: String, bearer: String) async throws -> PlaylistLinkDTO {
+        try await client.saveLink(playlistID, bearer: bearer).link
+    }
+
+    func unlink(_ playlistID: String, bearer: String) async throws {
+        try await client.deleteLink(playlistID, bearer: bearer)
+    }
+}
 
 @MainActor
 final class AccountSessionCoordinatorTests: XCTestCase {
@@ -548,5 +569,168 @@ final class AccountSessionCoordinatorTests: XCTestCase {
         await fulfillment(of: [called], timeout: 1)
         auth.finish(token); await task.value
         XCTAssertEqual(coordinator.state, .signedIn)
+    }
+}
+
+@MainActor
+private final class SyntheticAccountAuth: AccountAuthenticationService {
+    private var signInCount = 0
+    func restore() async throws -> AccountSession? { try await signIn() }
+    func signIn() async throws -> AccountSession {
+        signInCount += 1
+        return AccountSession(bearer: "synthetic-token-\(signInCount)", accountID: "synthetic-account-\(signInCount)")
+    }
+    func refresh(_ session: AccountSession) async throws -> AccountSession { session }
+    func signOut() async throws {}
+}
+
+// Never performs I/O and intentionally ignores cancellation while a response is held.
+private actor SyntheticAccountTransport: APITransport {
+    private(set) var requests: [URLRequest] = []
+    var status: Int = 200
+    var body = ""
+    var hold = false
+    var started: XCTestExpectation?
+    private var pending: CheckedContinuation<(Data, URLResponse), Error>?
+    private var heldRequest: URLRequest?
+
+    func configure(status: Int, body: String, hold: Bool = false, started: XCTestExpectation? = nil) {
+        self.status = status; self.body = body; self.hold = hold; self.started = started
+    }
+
+    func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        requests.append(request)
+        if hold {
+            return try await withCheckedThrowingContinuation { continuation in
+                pending = continuation; heldRequest = request; started?.fulfill()
+            }
+        }
+        return response(request)
+    }
+
+    func complete() {
+        // Also release a request that arrives after an expectation timeout.
+        hold = false
+        guard let pending = pending, let request = heldRequest else { return }
+        self.pending = nil; heldRequest = nil
+        pending.resume(returning: response(request))
+    }
+
+    private func response(_ request: URLRequest) -> (Data, URLResponse) {
+        (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
+    }
+}
+
+@MainActor
+final class AccountAPIIntegrationTests: XCTestCase {
+    private let id = "abcdefghij"
+    private let linkJSON = #"{"youtubePlaylistId":"abcdefghij","createdAt":"2026-01-01T00:00:00.000Z"}"#
+
+    private func makeCoordinator(_ transport: SyntheticAccountTransport) throws -> AccountSessionCoordinator {
+        let client = try APIClient(origin: URL(string: "https://example.test")!, transport: transport)
+        return AccountSessionCoordinator(authentication: SyntheticAccountAuth(), links: APIAccountLinkService(client: client))
+    }
+
+    func testExplicitLinkRequestsAndNonSnapshotTraversal() async throws {
+        let transport = SyntheticAccountTransport()
+        let coordinator = try makeCoordinator(transport)
+        await coordinator.signIn()
+        let before = await transport.requests
+        XCTAssertTrue(before.isEmpty)
+
+        await transport.configure(status: 200, body: "{\"links\":[\(linkJSON)]}")
+        if case .success(let page) = await coordinator.list() {
+            XCTAssertEqual(page.links.map(\.youtubePlaylistId), [id])
+            XCTAssertEqual(page.completeness, .serverTraversalCompleteNonSnapshot)
+        } else { XCTFail("list failed") }
+
+        await transport.configure(status: 201, body: "{\"link\":\(linkJSON)}")
+        if case .success(let link) = await coordinator.save(id) { XCTAssertEqual(link.youtubePlaylistId, id) }
+        else { XCTFail("save failed") }
+        await transport.configure(status: 204, body: "")
+        if case .success = await coordinator.unlink(id) {} else { XCTFail("unlink failed") }
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests.map { $0.httpMethod }, ["GET", "POST", "DELETE"])
+        XCTAssertEqual(requests.map { $0.url?.path }, ["/api/playlist-links", "/api/playlist-links", "/api/playlist-links/abcdefghij"])
+        XCTAssertTrue(requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "Bearer synthetic-token-1" && $0.url?.query == nil })
+        guard requests.count == 3 else { return }
+        XCTAssertNil(requests[0].httpBody)
+        XCTAssertNil(requests[2].httpBody)
+        let body = try XCTUnwrap(requests[1].httpBody)
+        XCTAssertEqual(try JSONSerialization.jsonObject(with: body) as? [String: String], ["playlistId": id])
+    }
+
+    func testServerErrorsAreSanitizedAndNeverRetried() async throws {
+        for operation in ["list", "save", "unlink"] {
+            let transport = SyntheticAccountTransport()
+            let coordinator = try makeCoordinator(transport)
+            await coordinator.signIn()
+            await transport.configure(status: 503, body: #"{"error":{"code":"internal_error","message":"synthetic-token private server detail"}}"#)
+            switch operation {
+            case "list":
+                if case .unavailable = await coordinator.list() {} else { XCTFail() }
+                XCTAssertEqual(coordinator.state, .recoverableError(.links))
+            case "save":
+                if case .mutationOutcomeUnknown = await coordinator.save(id) {} else { XCTFail() }
+                XCTAssertEqual(coordinator.state, .recoverableError(.mutationOutcomeUnknown))
+                XCTAssertTrue(coordinator.hasUncertainMutations)
+            default:
+                if case .mutationOutcomeUnknown = await coordinator.unlink(id) {} else { XCTFail() }
+                XCTAssertEqual(coordinator.state, .recoverableError(.mutationOutcomeUnknown))
+                XCTAssertTrue(coordinator.hasUncertainMutations)
+            }
+            XCTAssertFalse(String(reflecting: coordinator.state).contains("synthetic-token"))
+            let requests = await transport.requests
+            XCTAssertEqual(requests.count, 1)
+        }
+    }
+
+    func testLateResponsesAfterCancellationOrSignOutAreDiscarded() async throws {
+        for operation in ["list", "save", "unlink"] {
+            for signOut in [false, true] {
+                let transport = SyntheticAccountTransport()
+                let coordinator = try makeCoordinator(transport)
+                await coordinator.signIn()
+                let started = expectation(description: "synthetic request started")
+                let body = operation == "list" ? "{\"links\":[\(linkJSON)]}" : (operation == "save" ? "{\"link\":\(linkJSON)}" : "")
+                await transport.configure(status: operation == "unlink" ? 204 : 200, body: body, hold: true, started: started)
+                let playlistID = id
+                let task = Task { () -> Bool in
+                    switch operation {
+                    case "list": if case .unavailable = await coordinator.list() { return true }
+                    case "save": if case .mutationOutcomeUnknown = await coordinator.save(playlistID) { return true }
+                    default: if case .mutationOutcomeUnknown = await coordinator.unlink(playlistID) { return true }
+                    }
+                    return false
+                }
+                await fulfillment(of: [started], timeout: 1)
+                if signOut {
+                    _ = await coordinator.signOut()
+                    await coordinator.signIn()
+                    XCTAssertEqual(coordinator.state, .signedIn)
+                    XCTAssertFalse(coordinator.hasUncertainMutations)
+                } else { task.cancel() }
+                await transport.complete()
+                let discarded = await task.value
+                XCTAssertTrue(discarded)
+                if signOut {
+                    XCTAssertEqual(coordinator.state, .signedIn)
+                    XCTAssertFalse(coordinator.hasUncertainMutations)
+                } else if operation != "list" {
+                    XCTAssertTrue(coordinator.hasUncertainMutations)
+                }
+                let requests = await transport.requests
+                XCTAssertEqual(requests.count, 1)
+                if signOut {
+                    await transport.configure(status: 200, body: "{\"links\":[\(linkJSON)]}")
+                    if case .success = await coordinator.list() {} else { XCTFail("new account list failed") }
+                    let finalRequests = await transport.requests
+                    XCTAssertEqual(finalRequests.last?.value(forHTTPHeaderField: "Authorization"), "Bearer synthetic-token-2")
+                    XCTAssertEqual(coordinator.state, .signedIn)
+                    XCTAssertFalse(coordinator.hasUncertainMutations)
+                }
+            }
+        }
     }
 }

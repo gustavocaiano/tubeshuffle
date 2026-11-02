@@ -99,6 +99,84 @@ do $$ begin
   if (select count(*) from public.playlist_links) <> 1 then raise exception 'non-owner deleted data'; end if;
 end $$;
 
+-- Synthetic claims only. The migration deliberately follows auth.uid(): a
+-- nonempty legacy sub wins; otherwise the JSON sub is used. Each case sets
+-- both GUCs locally so it cannot inherit another case's identity.
+set local role authenticated;
+do $$
+declare
+  c record;
+  r record;
+  deleted integer;
+begin
+  for c in select * from (values
+    ('JSON owner', '', '{"sub":"11111111-1111-1111-1111-111111111111"}', true),
+    ('JSON non-owner', '', '{"sub":"22222222-2222-2222-2222-222222222222"}', false),
+    ('missing JSON sub', '', '{}', false),
+    ('null JSON sub', '', '{"sub":null}', false),
+    ('empty claims', '', '', false),
+    ('legacy owner wins', '11111111-1111-1111-1111-111111111111', '{"sub":"22222222-2222-2222-2222-222222222222"}', true),
+    ('legacy non-owner wins', '22222222-2222-2222-2222-222222222222', '{"sub":"11111111-1111-1111-1111-111111111111"}', false)
+  ) as cases(label, legacy_sub, claims, allowed)
+  loop
+    perform set_config('request.jwt.claim.sub', c.legacy_sub, true);
+    perform set_config('request.jwt.claims', c.claims, true);
+    if public.is_approved_owner() is distinct from c.allowed then
+      raise exception '%: incorrect owner result', c.label;
+    end if;
+    if (select count(*) from public.playlist_links where youtube_playlist_id = 'abcdefghij')
+       <> (case when c.allowed then 1 else 0 end) then
+      raise exception '%: incorrect direct SELECT visibility', c.label;
+    end if;
+    if c.allowed then
+      select * into strict r from public.save_playlist_link('claimstestid');
+      if r.created is distinct from true or r.limit_reached is distinct from false
+         or r.youtube_playlist_id is distinct from 'claimstestid' then
+        raise exception '%: RPC save failed', c.label;
+      end if;
+      delete from public.playlist_links where youtube_playlist_id = 'claimstestid';
+      get diagnostics deleted = row_count;
+      if deleted <> 1 then raise exception '%: direct DELETE failed', c.label; end if;
+    else
+      delete from public.playlist_links where youtube_playlist_id = 'abcdefghij';
+      get diagnostics deleted = row_count;
+      if deleted <> 0 then raise exception '%: direct DELETE allowed', c.label; end if;
+      begin
+        perform public.save_playlist_link('claimstestid');
+        raise exception '%: RPC save allowed', c.label;
+      exception when insufficient_privilege then null; end;
+    end if;
+  end loop;
+
+  -- An empty JSON sub is not NULL in the migration: the UUID cast fails closed.
+  perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claims', '{"sub":""}', true);
+  begin
+    perform public.is_approved_owner();
+    raise exception 'empty JSON sub accepted by owner check';
+  exception when invalid_text_representation then null; end;
+  begin
+    perform public.save_playlist_link('claimstestid');
+    raise exception 'empty JSON sub accepted by RPC';
+  exception when invalid_text_representation then null; end;
+  begin
+    perform * from public.playlist_links;
+    raise exception 'empty JSON sub accepted by direct SELECT';
+  exception when invalid_text_representation then null; end;
+  begin
+    delete from public.playlist_links;
+    raise exception 'empty JSON sub accepted by direct DELETE';
+  exception when invalid_text_representation then null; end;
+end $$;
+reset role;
+do $$ begin
+  if (select count(*) from public.playlist_links) <> 1
+     or not exists (select 1 from public.playlist_links where youtube_playlist_id = 'abcdefghij') then
+    raise exception 'claims tests changed the existing fixture';
+  end if;
+end $$;
+select set_config('request.jwt.claims', '', true);
+
 -- A trusted operator seeds the boundary, never a permitted client writer.
 insert into public.playlist_links (user_id, youtube_playlist_id)
 select '11111111-1111-1111-1111-111111111111'::uuid, 'seed_' || lpad(n::text, 10, '0')
