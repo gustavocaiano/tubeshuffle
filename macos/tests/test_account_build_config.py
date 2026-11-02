@@ -31,41 +31,74 @@ class AccountBuildConfigTests(unittest.TestCase):
         self.assertRegex(initializer.group(1),
                          r'#if DEBUG && LOCAL_OAUTH_DIAGNOSTIC\s+'
                          r'if ProcessInfo\.processInfo\.arguments\.contains\("--local-oauth-diagnostic"\) \{\s+'
-                         r'LocalOAuthDiagnosticOutput\.emit\(\.ready\)\s+'
                          r'return AccountViewModel\(factory: \{ try LocalOAuthDiagnosticService\(window: \$0\) \}\)\s+'
                          r'\}\s+#endif\s+return AccountViewModel\(\)')
         self.assertEqual(app.count('LocalOAuthDiagnosticService(window:'), 1)
         project = (ROOT / "TubeShuffle.xcodeproj/project.pbxproj").read_text()
         configs = re.findall(r'isa = XCBuildConfiguration; buildSettings = \{([^}]*)\}; name = (Debug|Release);', project)
         self.assertEqual(len(configs), 6)  # project, app and test target configurations
+        target_configs = set()
         for settings, name in configs:
             match = re.search(r'SWIFT_ACTIVE_COMPILATION_CONDITIONS = ("[^"]*"|[^;]*);', settings)
             conditions = match.group(1).strip('"').split() if match else []
             if name == "Release":
                 self.assertNotIn("DEBUG", conditions)
                 self.assertNotIn("LOCAL_OAUTH_DIAGNOSTIC", conditions)
-            elif "PRODUCT_BUNDLE_IDENTIFIER = com.tubeshuffle.playbacklab;" in settings:
+            bundle = re.search(r'PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);', settings)
+            if bundle and bundle.group(1) in ("com.tubeshuffle.playbacklab", "com.tubeshuffle.playbacklab.tests"):
+                target = bundle.group(1)
+                self.assertNotIn((target, name), target_configs)
+                target_configs.add((target, name))
+            if name == "Debug" and bundle and bundle.group(1) in ("com.tubeshuffle.playbacklab", "com.tubeshuffle.playbacklab.tests"):
                 self.assertIn("DEBUG", conditions)
                 self.assertIn("LOCAL_OAUTH_DIAGNOSTIC", conditions)
+        self.assertEqual(target_configs, {(target, name) for target in
+                         ("com.tubeshuffle.playbacklab", "com.tubeshuffle.playbacklab.tests")
+                         for name in ("Debug", "Release")})
         for forbidden in ("TubeShuffleProjectOrigin", "TubeShufflePublishableKey", "Bundle.main.infoDictionary"):
             self.assertNotIn(forbidden, app)
 
-    def test_temporary_diagnostic_symbols_are_guarded(self):
-        for relative in ("TubeShuffle/App/TubeShuffleApp.swift", "TubeShuffle/Account/TransientSupabaseAccount.swift",
-                         "TubeShuffle/Account/TransientOAuthCallback.swift", "TubeShuffleTests/Account/TransientOAuthCallbackTests.swift",
-                         "TubeShuffleTests/Account/TransientSupabaseAccountTests.swift"):
+    def test_retained_diagnostic_types_and_references_are_guarded(self):
+        account = (ROOT / "TubeShuffle/Account/TransientSupabaseAccount.swift").read_text()
+        for declaration in ("enum LocalOAuthDiagnosticConfiguration", "final class LocalOAuthDiagnosticService"):
+            self.assertEqual(account.count(declaration), 1)
+        expected = {
+            "TubeShuffle/Account/TransientSupabaseAccount.swift": {
+                "LocalOAuthDiagnosticConfiguration", "LocalOAuthDiagnosticService"},
+            "TubeShuffle/App/TubeShuffleApp.swift": {"LocalOAuthDiagnosticService"},
+            "TubeShuffleTests/Account/TransientSupabaseAccountTests.swift": {
+                "LocalOAuthDiagnosticConfiguration", "LocalOAuthDiagnosticConfigurationTests"},
+        }
+        pattern = re.compile(r'\bLocalOAuthDiagnostic(?:ConfigurationTests|Configuration|Service)\b')
+        for relative, required in expected.items():
             stack = []
+            found = set()
             for line in (ROOT / relative).read_text().splitlines():
                 directive = line.strip()
                 if directive.startswith("#if "):
                     stack.append(directive == "#if DEBUG && LOCAL_OAUTH_DIAGNOSTIC")
-                elif directive == "#else":
+                elif directive.startswith("#elseif ") or directive == "#else":
+                    self.assertTrue(stack, f"unmatched {directive} in {relative}")
                     stack[-1] = False
                 elif directive == "#endif":
+                    self.assertTrue(stack, f"unmatched #endif in {relative}")
                     stack.pop()
-                elif re.search(r'LocalOAuthDiagnostic(?:Configuration|Service|Output)|DiagnosticEvent|diagnosticSink|RejectionCategory|rejectionCategory|ParameterShape|rejectedFragmentShapes|diagnosticShapes|\[DEBUG-native-oauth\]', line):
-                    self.assertIn(True, stack, f"unguarded diagnostic in {relative}: {line}")
-            self.assertFalse(stack)
+                else:
+                    symbols = set(pattern.findall(line))
+                    if symbols:
+                        found.update(symbols)
+                        self.assertIn(True, stack, f"unguarded diagnostic in {relative}: {line}")
+            self.assertFalse(stack, f"unclosed conditional in {relative}")
+            self.assertTrue(required <= found, f"missing expected diagnostic symbols in {relative}")
+
+    def test_removed_probe_symbols_stay_removed(self):
+        forbidden = re.compile(r'\b(?:LocalOAuthDiagnosticOutput|DiagnosticEvent|diagnosticSink|'
+                               r'RejectionCategory|rejectionCategory|ParameterShape|'
+                               r'rejectedFragmentShapes|diagnosticShapes)\b|\[DEBUG-native-oauth\]')
+        sources = list((ROOT / "TubeShuffle").rglob("*.swift")) + list((ROOT / "TubeShuffleTests").rglob("*.swift"))
+        self.assertTrue(sources)
+        for source in sources:
+            self.assertIsNone(forbidden.search(source.read_text()), str(source))
 
 
 if __name__ == "__main__":

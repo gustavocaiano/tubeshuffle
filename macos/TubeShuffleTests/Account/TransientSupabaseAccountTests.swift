@@ -1,38 +1,11 @@
 import Auth
 import AppKit
 import Foundation
-import Darwin
 import XCTest
 @testable import TubeShuffle
 
 #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
 final class LocalOAuthDiagnosticConfigurationTests: XCTestCase {
-    func testDiagnosticOutputIsImmediateAndContainsOnlyFixedNames() throws {
-        XCTAssertEqual(Set(TransientSupabaseAccount.DiagnosticEvent.allCases.map(\.rawValue)), Set([
-            "ready", "preparation_failed", "browser_failed", "browser_cancelled", "browser_missing_callback",
-            "callback_received", "callback_rejected", "correlation_rejected", "provider_rejected",
-            "exchange_started", "exchange_failed", "exchange_succeeded", "flow_interrupted",
-            "rejection_fragment_present", "rejection_destination_mismatch_or_malformed", "rejection_query_missing",
-            "rejection_unknown_or_duplicate_keys", "rejection_malformed_encoding", "rejection_correlation_absent",
-            "rejection_code_absent", "rejection_other",
-            "fragment_shape_empty", "fragment_shape_provider_error", "fragment_shape_token", "fragment_shape_mixed", "fragment_shape_other",
-            "query_shape_empty", "query_shape_provider_error", "query_shape_token", "query_shape_mixed", "query_shape_other"
-        ]))
-        let channel = Pipe()
-        let readFD = channel.fileHandleForReading.fileDescriptor
-        XCTAssertGreaterThanOrEqual(fcntl(readFD, F_SETFL, O_NONBLOCK), 0)
-        for event in TransientSupabaseAccount.DiagnosticEvent.allCases {
-            LocalOAuthDiagnosticOutput.emit(event, to: channel.fileHandleForWriting.fileDescriptor)
-            var buffer = [UInt8](repeating: 0, count: 256)
-            let count = read(readFD, &buffer, buffer.count)
-            XCTAssertGreaterThan(count, 0, "output must be available before closing the writer")
-            guard count > 0 else { continue }
-            XCTAssertEqual(String(decoding: buffer.prefix(count), as: UTF8.self),
-                           "[DEBUG-native-oauth] \(event.rawValue)\n")
-            XCTAssertTrue(event.rawValue.range(of: "^[a-z_]+$", options: .regularExpression) != nil)
-        }
-    }
-
     func testPrivateRuntimeFileFailsClosed() throws {
         let manager = FileManager.default
         let directory = manager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -67,6 +40,7 @@ final class LocalOAuthDiagnosticConfigurationTests: XCTestCase {
         XCTAssertFalse(TransientSupabaseAccount.validEndpoint(URL(string: "https://evil.example/auth/v1")!, trustedOrigin: origin))
     }
 }
+
 #endif
 
 final class CallbackRegistrationTests: XCTestCase {
@@ -261,67 +235,6 @@ final class TransientSupabaseAccountTests: XCTestCase {
         parts.queryItems!.append(URLQueryItem(name: "code", value: "code-sentinel"))
         return parts.url!
     }
-
-    #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
-    func testTemporaryDiagnosticEventsAreStageOnly() async throws {
-        typealias Event = TransientSupabaseAccount.DiagnosticEvent
-        func run(_ launch: @escaping @MainActor (URL, String) async throws -> URL) async throws -> [Event] {
-            let transport = Transport()
-            var events: [Event] = []
-            var account: TransientSupabaseAccount? = try TransientSupabaseAccount(authURL: endpoint, trustedProjectOrigin: origin,
-                publishableKey: key, baseRedirect: redirect, launch: launch, closeBrowser: {},
-                fetch: { try await transport.send($0) })
-            weak var weakAccount = account
-            var attempts: [UUID] = []
-            account?.diagnosticSink = { attempt, event in attempts.append(attempt); events.append(event) }
-            do { _ = try await account!.signIn(); XCTFail("expected rejection") } catch {}
-            if !events.contains(.exchangeStarted) {
-                let requestCount = await transport.count()
-                XCTAssertEqual(requestCount, 0)
-            }
-            XCTAssertEqual(Set(attempts).count, 1)
-            account = nil
-            XCTAssertNil(weakAccount, "diagnostic exchange closure must not retain the account")
-            return events
-        }
-        let browser = try await run { _, _ in throw TransientAuthBrowser.Failure.browserFailure }
-        XCTAssertEqual(browser, [.browserFailed])
-        let cancelled = try await run { _, _ in throw TransientAuthBrowser.Failure.cancelled }
-        XCTAssertEqual(cancelled, [.browserCancelled])
-        let missing = try await run { _, _ in throw TransientAuthBrowser.Failure.missingCallback }
-        XCTAssertEqual(missing, [.browserMissingCallback])
-        let malformed = try await run { _, _ in URL(string: "example-app://auth.example/callback?secret=sentinel")! }
-        XCTAssertEqual(malformed, [.callbackReceived, .callbackRejected, .rejectionUnknownOrDuplicate])
-        let fragment = try await run { _, _ in URL(string: "example-app://auth.example/callback?flow_correlation=secret#error_description=secret&access_token=secret")! }
-        XCTAssertEqual(fragment, [.callbackReceived, .callbackRejected, .rejectionFragment, .queryShapeOther, .fragmentShapeMixed])
-        XCTAssertFalse(fragment.map(\.rawValue).joined().contains("secret"))
-        let mismatch = try await run { url, _ in self.callback(url, correlation: "wrong-epoch") }
-        XCTAssertEqual(mismatch, [.callbackReceived, .correlationRejected])
-        let noCode = try await run { url, _ in
-            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)!.queryItems!
-            return URL(string: items.first { $0.name == "redirect_to" }!.value!)!
-        }
-        XCTAssertEqual(noCode, [.callbackReceived, .callbackRejected, .rejectionCodeAbsent])
-        let exchange = try await run { url, _ in self.callback(url) }
-        XCTAssertEqual(exchange, [.callbackReceived, .exchangeStarted, .exchangeFailed])
-        XCTAssertFalse(exchange.map(\.rawValue).joined().contains("sentinel"))
-    }
-
-    func testTemporaryDiagnosticAttemptsHaveIndependentLabels() async throws {
-        let transport = Transport()
-        let account = try TransientSupabaseAccount(authURL: endpoint, trustedProjectOrigin: origin,
-            publishableKey: key, baseRedirect: redirect,
-            launch: { _, _ in throw TransientAuthBrowser.Failure.browserFailure }, closeBrowser: {},
-            fetch: { try await transport.send($0) })
-        var attempts: [UUID] = []
-        account.diagnosticSink = { attempt, _ in attempts.append(attempt) }
-        for _ in 0..<2 {
-            do { _ = try await account.signIn(); XCTFail("expected rejection") } catch {}
-        }
-        XCTAssertEqual(attempts.count, 2)
-        XCTAssertEqual(Set(attempts).count, 2)
-    }
-    #endif
 
     func testMismatchedCorrelationNeverExchanges() async throws {
         let transport = Transport()

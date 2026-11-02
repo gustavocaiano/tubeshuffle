@@ -117,7 +117,6 @@ struct TubeShuffleApp: App {
     @StateObject private var account: AccountViewModel = {
         #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
         if ProcessInfo.processInfo.arguments.contains("--local-oauth-diagnostic") {
-            LocalOAuthDiagnosticOutput.emit(.ready)
             return AccountViewModel(factory: { try LocalOAuthDiagnosticService(window: $0) })
         }
         #endif

@@ -3,55 +3,6 @@ import XCTest
 @testable import TubeShuffle
 
 final class TransientOAuthCallbackTests: XCTestCase {
-    #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
-    func testTemporaryFragmentShapesInspectNamesOnlyAndNeverChangeAcceptance() throws {
-        let base = "example-app://auth.example/callback"
-        let validator = try TransientOAuthCallback(redirect: base, correlationKey: "flow_correlation")
-        typealias Shape = TransientOAuthCallback.ParameterShape
-        let cases: [(String, Shape, Shape)] = [
-            ("#", .empty, .empty),
-            ("?flow_correlation=secret#error_description=secret", .other, .providerError),
-            ("?error=secret#access_token=secret", .providerError, .token),
-            ("?refresh_token=secret#error_code=secret&token_type=secret", .token, .mixed),
-            ("?error=secret&id_token=secret#unknown=secret", .mixed, .other),
-            ("?x=error#x=access_token", .other, .other),
-            ("#%65rror=secret", .empty, .providerError),
-            ("#%ZZ=secret", .empty, .other),
-            ("?error=synthetic&%65rror=synthetic#access_token=synthetic&access_token=synthetic", .providerError, .token),
-            ("?%ZZ=synthetic&error=synthetic#%ZZ=synthetic&access_token=synthetic", .providerError, .token),
-            ("?access_token=synthetic&%ZZ=synthetic#error=synthetic&%ZZ=synthetic", .token, .providerError)
-        ]
-        for (suffix, query, fragment) in cases {
-            let callback = base + suffix
-            let shapes = try XCTUnwrap(validator.rejectedFragmentShapes(callback))
-            XCTAssertEqual(shapes.query, query)
-            XCTAssertEqual(shapes.fragment, fragment)
-            XCTAssertThrowsError(try validator.code(from: callback))
-            XCTAssertThrowsError(try validator.correlation(from: callback))
-        }
-        XCTAssertNil(validator.rejectedFragmentShapes(base + "?code=secret"))
-    }
-
-    func testTemporaryRejectionCategoriesAreFixedAndDoNotChangeValidation() throws {
-        let base = "example-app://auth.example/callback"
-        let validator = try TransientOAuthCallback(redirect: base, correlationKey: "flow_correlation")
-        let cases: [(String, TransientOAuthCallback.RejectionCategory)] = [
-            (base + "?code=x#fragment", .fragment),
-            ("example-app://other.example/callback?code=x", .destination),
-            (base, .queryMissing), (base + "?", .queryMissing),
-            (base + "?unknown=secret", .unknownOrDuplicate),
-            (base + "?code=x&code=y", .unknownOrDuplicate),
-            (base + "?code=%ZZ", .malformedEncoding),
-            (base + "?code=x", .correlationAbsent),
-            (base + "?flow_correlation=x", .codeAbsent),
-            (base + "?broken", .other)
-        ]
-        for (callback, category) in cases {
-            XCTAssertEqual(validator.rejectionCategory(callback), category)
-            XCTAssertThrowsError(try validator.code(from: callback))
-        }
-    }
-    #endif
     private let redirect = "example-app://auth.example/callback"
 
     func testValidCodeAndCaseInsensitiveDestination() throws {
