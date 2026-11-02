@@ -91,6 +91,13 @@ final class TransientSupabaseAccount {
         case correlationRejected = "correlation_rejected", providerRejected = "provider_rejected"
         case exchangeStarted = "exchange_started", exchangeFailed = "exchange_failed"
         case exchangeSucceeded = "exchange_succeeded", flowInterrupted = "flow_interrupted"
+        case rejectionFragment = "rejection_fragment_present"
+        case rejectionDestination = "rejection_destination_mismatch_or_malformed"
+        case rejectionQueryMissing = "rejection_query_missing"
+        case rejectionUnknownOrDuplicate = "rejection_unknown_or_duplicate_keys"
+        case rejectionMalformedEncoding = "rejection_malformed_encoding"
+        case rejectionCorrelationAbsent = "rejection_correlation_absent"
+        case rejectionCodeAbsent = "rejection_code_absent", rejectionOther = "rejection_other"
     }
     #endif
 
@@ -243,13 +250,19 @@ final class TransientSupabaseAccount {
                 // the actual callback and is checked before any token request.
                 let received: String
                 do { received = try validator.correlation(from: callback.absoluteString) }
-                catch { diagnostic(.callbackRejected); throw error }
+                catch {
+                    diagnostic(.callbackRejected)
+                    diagnostic(DiagnosticEvent(rawValue: validator.rejectionCategory(callback.absoluteString).rawValue) ?? .rejectionOther)
+                    throw error
+                }
                 do {
                     return try await flow.receive(generation: generation, correlation: received, callback: callback.absoluteString)
                 } catch let failure as TransientFlowState<Session>.Failure {
                     switch failure {
                     case .invalidCorrelation: diagnostic(.correlationRejected)
-                    case .invalidCallback: diagnostic(.callbackRejected)
+                    case .invalidCallback:
+                        diagnostic(.callbackRejected)
+                        diagnostic(DiagnosticEvent(rawValue: validator.rejectionCategory(callback.absoluteString).rawValue) ?? .rejectionOther)
                     case .providerError: diagnostic(.providerRejected)
                     case .exchangeFailed: break // recorded at the exchange boundary
                     default: diagnostic(.flowInterrupted)

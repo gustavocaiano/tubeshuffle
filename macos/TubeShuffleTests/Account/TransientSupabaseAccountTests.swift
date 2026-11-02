@@ -11,7 +11,10 @@ final class LocalOAuthDiagnosticConfigurationTests: XCTestCase {
         XCTAssertEqual(Set(TransientSupabaseAccount.DiagnosticEvent.allCases.map(\.rawValue)), Set([
             "ready", "preparation_failed", "browser_failed", "browser_cancelled", "browser_missing_callback",
             "callback_received", "callback_rejected", "correlation_rejected", "provider_rejected",
-            "exchange_started", "exchange_failed", "exchange_succeeded", "flow_interrupted"
+            "exchange_started", "exchange_failed", "exchange_succeeded", "flow_interrupted",
+            "rejection_fragment_present", "rejection_destination_mismatch_or_malformed", "rejection_query_missing",
+            "rejection_unknown_or_duplicate_keys", "rejection_malformed_encoding", "rejection_correlation_absent",
+            "rejection_code_absent", "rejection_other"
         ]))
         let channel = Pipe()
         let readFD = channel.fileHandleForReading.fileDescriptor
@@ -270,6 +273,10 @@ final class TransientSupabaseAccountTests: XCTestCase {
             var attempts: [UUID] = []
             account?.diagnosticSink = { attempt, event in attempts.append(attempt); events.append(event) }
             do { _ = try await account!.signIn(); XCTFail("expected rejection") } catch {}
+            if !events.contains(.exchangeStarted) {
+                let requestCount = await transport.count()
+                XCTAssertEqual(requestCount, 0)
+            }
             XCTAssertEqual(Set(attempts).count, 1)
             account = nil
             XCTAssertNil(weakAccount, "diagnostic exchange closure must not retain the account")
@@ -282,9 +289,14 @@ final class TransientSupabaseAccountTests: XCTestCase {
         let missing = try await run { _, _ in throw TransientAuthBrowser.Failure.missingCallback }
         XCTAssertEqual(missing, [.browserMissingCallback])
         let malformed = try await run { _, _ in URL(string: "example-app://auth.example/callback?secret=sentinel")! }
-        XCTAssertEqual(malformed, [.callbackReceived, .callbackRejected])
+        XCTAssertEqual(malformed, [.callbackReceived, .callbackRejected, .rejectionUnknownOrDuplicate])
         let mismatch = try await run { url, _ in self.callback(url, correlation: "wrong-epoch") }
         XCTAssertEqual(mismatch, [.callbackReceived, .correlationRejected])
+        let noCode = try await run { url, _ in
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)!.queryItems!
+            return URL(string: items.first { $0.name == "redirect_to" }!.value!)!
+        }
+        XCTAssertEqual(noCode, [.callbackReceived, .callbackRejected, .rejectionCodeAbsent])
         let exchange = try await run { url, _ in self.callback(url) }
         XCTAssertEqual(exchange, [.callbackReceived, .exchangeStarted, .exchangeFailed])
         XCTAssertFalse(exchange.map(\.rawValue).joined().contains("sentinel"))

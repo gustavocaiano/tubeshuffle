@@ -51,6 +51,47 @@ struct TransientOAuthCallback {
         return value
     }
 
+    #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+    // Observation only, invoked after rejection. Never return callback data.
+    enum RejectionCategory: String {
+        case fragment = "rejection_fragment_present"
+        case destination = "rejection_destination_mismatch_or_malformed"
+        case queryMissing = "rejection_query_missing"
+        case unknownOrDuplicate = "rejection_unknown_or_duplicate_keys"
+        case malformedEncoding = "rejection_malformed_encoding"
+        case correlationAbsent = "rejection_correlation_absent"
+        case codeAbsent = "rejection_code_absent"
+        case other = "rejection_other"
+    }
+
+    func rejectionCategory(_ callback: String) -> RejectionCategory {
+        if callback.contains("#") { return .fragment }
+        let pieces = callback.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        guard let target = Self.destination(String(pieces[0])),
+              target.scheme.lowercased() == scheme, target.host.lowercased() == host,
+              target.path.utf8.elementsEqual(path.utf8) else { return .destination }
+        guard pieces.count == 2, !pieces[1].isEmpty else { return .queryMissing }
+        let query = String(pieces[1])
+        guard Self.validComponent(query, path: false) else { return .malformedEncoding }
+        var keys = Set<String>()
+        var correlationPresent = false
+        var codePresent = false
+        var providerErrorPresent = false
+        for item in query.split(separator: "&", omittingEmptySubsequences: false) {
+            let pair = item.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard pair.count == 2, let key = Self.decode(String(pair[0])) else { return .other }
+            guard (["code", "error", "error_description", "error_code"].contains(key) || key == correlationKey),
+                  keys.insert(key).inserted else { return .unknownOrDuplicate }
+            if key == correlationKey { correlationPresent = !pair[1].isEmpty }
+            if key == "code" { codePresent = !pair[1].isEmpty }
+            if ["error", "error_description", "error_code"].contains(key) { providerErrorPresent = true }
+        }
+        if correlationKey != nil && !correlationPresent { return .correlationAbsent }
+        if !providerErrorPresent && !codePresent { return .codeAbsent }
+        return .other
+    }
+    #endif
+
     private func parse(_ callback: String) throws -> [String: String] {
         guard let parts = Self.destination(callback),
               parts.scheme.lowercased() == scheme,

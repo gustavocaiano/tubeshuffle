@@ -3,6 +3,27 @@ import XCTest
 @testable import TubeShuffle
 
 final class TransientOAuthCallbackTests: XCTestCase {
+    #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+    func testTemporaryRejectionCategoriesAreFixedAndDoNotChangeValidation() throws {
+        let base = "example-app://auth.example/callback"
+        let validator = try TransientOAuthCallback(redirect: base, correlationKey: "flow_correlation")
+        let cases: [(String, TransientOAuthCallback.RejectionCategory)] = [
+            (base + "?code=x#fragment", .fragment),
+            ("example-app://other.example/callback?code=x", .destination),
+            (base, .queryMissing), (base + "?", .queryMissing),
+            (base + "?unknown=secret", .unknownOrDuplicate),
+            (base + "?code=x&code=y", .unknownOrDuplicate),
+            (base + "?code=%ZZ", .malformedEncoding),
+            (base + "?code=x", .correlationAbsent),
+            (base + "?flow_correlation=x", .codeAbsent),
+            (base + "?broken", .other)
+        ]
+        for (callback, category) in cases {
+            XCTAssertEqual(validator.rejectionCategory(callback), category)
+            XCTAssertThrowsError(try validator.code(from: callback))
+        }
+    }
+    #endif
     private let redirect = "example-app://auth.example/callback"
 
     func testValidCodeAndCaseInsensitiveDestination() throws {

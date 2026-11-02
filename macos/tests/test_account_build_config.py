@@ -52,6 +52,7 @@ class AccountBuildConfigTests(unittest.TestCase):
 
     def test_temporary_diagnostic_symbols_are_guarded(self):
         for relative in ("TubeShuffle/App/TubeShuffleApp.swift", "TubeShuffle/Account/TransientSupabaseAccount.swift",
+                         "TubeShuffle/Account/TransientOAuthCallback.swift", "TubeShuffleTests/Account/TransientOAuthCallbackTests.swift",
                          "TubeShuffleTests/Account/TransientSupabaseAccountTests.swift"):
             stack = []
             for line in (ROOT / relative).read_text().splitlines():
@@ -62,7 +63,7 @@ class AccountBuildConfigTests(unittest.TestCase):
                     stack[-1] = False
                 elif directive == "#endif":
                     stack.pop()
-                elif re.search(r'LocalOAuthDiagnostic(?:Configuration|Service|Output)|DiagnosticEvent|diagnosticSink|\[DEBUG-native-oauth\]', line):
+                elif re.search(r'LocalOAuthDiagnostic(?:Configuration|Service|Output)|DiagnosticEvent|diagnosticSink|RejectionCategory|rejectionCategory|\[DEBUG-native-oauth\]', line):
                     self.assertIn(True, stack, f"unguarded diagnostic in {relative}: {line}")
             self.assertFalse(stack)
 
