@@ -49,6 +49,27 @@ YouTube's background-player policy conflict remains release-blocking; the owner-
 
 The app declares the proposed callback `com.tubeshuffle.playbacklab://auth/callback` locally. It is unverified, has not been registered with Supabase or an identity provider by this change, and a custom URL scheme is not exclusive to this app. No remote configuration is changed here.
 
-Sign-in is unavailable in every build. The app does not load a Supabase origin or key from build settings or Info.plist and has no live account integration wired in; compilation flags cannot enable it. Do not pass keys or secrets to Xcode build settings: tooling can log them. Account components and injected test doubles are scaffolding, not a deployable integration.
+Sign-in remains unavailable by default. A **private local Debug diagnostic** can be explicitly enabled as described below. With the checked-in build settings, a normal Release build does not enable it, even with the launch argument. Build setting overrides can define both compilation conditions in another configuration and are outside this guarantee. No origin or key is taken from build settings or Info.plist. This experiment is not production account integration.
 
 Run offline structural checks with `python3 macos/tests/test_account_build_config.py`. A Mac/Xcode build and tests are still required to verify Swift compilation and the actual bundle.
+
+### Private OAuth diagnostic (owner Mac only)
+
+Do not run live authentication until the parent security review and Mac verification are complete. This is an explicitly enabled experiment, not playlist sync. The code pins the user-confirmed project origin `https://rkgbxjwmnlsmguhctguf.supabase.co`. It checks the runtime key's modern publishable-key format, not its project provenance; a valid-looking key may belong to a different project. Obtain the matching publishable key directly from that project's trusted dashboard. Legacy JWT, service-role, and secret keys are rejected by the format check; the server must validate the opaque key. Never post keys, callback URLs, tokens, provider errors, or screenshots containing them in chat or logs.
+
+1. Build and launch the Debug app normally once, then quit, so macOS creates its sandbox container. Verify the local bundle ID is `com.tubeshuffle.playbacklab`. Use a private Mac account, disable terminal session recording, and avoid screen sharing. The diagnostic needs network access and a pre-existing, separately configured Google/Supabase OAuth setup and exact callback allowlist; this change makes **no remote configuration changes**. The callback is `com.tubeshuffle.playbacklab://auth/callback`; custom schemes are not exclusive, and successful callback correlation is not proof of exclusive delivery.
+2. In a local terminal, create the file in the app container, outside the repository. Enter the matching publishable key silently when prompted; do not paste it into a command, Xcode setting, chat, or a file under version control:
+
+   ```zsh
+   umask 077
+   target="$HOME/Library/Containers/com.tubeshuffle.playbacklab/Data/oauth-diagnostic-key"
+   read -rs 'key?Publishable key: '
+   (set -C; print -r -- "$key" > "$target")
+   unset key target
+   ```
+
+   Before writing, verify the container and parent directories are trusted, owned and controlled by your private account, and have no unexpected ACL entries or shared access. Do not run this on a shared or untrusted account or with untrusted processes running as that user. The no-clobber write must succeed; if the path already exists, inspect and remove it locally before retrying. The file must be a regular, single-link file owned by the current user with mode `0600`; a symlink at the final path component and other mode bits are rejected. The file contains only the key and an optional single trailing newline. The file is not embedded in the app. The diagnostic fails closed if its checks or read fail, but those checks do not validate ACLs or parent directories and do not protect against hostile processes running as the same user. They do not guarantee secrecy.
+3. In Xcode select the Debug configuration and add `--local-oauth-diagnostic` to the scheme's Run arguments. Launch the app and use its account control only when authorized. No credentials, callback, provider error, or identity are shown in the app. Sign-out, cancellation, window close and process exit clear local in-memory session state; sign-out is not provider-side revocation. Browser behavior and OS-managed caches are outside the app's persistence guarantees. OAuth itself creates/uses provider-side authentication sessions; the diagnostic performs no playlist or application-data API operations.
+4. Quit the app, remove the launch argument, and delete `~/Library/Containers/com.tubeshuffle.playbacklab/Data/oauth-diagnostic-key`. Do not commit the runtime file. Remove it even after failure; deletion is not guaranteed secure erasure. Review provider-side session/revocation separately if required. A normal subsequent run remains unavailable.
+
+The ephemeral browser, PKCE, callback correlation, exchange, actual sandbox file path, and local cleanup require Mac verification; no live flow or Xcode test has been performed here. No token is stored in Keychain by this diagnostic.

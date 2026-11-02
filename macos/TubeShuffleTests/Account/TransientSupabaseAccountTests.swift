@@ -4,6 +4,42 @@ import Foundation
 import XCTest
 @testable import TubeShuffle
 
+final class LocalOAuthDiagnosticConfigurationTests: XCTestCase {
+    func testPrivateRuntimeFileFailsClosed() throws {
+        let manager = FileManager.default
+        let directory = manager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try manager.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? manager.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("key")
+        let synthetic = "sb_publishable_abcdefghijklmnopqrstuv_12345678"
+        func write(_ value: String, mode: Int = 0o600) throws {
+            try Data(value.utf8).write(to: file)
+            try manager.setAttributes([.posixPermissions: mode], ofItemAtPath: file.path)
+        }
+        XCTAssertThrowsError(try LocalOAuthDiagnosticConfiguration.readKey(path: file.path))
+        try write(synthetic + "\n")
+        XCTAssertEqual(try LocalOAuthDiagnosticConfiguration.readKey(path: file.path), synthetic)
+        try write(synthetic, mode: 0o644)
+        XCTAssertThrowsError(try LocalOAuthDiagnosticConfiguration.readKey(path: file.path))
+        for invalid in ["sb_" + "secret_abcdefghijklmnopqrstuv_12345678", "eyJhbGciOiJIUzI1NiJ9.service_role.signature",
+                        "sb_publishable_short", synthetic + "\n\n", synthetic + " ", String(repeating: "x", count: 257)] {
+            try write(invalid)
+            XCTAssertThrowsError(try LocalOAuthDiagnosticConfiguration.readKey(path: file.path))
+        }
+        try write(synthetic)
+        let link = directory.appendingPathComponent("link")
+        try manager.createSymbolicLink(at: link, withDestinationURL: file)
+        XCTAssertThrowsError(try LocalOAuthDiagnosticConfiguration.readKey(path: link.path))
+    }
+
+    func testPinnedDestination() {
+        let origin = LocalOAuthDiagnosticConfiguration.origin
+        XCTAssertEqual(origin.absoluteString, "https://rkgbxjwmnlsmguhctguf.supabase.co")
+        XCTAssertTrue(TransientSupabaseAccount.validEndpoint(origin.appendingPathComponent("auth/v1"), trustedOrigin: origin))
+        XCTAssertFalse(TransientSupabaseAccount.validEndpoint(URL(string: "https://evil.example/auth/v1")!, trustedOrigin: origin))
+    }
+}
+
 final class CallbackRegistrationTests: XCTestCase {
     func testHostAppDeclaresCallbackScheme() throws {
         let scheme = "com.tubeshuffle.playbacklab"

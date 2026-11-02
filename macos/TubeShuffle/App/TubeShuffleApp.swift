@@ -114,8 +114,14 @@ final class AccountViewModel: NSObject, ObservableObject {
 @main
 struct TubeShuffleApp: App {
     @StateObject private var coordinator = PlayerCoordinator()
-    // No live account integration is wired into this app in any build.
-    @StateObject private var account = AccountViewModel()
+    @StateObject private var account: AccountViewModel = {
+        #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+        if ProcessInfo.processInfo.arguments.contains("--local-oauth-diagnostic") {
+            return AccountViewModel(factory: { try LocalOAuthDiagnosticService(window: $0) })
+        }
+        #endif
+        return AccountViewModel()
+    }()
 
     var body: some Scene {
         Window("TubeShuffle Playback Lab", id: "player") {

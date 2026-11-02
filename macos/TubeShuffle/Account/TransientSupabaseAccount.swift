@@ -1,6 +1,64 @@
 import Auth
+import AppKit
 import Foundation
 import Security
+import Darwin
+
+/// Private, opt-in diagnostic configuration. The file contains only the modern
+/// publishable key, never a URL or a privileged credential.
+enum LocalOAuthDiagnosticConfiguration {
+    enum Failure: Error { case unavailable }
+    static let origin = URL(string: "https://rkgbxjwmnlsmguhctguf.supabase.co")!
+    static let redirect = URL(string: "com.tubeshuffle.playbacklab://auth/callback")!
+
+    static func readKey(path: String) throws -> String {
+        let fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
+        guard fd >= 0 else { throw Failure.unavailable }
+        defer { close(fd) }
+        var info = stat()
+        guard fstat(fd, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG,
+              info.st_uid == getuid(), (info.st_mode & 0o7777) == 0o600,
+              info.st_nlink == 1, info.st_size > 0, info.st_size <= 256 else {
+            throw Failure.unavailable
+        }
+        var bytes = [UInt8](repeating: 0, count: 257)
+        var total = 0
+        while total < bytes.count {
+            let count = bytes.withUnsafeMutableBytes { buffer in
+                read(fd, buffer.baseAddress!.advanced(by: total), buffer.count - total)
+            }
+            if count == 0 { break }
+            guard count > 0 else { throw Failure.unavailable }
+            total += count
+        }
+        guard Int64(total) == info.st_size, total <= 256,
+              var key = String(bytes: bytes.prefix(total), encoding: .utf8) else { throw Failure.unavailable }
+        if key.hasSuffix("\n") { key.removeLast() }
+        let keyBytes = Array(key.utf8)
+        // Documented platform format: prefix, 22 random characters, separator,
+        // eight checksum characters. The server validates the opaque key.
+        guard keyBytes.count == 46, keyBytes[37] == 95,
+              TransientSupabaseAccount.validPublishableKey(key) else { throw Failure.unavailable }
+        return key
+    }
+}
+
+@MainActor
+final class LocalOAuthDiagnosticService: TemporaryAccountService {
+    private let account: TransientSupabaseAccount
+
+    init(window: NSWindow) throws {
+        let key = try LocalOAuthDiagnosticConfiguration.readKey(path: NSHomeDirectory() + "/oauth-diagnostic-key")
+        let origin = LocalOAuthDiagnosticConfiguration.origin
+        account = try TransientSupabaseAccount(authURL: origin.appendingPathComponent("auth/v1"),
+            trustedProjectOrigin: origin, publishableKey: key,
+            baseRedirect: LocalOAuthDiagnosticConfiguration.redirect, browser: TransientAuthBrowser(anchor: window))
+    }
+
+    func signInExpiry() async throws -> Date { Date(timeIntervalSince1970: try await account.signIn().expiresAt) }
+    func cancel() { account.cancel() }
+    func signOutLocally() { account.logout() }
+}
 
 /// Unconnected, memory-only experiment. Integration must establish the provenance
 /// of the trusted project origin and publishable key from trusted app configuration.
