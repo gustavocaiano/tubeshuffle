@@ -62,9 +62,27 @@ final class TransientOAuthCallbackTests: XCTestCase {
         XCTAssertEqual(try validator.code(from: "example-app://auth.example/callback?code=a+b"), "a+b")
     }
 
+    func testEmptyTrailingFragmentPreservesEncodedValuesAndValidation() throws {
+        let validator = try TransientOAuthCallback(redirect: redirect, correlationKey: "flow_correlation")
+        let callback = redirect + "?flow_correlation=a%23b&code=c%23d#"
+        XCTAssertEqual(try validator.correlation(from: callback), "a#b")
+        XCTAssertEqual(try validator.code(from: callback), "c#d")
+        for suffix in ["#fragment", "##", "#fragment#", "#%23", "##fragment"] {
+            let invalid = redirect + "?flow_correlation=a&code=c" + suffix
+            XCTAssertThrowsError(try validator.code(from: invalid))
+            XCTAssertThrowsError(try validator.correlation(from: invalid))
+        }
+        for query in ["flow_correlation=a&code=x&%63ode=y", "flow_correlation=a&code=x&other=y",
+                      "flow_correlation=&code=x", "flow_correlation=a&code=%", "flow_correlation=a&code="] {
+            XCTAssertThrowsError(try validator.code(from: redirect + "?" + query + "#"))
+        }
+        XCTAssertThrowsError(try validator.code(from: "example-app://other.example/callback?flow_correlation=a&code=x#"))
+    }
+
     func testInvalidConfiguration() {
         for raw in ["", "example-app:/callback", "example-app:///callback", "example-app://auth.example/callback?",
-                    "example-app://auth.example/callback#", "example-app://user@auth.example/callback",
+                    "example-app://auth.example/callback#", "example-app://auth.example/callback##",
+                    "example-app://auth.example/callback#fragment", "example-app://user@auth.example/callback",
                     "example-app://auth.example:443/callback", "example-app://auth.example:/callback",
                     "example-app://auth.example/%GG", "example-app://auth.example/☃"] {
             XCTAssertThrowsError(try TransientOAuthCallback(redirect: raw), raw) {
@@ -103,7 +121,7 @@ final class TransientOAuthCallbackTests: XCTestCase {
         for raw in ["other://auth.example/callback?code=x", "example-app://other/callback?code=x",
                     "example-app://auth.example/Callback?code=x", "example-app://auth.example/callback/?code=x",
                     "example-app://auth.example:443/callback?code=x", "example-app://auth.example:/callback?code=x",
-                    "example-app://user@auth.example/callback?code=x", "example-app://auth.example/callback?code=x#",
+                    "example-app://user@auth.example/callback?code=x", "example-app://auth.example/callback?code=x#fragment",
                     "example-app://auth.example/callback", "example-app://auth.example/callback?code=",
                     "example-app://auth.example/callback?code", "example-app://auth.example/callback?code=x&",
                     "example-app://auth.example/callback?code=x&other=y",

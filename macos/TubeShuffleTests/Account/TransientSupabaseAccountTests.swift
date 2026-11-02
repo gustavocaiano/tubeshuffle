@@ -334,6 +334,24 @@ final class TransientSupabaseAccountTests: XCTestCase {
         XCTAssertNil(account.session)
     }
 
+    func testEmptyFragmentStillRequiresMatchingCorrelationBeforeExchange() async throws {
+        for mismatch in [false, true] {
+            let transport = Transport()
+            let account = try TransientSupabaseAccount(authURL: endpoint, trustedProjectOrigin: origin,
+                publishableKey: key, baseRedirect: redirect, launch: { url, _ in
+                    let callback = self.callback(url, correlation: mismatch ? "wrong-epoch" : nil)
+                    let withEmptyFragment = URL(string: callback.absoluteString + "#")!
+                    XCTAssertTrue(withEmptyFragment.absoluteString.hasSuffix("#"))
+                    XCTAssertEqual(withEmptyFragment.absoluteString.filter { $0 == "#" }.count, 1)
+                    return withEmptyFragment
+                }, closeBrowser: {}, fetch: { try await transport.send($0) })
+            do { _ = try await account.signIn(); XCTFail("synthetic transport must fail") } catch {}
+            let count = await transport.count()
+            XCTAssertEqual(count, mismatch ? 0 : 1)
+            XCTAssertNil(account.session)
+        }
+    }
+
     func testPKCEPostFailureIsNotRetriedAndLogoutIsLocal() async throws {
         let transport = Transport()
         let account = try TransientSupabaseAccount(authURL: endpoint, trustedProjectOrigin: origin, publishableKey: key, baseRedirect: redirect,

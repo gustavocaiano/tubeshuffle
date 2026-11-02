@@ -120,7 +120,10 @@ struct TransientOAuthCallback {
     #endif
 
     private func parse(_ callback: String) throws -> [String: String] {
-        guard let parts = Self.destination(callback),
+        // A callback may carry one empty fragment delimiter. Leave every other
+        // byte untouched; destination still rejects any remaining literal '#'.
+        let target = callback.hasSuffix("#") ? String(callback.dropLast()) : callback
+        guard let parts = Self.destination(target),
               parts.scheme.lowercased() == scheme,
               parts.host.lowercased() == host,
               parts.path.utf8.elementsEqual(path.utf8),
