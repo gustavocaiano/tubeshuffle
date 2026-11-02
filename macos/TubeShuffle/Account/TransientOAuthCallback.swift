@@ -64,6 +64,33 @@ struct TransientOAuthCallback {
         case other = "rejection_other"
     }
 
+    // Temporary shape-only probe: examine parameter names, never their values.
+    enum ParameterShape {
+        case empty, providerError, token, mixed, other
+    }
+
+    func rejectedFragmentShapes(_ callback: String) -> (query: ParameterShape, fragment: ParameterShape)? {
+        guard let hash = callback.firstIndex(of: "#") else { return nil }
+        let beforeFragment = callback[..<hash]
+        let query = beforeFragment.firstIndex(of: "?").map { beforeFragment[beforeFragment.index(after: $0)...] }
+        let fragment = callback[callback.index(after: hash)...]
+        func shape(_ component: Substring?) -> ParameterShape {
+            guard let component, !component.isEmpty else { return .empty }
+            var hasError = false, hasToken = false
+            for item in component.split(separator: "&", omittingEmptySubsequences: false) {
+                let keyPart = item.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false).first ?? ""
+                guard let key = Self.decode(String(keyPart)) else { continue }
+                if ["error", "error_description", "error_code"].contains(key) { hasError = true }
+                if ["access_token", "refresh_token", "id_token", "token_type", "expires_in", "expires_at"].contains(key) { hasToken = true }
+            }
+            if hasError && hasToken { return .mixed }
+            if hasError { return .providerError }
+            if hasToken { return .token }
+            return .other
+        }
+        return (shape(query), shape(fragment))
+    }
+
     func rejectionCategory(_ callback: String) -> RejectionCategory {
         if callback.contains("#") { return .fragment }
         let pieces = callback.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)

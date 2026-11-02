@@ -98,6 +98,30 @@ final class TransientSupabaseAccount {
         case rejectionMalformedEncoding = "rejection_malformed_encoding"
         case rejectionCorrelationAbsent = "rejection_correlation_absent"
         case rejectionCodeAbsent = "rejection_code_absent", rejectionOther = "rejection_other"
+        case fragmentShapeEmpty = "fragment_shape_empty", fragmentShapeProviderError = "fragment_shape_provider_error"
+        case fragmentShapeToken = "fragment_shape_token", fragmentShapeMixed = "fragment_shape_mixed", fragmentShapeOther = "fragment_shape_other"
+        case queryShapeEmpty = "query_shape_empty", queryShapeProviderError = "query_shape_provider_error"
+        case queryShapeToken = "query_shape_token", queryShapeMixed = "query_shape_mixed", queryShapeOther = "query_shape_other"
+    }
+
+    private static func diagnosticShapes(_ shapes: (query: TransientOAuthCallback.ParameterShape, fragment: TransientOAuthCallback.ParameterShape)) -> [DiagnosticEvent] {
+        let query: DiagnosticEvent
+        switch shapes.query {
+        case .empty: query = .queryShapeEmpty
+        case .providerError: query = .queryShapeProviderError
+        case .token: query = .queryShapeToken
+        case .mixed: query = .queryShapeMixed
+        case .other: query = .queryShapeOther
+        }
+        let fragment: DiagnosticEvent
+        switch shapes.fragment {
+        case .empty: fragment = .fragmentShapeEmpty
+        case .providerError: fragment = .fragmentShapeProviderError
+        case .token: fragment = .fragmentShapeToken
+        case .mixed: fragment = .fragmentShapeMixed
+        case .other: fragment = .fragmentShapeOther
+        }
+        return [query, fragment]
     }
     #endif
 
@@ -253,6 +277,9 @@ final class TransientSupabaseAccount {
                 catch {
                     diagnostic(.callbackRejected)
                     diagnostic(DiagnosticEvent(rawValue: validator.rejectionCategory(callback.absoluteString).rawValue) ?? .rejectionOther)
+                    if let shapes = validator.rejectedFragmentShapes(callback.absoluteString) {
+                        Self.diagnosticShapes(shapes).forEach { diagnostic($0) }
+                    }
                     throw error
                 }
                 do {
@@ -263,6 +290,9 @@ final class TransientSupabaseAccount {
                     case .invalidCallback:
                         diagnostic(.callbackRejected)
                         diagnostic(DiagnosticEvent(rawValue: validator.rejectionCategory(callback.absoluteString).rawValue) ?? .rejectionOther)
+                        if let shapes = validator.rejectedFragmentShapes(callback.absoluteString) {
+                            Self.diagnosticShapes(shapes).forEach { diagnostic($0) }
+                        }
                     case .providerError: diagnostic(.providerRejected)
                     case .exchangeFailed: break // recorded at the exchange boundary
                     default: diagnostic(.flowInterrupted)

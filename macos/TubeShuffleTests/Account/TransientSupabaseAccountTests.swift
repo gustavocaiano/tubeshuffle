@@ -14,7 +14,9 @@ final class LocalOAuthDiagnosticConfigurationTests: XCTestCase {
             "exchange_started", "exchange_failed", "exchange_succeeded", "flow_interrupted",
             "rejection_fragment_present", "rejection_destination_mismatch_or_malformed", "rejection_query_missing",
             "rejection_unknown_or_duplicate_keys", "rejection_malformed_encoding", "rejection_correlation_absent",
-            "rejection_code_absent", "rejection_other"
+            "rejection_code_absent", "rejection_other",
+            "fragment_shape_empty", "fragment_shape_provider_error", "fragment_shape_token", "fragment_shape_mixed", "fragment_shape_other",
+            "query_shape_empty", "query_shape_provider_error", "query_shape_token", "query_shape_mixed", "query_shape_other"
         ]))
         let channel = Pipe()
         let readFD = channel.fileHandleForReading.fileDescriptor
@@ -290,6 +292,9 @@ final class TransientSupabaseAccountTests: XCTestCase {
         XCTAssertEqual(missing, [.browserMissingCallback])
         let malformed = try await run { _, _ in URL(string: "example-app://auth.example/callback?secret=sentinel")! }
         XCTAssertEqual(malformed, [.callbackReceived, .callbackRejected, .rejectionUnknownOrDuplicate])
+        let fragment = try await run { _, _ in URL(string: "example-app://auth.example/callback?flow_correlation=secret#error_description=secret&access_token=secret")! }
+        XCTAssertEqual(fragment, [.callbackReceived, .callbackRejected, .rejectionFragment, .queryShapeOther, .fragmentShapeMixed])
+        XCTAssertFalse(fragment.map(\.rawValue).joined().contains("secret"))
         let mismatch = try await run { url, _ in self.callback(url, correlation: "wrong-epoch") }
         XCTAssertEqual(mismatch, [.callbackReceived, .correlationRejected])
         let noCode = try await run { url, _ in

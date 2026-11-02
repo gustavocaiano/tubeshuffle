@@ -63,7 +63,7 @@ class AccountBuildConfigTests(unittest.TestCase):
                     stack[-1] = False
                 elif directive == "#endif":
                     stack.pop()
-                elif re.search(r'LocalOAuthDiagnostic(?:Configuration|Service|Output)|DiagnosticEvent|diagnosticSink|RejectionCategory|rejectionCategory|\[DEBUG-native-oauth\]', line):
+                elif re.search(r'LocalOAuthDiagnostic(?:Configuration|Service|Output)|DiagnosticEvent|diagnosticSink|RejectionCategory|rejectionCategory|ParameterShape|rejectedFragmentShapes|diagnosticShapes|\[DEBUG-native-oauth\]', line):
                     self.assertIn(True, stack, f"unguarded diagnostic in {relative}: {line}")
             self.assertFalse(stack)
 
