@@ -49,6 +49,22 @@ class AccountBuildConfigTests(unittest.TestCase):
         for forbidden in ("TubeShuffleProjectOrigin", "TubeShufflePublishableKey", "Bundle.main.infoDictionary"):
             self.assertNotIn(forbidden, app)
 
+    def test_temporary_diagnostic_symbols_are_guarded(self):
+        for relative in ("TubeShuffle/Account/TransientSupabaseAccount.swift",
+                         "TubeShuffleTests/Account/TransientSupabaseAccountTests.swift"):
+            stack = []
+            for line in (ROOT / relative).read_text().splitlines():
+                directive = line.strip()
+                if directive.startswith("#if "):
+                    stack.append(directive == "#if DEBUG && LOCAL_OAUTH_DIAGNOSTIC")
+                elif directive == "#else":
+                    stack[-1] = False
+                elif directive == "#endif":
+                    stack.pop()
+                elif re.search(r'LocalOAuthDiagnostic(?:Configuration|Service)|DiagnosticEvent|diagnosticSink|\[DEBUG-native-oauth\]', line):
+                    self.assertIn(True, stack, f"unguarded diagnostic in {relative}: {line}")
+            self.assertFalse(stack)
+
 
 if __name__ == "__main__":
     unittest.main()

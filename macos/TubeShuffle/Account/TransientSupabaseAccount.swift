@@ -4,6 +4,7 @@ import Foundation
 import Security
 import Darwin
 
+#if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
 /// Private, opt-in diagnostic configuration. The file contains only the modern
 /// publishable key, never a URL or a privileged credential.
 enum LocalOAuthDiagnosticConfiguration {
@@ -53,12 +54,16 @@ final class LocalOAuthDiagnosticService: TemporaryAccountService {
         account = try TransientSupabaseAccount(authURL: origin.appendingPathComponent("auth/v1"),
             trustedProjectOrigin: origin, publishableKey: key,
             baseRedirect: LocalOAuthDiagnosticConfiguration.redirect, browser: TransientAuthBrowser(anchor: window))
+        account.diagnosticSink = { attempt, event in
+            print("[DEBUG-native-oauth] \(attempt.uuidString) \(event.rawValue)")
+        }
     }
 
     func signInExpiry() async throws -> Date { Date(timeIntervalSince1970: try await account.signIn().expiresAt) }
     func cancel() { account.cancel() }
     func signOutLocally() { account.logout() }
 }
+#endif
 
 /// Unconnected, memory-only experiment. Integration must establish the provenance
 /// of the trusted project origin and publishable key from trusted app configuration.
@@ -66,6 +71,17 @@ final class LocalOAuthDiagnosticService: TemporaryAccountService {
 @MainActor
 final class TransientSupabaseAccount {
     enum Failure: Error { case busy, randomUnavailable, invalidConfiguration, authorizationFailed }
+    #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+    // Temporary, closed vocabulary: never attach error descriptions, URLs or credentials.
+    enum DiagnosticEvent: String {
+        case preparationFailed = "preparation_failed", browserFailed = "browser_failed"
+        case browserCancelled = "browser_cancelled", browserMissingCallback = "browser_missing_callback"
+        case callbackReceived = "callback_received", callbackRejected = "callback_rejected"
+        case correlationRejected = "correlation_rejected", providerRejected = "provider_rejected"
+        case exchangeStarted = "exchange_started", exchangeFailed = "exchange_failed"
+        case exchangeSucceeded = "exchange_succeeded", flowInterrupted = "flow_interrupted"
+    }
+    #endif
 
     private let authURL: URL
     private let publishableKey: String
@@ -75,6 +91,9 @@ final class TransientSupabaseAccount {
     private let launch: @MainActor (URL, String) async throws -> URL
     private let closeBrowser: @MainActor () -> Void
     private let fetch: AuthClient.FetchHandler
+    #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+    var diagnosticSink: @MainActor (UUID, DiagnosticEvent) -> Void = { _, _ in }
+    #endif
     private var running = false
 
     convenience init(authURL: URL, trustedProjectOrigin: URL, publishableKey: String,
@@ -144,6 +163,12 @@ final class TransientSupabaseAccount {
 
     func signIn() async throws -> Session {
         guard !running else { throw Failure.busy }
+        #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+        // Independent random label, unrelated to the OAuth flow or its credentials.
+        let sink = diagnosticSink
+        let attempt = UUID()
+        let diagnostic: @MainActor (DiagnosticEvent) -> Void = { event in sink(attempt, event) }
+        #endif
         running = true
         defer { running = false }
         let memory = RevocableSessionMemory()
@@ -167,19 +192,65 @@ final class TransientSupabaseAccount {
         let generation: UUID
         do {
             generation = try flow.start(correlation: correlation, revoke: { memory.revokeAndClear() },
-                                        exchange: { try await client.exchangeCodeForSession(authCode: $0) })
+                                         exchange: { code in
+                #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+                diagnostic(.exchangeStarted)
+                do {
+                    let result = try await client.exchangeCodeForSession(authCode: code)
+                    diagnostic(.exchangeSucceeded)
+                    return result
+                } catch {
+                    diagnostic(.exchangeFailed)
+                    throw error
+                }
+                #else
+                return try await client.exchangeCodeForSession(authCode: code)
+                #endif
+            })
         } catch {
             memory.revokeAndClear()
             throw Failure.busy
         }
         do {
             return try await withTaskCancellationHandler {
-                let url = try client.getOAuthSignInURL(provider: .google, redirectTo: redirectURL)
-                let callback = try await launch(url, scheme)
+                #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+                let url: URL
+                do { url = try client.getOAuthSignInURL(provider: .google, redirectTo: redirectURL) }
+                catch { diagnostic(.preparationFailed); throw error }
+                let callback: URL
+                do { callback = try await launch(url, scheme) }
+                catch {
+                    switch error as? TransientAuthBrowser.Failure {
+                    case .cancelled: diagnostic(.browserCancelled)
+                    case .missingCallback: diagnostic(.browserMissingCallback)
+                    default: diagnostic(.browserFailed)
+                    }
+                    throw error
+                }
+                diagnostic(.callbackReceived)
                 // Never synthesize this value from the current flow: it comes from
                 // the actual callback and is checked before any token request.
+                let received: String
+                do { received = try validator.correlation(from: callback.absoluteString) }
+                catch { diagnostic(.callbackRejected); throw error }
+                do {
+                    return try await flow.receive(generation: generation, correlation: received, callback: callback.absoluteString)
+                } catch let failure as TransientFlowState<Session>.Failure {
+                    switch failure {
+                    case .invalidCorrelation: diagnostic(.correlationRejected)
+                    case .invalidCallback: diagnostic(.callbackRejected)
+                    case .providerError: diagnostic(.providerRejected)
+                    case .exchangeFailed: break // recorded at the exchange boundary
+                    default: diagnostic(.flowInterrupted)
+                    }
+                    throw failure
+                }
+                #else
+                let url = try client.getOAuthSignInURL(provider: .google, redirectTo: redirectURL)
+                let callback = try await launch(url, scheme)
                 let received = try validator.correlation(from: callback.absoluteString)
                 return try await flow.receive(generation: generation, correlation: received, callback: callback.absoluteString)
+                #endif
             } onCancel: {
                 memory.revokeAndClear()
             }

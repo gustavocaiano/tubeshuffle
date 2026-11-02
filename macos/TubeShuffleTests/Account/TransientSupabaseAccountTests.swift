@@ -4,6 +4,7 @@ import Foundation
 import XCTest
 @testable import TubeShuffle
 
+#if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
 final class LocalOAuthDiagnosticConfigurationTests: XCTestCase {
     func testPrivateRuntimeFileFailsClosed() throws {
         let manager = FileManager.default
@@ -39,6 +40,7 @@ final class LocalOAuthDiagnosticConfigurationTests: XCTestCase {
         XCTAssertFalse(TransientSupabaseAccount.validEndpoint(URL(string: "https://evil.example/auth/v1")!, trustedOrigin: origin))
     }
 }
+#endif
 
 final class CallbackRegistrationTests: XCTestCase {
     func testHostAppDeclaresCallbackScheme() throws {
@@ -232,6 +234,55 @@ final class TransientSupabaseAccountTests: XCTestCase {
         parts.queryItems!.append(URLQueryItem(name: "code", value: "code-sentinel"))
         return parts.url!
     }
+
+    #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+    func testTemporaryDiagnosticEventsAreStageOnly() async throws {
+        typealias Event = TransientSupabaseAccount.DiagnosticEvent
+        func run(_ launch: @escaping @MainActor (URL, String) async throws -> URL) async throws -> [Event] {
+            let transport = Transport()
+            var events: [Event] = []
+            var account: TransientSupabaseAccount? = try TransientSupabaseAccount(authURL: endpoint, trustedProjectOrigin: origin,
+                publishableKey: key, baseRedirect: redirect, launch: launch, closeBrowser: {},
+                fetch: { try await transport.send($0) })
+            weak var weakAccount = account
+            var attempts: [UUID] = []
+            account?.diagnosticSink = { attempt, event in attempts.append(attempt); events.append(event) }
+            do { _ = try await account!.signIn(); XCTFail("expected rejection") } catch {}
+            XCTAssertEqual(Set(attempts).count, 1)
+            account = nil
+            XCTAssertNil(weakAccount, "diagnostic exchange closure must not retain the account")
+            return events
+        }
+        let browser = try await run { _, _ in throw TransientAuthBrowser.Failure.browserFailure }
+        XCTAssertEqual(browser, [.browserFailed])
+        let cancelled = try await run { _, _ in throw TransientAuthBrowser.Failure.cancelled }
+        XCTAssertEqual(cancelled, [.browserCancelled])
+        let missing = try await run { _, _ in throw TransientAuthBrowser.Failure.missingCallback }
+        XCTAssertEqual(missing, [.browserMissingCallback])
+        let malformed = try await run { _, _ in URL(string: "example-app://auth.example/callback?secret=sentinel")! }
+        XCTAssertEqual(malformed, [.callbackReceived, .callbackRejected])
+        let mismatch = try await run { url, _ in self.callback(url, correlation: "wrong-epoch") }
+        XCTAssertEqual(mismatch, [.callbackReceived, .correlationRejected])
+        let exchange = try await run { url, _ in self.callback(url) }
+        XCTAssertEqual(exchange, [.callbackReceived, .exchangeStarted, .exchangeFailed])
+        XCTAssertFalse(exchange.map(\.rawValue).joined().contains("sentinel"))
+    }
+
+    func testTemporaryDiagnosticAttemptsHaveIndependentLabels() async throws {
+        let transport = Transport()
+        let account = try TransientSupabaseAccount(authURL: endpoint, trustedProjectOrigin: origin,
+            publishableKey: key, baseRedirect: redirect,
+            launch: { _, _ in throw TransientAuthBrowser.Failure.browserFailure }, closeBrowser: {},
+            fetch: { try await transport.send($0) })
+        var attempts: [UUID] = []
+        account.diagnosticSink = { attempt, _ in attempts.append(attempt) }
+        for _ in 0..<2 {
+            do { _ = try await account.signIn(); XCTFail("expected rejection") } catch {}
+        }
+        XCTAssertEqual(attempts.count, 2)
+        XCTAssertEqual(Set(attempts).count, 2)
+    }
+    #endif
 
     func testMismatchedCorrelationNeverExchanges() async throws {
         let transport = Transport()
