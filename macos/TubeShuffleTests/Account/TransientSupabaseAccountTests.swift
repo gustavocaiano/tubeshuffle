@@ -1,7 +1,147 @@
 import Auth
+import AppKit
 import Foundation
 import XCTest
 @testable import TubeShuffle
+
+@MainActor
+final class AccountViewModelTests: XCTestCase {
+    private final class FakeAccount: TemporaryAccountService {
+        var continuation: CheckedContinuation<Date, Error>?
+        var localSignOuts = 0
+        var cancellations = 0
+        var started: XCTestExpectation?
+        func signInExpiry() async throws -> Date {
+            try await withCheckedThrowingContinuation {
+                continuation = $0
+                started?.fulfill()
+            }
+        }
+        func cancel() { cancellations += 1 }
+        func signOutLocally() { localSignOuts += 1 }
+        func complete(_ expiry: Date) {
+            let pending = continuation
+            continuation = nil
+            pending?.resume(returning: expiry)
+        }
+    }
+
+    func testUnavailableByDefault() {
+        let model = AccountViewModel()
+        XCTAssertEqual(model.state, .unavailable)
+        model.signIn()
+        XCTAssertEqual(model.state, .unavailable)
+    }
+
+    func testCancelledLateCompletionCannotRestoreSession() async {
+        let fake = FakeAccount()
+        fake.started = expectation(description: "sign-in started")
+        let model = AccountViewModel(factory: { _ in fake })
+        let window = NSWindow()
+        model.attach(window: window)
+        model.signIn()
+        XCTAssertEqual(model.state, .signingIn)
+        let operation = model.operation
+        await fulfillment(of: [fake.started!], timeout: 1)
+        model.cancel()
+        fake.complete(Date().addingTimeInterval(3600))
+        await operation?.value
+        XCTAssertEqual(model.state, .signedOut)
+        XCTAssertEqual(fake.localSignOuts, 1)
+        XCTAssertEqual(fake.cancellations, 1)
+        withExtendedLifetime(window) {}
+    }
+
+    func testExpiredCompletionSignsOutLocally() async {
+        let fake = FakeAccount()
+        fake.started = expectation(description: "sign-in started")
+        let model = AccountViewModel(factory: { _ in fake })
+        let window = NSWindow()
+        model.attach(window: window)
+        model.signIn()
+        let operation = model.operation
+        await fulfillment(of: [fake.started!], timeout: 1)
+        fake.complete(Date().addingTimeInterval(-1))
+        await operation?.value
+        XCTAssertEqual(model.state, .signedOut)
+        XCTAssertEqual(fake.localSignOuts, 1)
+        withExtendedLifetime(window) {}
+    }
+
+    func testWindowCloseCancelsAndStaleCompletionCannotAffectRetry() async {
+        let first = FakeAccount(), second = FakeAccount()
+        first.started = expectation(description: "first started")
+        second.started = expectation(description: "retry started")
+        var count = 0
+        let model = AccountViewModel(factory: { _ in
+            count += 1
+            return count == 1 ? first : second
+        })
+        let window = NSWindow(), replacement = NSWindow()
+        model.attach(window: window)
+        model.signIn()
+        let oldOperation = model.operation
+        await fulfillment(of: [first.started!], timeout: 1)
+        NotificationCenter.default.post(name: NSWindow.willCloseNotification, object: window)
+        XCTAssertEqual(model.state, .signedOut)
+        XCTAssertEqual(first.cancellations, 1)
+        XCTAssertEqual(first.localSignOuts, 1)
+
+        model.attach(window: replacement)
+        model.signIn()
+        let newOperation = model.operation
+        await fulfillment(of: [second.started!], timeout: 1)
+        first.complete(Date().addingTimeInterval(3600))
+        await oldOperation?.value
+        XCTAssertEqual(model.state, .signingIn)
+        second.complete(Date().addingTimeInterval(3600))
+        await newOperation?.value
+        XCTAssertEqual(model.state, .signedIn)
+        model.signOut()
+    }
+
+    func testRepeatedAttachAndUnrelatedWindowCloseDoNotCancel() async {
+        let fake = FakeAccount()
+        fake.started = expectation(description: "started")
+        let model = AccountViewModel(factory: { _ in fake })
+        let window = NSWindow(), other = NSWindow()
+        model.attach(window: window)
+        model.signIn()
+        let operation = model.operation
+        await fulfillment(of: [fake.started!], timeout: 1)
+        model.attach(window: window)
+        NotificationCenter.default.post(name: NSWindow.willCloseNotification, object: other)
+        XCTAssertEqual(model.state, .signingIn)
+        XCTAssertEqual(fake.cancellations, 0)
+        NotificationCenter.default.post(name: NSWindow.willCloseNotification, object: window)
+        fake.complete(Date().addingTimeInterval(3600))
+        await operation?.value
+        XCTAssertEqual(model.state, .signedOut)
+    }
+
+    func testRemovedTrackingViewDoesNotEndSessionButWindowCloseDoes() async {
+        let fake = FakeAccount()
+        fake.started = expectation(description: "started")
+        let model = AccountViewModel(factory: { _ in fake })
+        let window = NSWindow()
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 100, height: 100))
+        window.contentView = container
+        let view = WindowTrackingView()
+        view.attached = { [weak model] in model?.attach(window: $0) }
+        container.addSubview(view)
+        model.signIn()
+        let operation = model.operation
+        await fulfillment(of: [fake.started!], timeout: 1)
+        view.removeFromSuperview()
+        XCTAssertEqual(model.state, .signingIn)
+        XCTAssertEqual(fake.cancellations, 0)
+        NotificationCenter.default.post(name: NSWindow.willCloseNotification, object: window)
+        XCTAssertEqual(fake.cancellations, 1)
+        fake.complete(Date().addingTimeInterval(3600))
+        await operation?.value
+        XCTAssertEqual(model.state, .signedOut)
+    }
+}
 
 @MainActor
 final class TransientSupabaseAccountTests: XCTestCase {

@@ -68,7 +68,8 @@ final class TransientAuthBrowserTests: XCTestCase {
         let firstStarted = expectation(description: "first")
         let secondStarted = expectation(description: "second")
         var count = 0
-        let browser = TransientAuthBrowser(anchor: NSWindow()) { _, _, _, completion in
+        let window = NSWindow()
+        let browser = TransientAuthBrowser(anchor: window) { _, _, _, completion in
             count += 1
             let fake = count == 1 ? first : second
             fake.completion = completion
@@ -86,6 +87,7 @@ final class TransientAuthBrowserTests: XCTestCase {
         second.completion?(callbackURL, nil)
         let result = try await next.value
         XCTAssertEqual(result, callbackURL)
+        withExtendedLifetime(window) {}
     }
 
     func testTaskCancellationAndConcurrentStart() async {
@@ -129,7 +131,8 @@ final class TransientAuthBrowserTests: XCTestCase {
     func testAlreadyCancelledDoesNotCreateOrStartSession() async {
         let fake = FakeAuthSession()
         var factoryCount = 0
-        let browser = TransientAuthBrowser(anchor: NSWindow()) { _, _, _, _ in
+        let window = NSWindow()
+        let browser = TransientAuthBrowser(anchor: window) { _, _, _, _ in
             factoryCount += 1
             return fake
         }
@@ -144,7 +147,8 @@ final class TransientAuthBrowserTests: XCTestCase {
 
     func testCancellationDuringFactoryDoesNotStartSession() async {
         let fake = FakeAuthSession()
-        let browser = TransientAuthBrowser(anchor: NSWindow()) { _, _, _, _ in
+        let window = NSWindow()
+        let browser = TransientAuthBrowser(anchor: window) { _, _, _, _ in
             withUnsafeCurrentTask { $0?.cancel() }
             return fake
         }
@@ -152,5 +156,34 @@ final class TransientAuthBrowserTests: XCTestCase {
         await failure(task, .cancelled)
         XCTAssertEqual(fake.startCount, 0)
         XCTAssertEqual(fake.cancelCount, 1)
+        withExtendedLifetime(window) {}
+    }
+
+    func testMissingAnchorDoesNotCreateSession() async {
+        var factoryCount = 0
+        let browser = TransientAuthBrowser(anchor: nil) { _, _, _, _ in
+            factoryCount += 1
+            return FakeAuthSession()
+        }
+        let task = Task { try await browser.start(url: authorizationURL, callbackScheme: "example-app") }
+        await failure(task, .missingAnchor)
+        XCTAssertEqual(factoryCount, 0)
+    }
+
+    func testRetainedPresentationContextRemainsValidAfterCancellation() async {
+        let window = NSWindow(), fake = FakeAuthSession()
+        let started = expectation(description: "started")
+        var savedContext: ASWebAuthenticationPresentationContextProviding?
+        let browser = TransientAuthBrowser(anchor: window) { _, _, provider, _ in
+            savedContext = provider
+            started.fulfill()
+            return fake
+        }
+        let task = Task { try await browser.start(url: authorizationURL, callbackScheme: "example-app") }
+        await fulfillment(of: [started], timeout: 1)
+        browser.cancel()
+        await failure(task, .cancelled)
+        let probe = ASWebAuthenticationSession(url: authorizationURL, callbackURLScheme: "example-app") { _, _ in }
+        XCTAssertTrue(savedContext?.presentationAnchor(for: probe) === window)
     }
 }
