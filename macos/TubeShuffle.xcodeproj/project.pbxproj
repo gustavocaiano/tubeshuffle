@@ -111,8 +111,8 @@
   A00000000000000000000031 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000034, A00000000000000000000035); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
   A00000000000000000000032 = {isa = XCBuildConfiguration; buildSettings = {ENABLE_TESTABILITY = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; SDKROOT = macosx; }; name = Debug; };
   A00000000000000000000033 = {isa = XCBuildConfiguration; buildSettings = {MACOSX_DEPLOYMENT_TARGET = 14.0; SDKROOT = macosx; }; name = Release; };
-  A00000000000000000000034 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = TubeShuffle/Resources/TubeShuffle.entitlements; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.tubeshuffle.playbacklab; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; }; name = Debug; };
-  A00000000000000000000035 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = TubeShuffle/Resources/TubeShuffle.entitlements; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.tubeshuffle.playbacklab; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; }; name = Release; };
+  A00000000000000000000034 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = TubeShuffle/Resources/TubeShuffle.entitlements; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = TubeShuffle/Resources/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.tubeshuffle.playbacklab; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; }; name = Debug; };
+  A00000000000000000000035 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = TubeShuffle/Resources/TubeShuffle.entitlements; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = TubeShuffle/Resources/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.tubeshuffle.playbacklab; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; }; name = Release; };
  };
  rootObject = A00000000000000000000026;
 }

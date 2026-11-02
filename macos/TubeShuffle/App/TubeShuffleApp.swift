@@ -2,39 +2,11 @@ import SwiftUI
 import AppKit
 import WebKit
 
-// Only app-owned, reviewed configuration may construct this value. A callback
-// must also be registered with both the app and the authentication provider.
-struct TrustedAccountConfiguration {
-    let authURL: URL
-    let projectOrigin: URL
-    let publishableKey: String
-    let registeredCallback: URL
-}
-
 @MainActor
 protocol TemporaryAccountService: AnyObject {
     func signInExpiry() async throws -> Date
     func cancel()
     func signOutLocally()
-}
-
-@MainActor
-private final class SupabaseTemporaryAccount: TemporaryAccountService {
-    private let account: TransientSupabaseAccount
-
-    init(configuration: TrustedAccountConfiguration, window: NSWindow) throws {
-        let browser = TransientAuthBrowser(anchor: window)
-        account = try TransientSupabaseAccount(authURL: configuration.authURL,
-            trustedProjectOrigin: configuration.projectOrigin, publishableKey: configuration.publishableKey,
-            baseRedirect: configuration.registeredCallback, browser: browser)
-    }
-
-    func signInExpiry() async throws -> Date {
-        let session = try await account.signIn()
-        return Date(timeIntervalSince1970: session.expiresAt)
-    }
-    func cancel() { account.cancel() }
-    func signOutLocally() { account.logout() }
 }
 
 @MainActor
@@ -55,11 +27,6 @@ final class AccountViewModel: NSObject, ObservableObject {
         self.factory = factory
         state = factory == nil ? .unavailable : .signedOut
         super.init()
-    }
-
-    convenience init(configuration: TrustedAccountConfiguration?) {
-        guard let configuration else { self.init(); return }
-        self.init(factory: { try SupabaseTemporaryAccount(configuration: configuration, window: $0) })
     }
 
     func attach(window: NSWindow) {
@@ -147,8 +114,8 @@ final class AccountViewModel: NSObject, ObservableObject {
 @main
 struct TubeShuffleApp: App {
     @StateObject private var coordinator = PlayerCoordinator()
-    // No trusted callback has been registered yet; sign-in stays unavailable.
-    @StateObject private var account = AccountViewModel(configuration: nil)
+    // No live account integration is wired into this app in any build.
+    @StateObject private var account = AccountViewModel()
 
     var body: some Scene {
         Window("TubeShuffle Playback Lab", id: "player") {

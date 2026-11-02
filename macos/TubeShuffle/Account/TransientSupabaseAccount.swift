@@ -49,7 +49,7 @@ final class TransientSupabaseAccount {
 
     // Require a canonical DNS origin and the exact SDK auth base path; no implicit
     // port, encoded path, userinfo, query, fragment, or alternate spelling.
-    private static func validEndpoint(_ endpoint: URL, trustedOrigin: URL) -> Bool {
+    nonisolated static func validEndpoint(_ endpoint: URL, trustedOrigin: URL) -> Bool {
         guard let parts = URLComponents(url: trustedOrigin, resolvingAgainstBaseURL: false),
               parts.scheme == "https", let host = parts.host, !host.isEmpty,
               parts.user == nil, parts.password == nil, parts.port == nil,
@@ -66,7 +66,7 @@ final class TransientSupabaseAccount {
 
     // Only the modern publishable-key format is accepted; legacy JWT keys cannot
     // safely be distinguished from service-role JWTs without trusted metadata.
-    private static func validPublishableKey(_ key: String) -> Bool {
+    nonisolated static func validPublishableKey(_ key: String) -> Bool {
         let prefix = "sb_publishable_"
         guard key.hasPrefix(prefix), key.utf8.count > prefix.utf8.count else { return false }
         return key.utf8.allSatisfy {

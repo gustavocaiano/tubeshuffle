@@ -4,6 +4,15 @@ import Foundation
 import XCTest
 @testable import TubeShuffle
 
+final class CallbackRegistrationTests: XCTestCase {
+    func testHostAppDeclaresCallbackScheme() throws {
+        let scheme = "com.tubeshuffle.playbacklab"
+        let types = try XCTUnwrap(Bundle.main.infoDictionary?["CFBundleURLTypes"] as? [[String: Any]])
+        XCTAssertTrue(types.contains { ($0["CFBundleURLSchemes"] as? [String])?.contains(scheme) == true })
+        XCTAssertEqual(Bundle.main.bundleIdentifier, scheme)
+    }
+}
+
 @MainActor
 final class AccountViewModelTests: XCTestCase {
     private final class FakeAccount: TemporaryAccountService {

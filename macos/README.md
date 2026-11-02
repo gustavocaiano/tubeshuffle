@@ -1,6 +1,6 @@
 # Playback Lab — P0 only
 
-This is an isolated feasibility experiment, not the native product. It uses one retained WKWebView hosting the official YouTube iframe player and a native-owned queue of six fixed public example IDs. It does not contain accounts, cloud data, API keys, downloads, or a media workaround. Video availability and embedding permissions may change. Background playback is not established or approved.
+This is an isolated feasibility experiment, not the native product. It uses one retained WKWebView hosting the official YouTube iframe player and a native-owned queue of six fixed public example IDs. Account sign-in is unavailable; it has no configured cloud data or API keys, downloads, or media workaround. Video availability and embedding permissions may change. Background playback is not established or approved.
 
 For the owner-authorized shorter P0 runs on 2026-10-28, the existing fixture was reordered to `ScMzIvxBSi4`, `jNQXAC9IVRw`, `dQw4w9WgXcQ`, `M7lc1UVf-VE`, `aqz-KE-bpKQ`, `ysz5S6PUM-U`. The first two items allow shorter natural-ending observations; those runs did not configure shortened end times. The final item displayed “Video unavailable” on this Mac. Original-order results and revised-order results are recorded separately in the plan.
 
@@ -21,7 +21,7 @@ For the owner-authorized shorter P0 runs on 2026-10-28, the existing fixture was
 
 The bundle ID is `com.tubeshuffle.playbacklab`; the HTML base URL and iframe origin are `https://com.tubeshuffle.playbacklab`. Actual HTTP Referer delivery and error-153 absence must be checked on the Mac; configuration alone does not prove identification.
 
-The deterministic queue checks are separate from Xcode's scheme (there is no XCTest target):
+The deterministic queue checks can also run separately from the XCTest target:
 
 ```sh
 swiftc macos/TubeShuffle/Playback/QueueState.swift macos/TubeShuffleTests/Playback/QueueStateTests.swift -o /tmp/tubeshuffle-queue-tests
@@ -45,3 +45,10 @@ The native position slider complements the unobscured embedded controls. It is d
 The log records sanitized events and last accepted item, not verified video identity. Accepted commands do not prove playback. Generation tags are supplied by the page script and remain unauthenticated; a forged or stale tag is rejected only insofar as it does not name the pending or active occurrence. No Linux test proves native playback.
 
 YouTube's background-player policy conflict remains release-blocking; the owner-authorized diagnostic is not YouTube permission. The hidden-window autoplay interaction is a separate unresolved issue: YouTube's required-minimum-functionality rules govern automatic and scripted initiation relative to player visibility, and whether a new occurrence's scripted initiation or a natural advancement is delayed, blocked, or throttled while the window is hidden, minimized, or occluded is unverified; the prototype neither observes nor influences that behavior, and the readiness and evaluation safeguards above treat an instance that never becomes ready or stops answering as restart-required rather than working around it. Occurrence identity itself remains unverified: every safeguard attributes callbacks to coordinator-issued player instances, never to authenticated remote video identity. No visibility or identity spoofing, keepalive, extraction, ad suppression or playback bypass is implemented. See [restrictions](../docs/production-restrictions.md).
+# Native account scaffolding
+
+The app declares the proposed callback `com.tubeshuffle.playbacklab://auth/callback` locally. It is unverified, has not been registered with Supabase or an identity provider by this change, and a custom URL scheme is not exclusive to this app. No remote configuration is changed here.
+
+Sign-in is unavailable in every build. The app does not load a Supabase origin or key from build settings or Info.plist and has no live account integration wired in; compilation flags cannot enable it. Do not pass keys or secrets to Xcode build settings: tooling can log them. Account components and injected test doubles are scaffolding, not a deployable integration.
+
+Run offline structural checks with `python3 macos/tests/test_account_build_config.py`. A Mac/Xcode build and tests are still required to verify Swift compilation and the actual bundle.
