@@ -100,6 +100,47 @@ class AccountBuildConfigTests(unittest.TestCase):
         for source in sources:
             self.assertIsNone(forbidden.search(source.read_text()), str(source))
 
+    def test_two_account_diagnostic_is_debug_guarded_and_test_target_only(self):
+        project = (ROOT / "TubeShuffle.xcodeproj/project.pbxproj").read_text()
+        paths = ("TubeShuffleTests/Account/TwoAccountReadOnlyDiagnostic.swift",
+                 "TubeShuffleTests/Account/TwoAccountReadOnlyDiagnosticTests.swift")
+        objects = dict(re.findall(r'^\s*([A-F0-9]{24}) = \{(.*?)\};', project, re.M))
+        targets = {}
+        for obj in objects.values():
+            match = re.search(r'isa = PBXNativeTarget;.*?buildPhases = \(([^)]*)\);.*?name = (TubeShuffle(?:Tests)?);', obj)
+            if match:
+                targets[match.group(2)] = re.findall(r'[A-F0-9]{24}', match.group(1))
+        self.assertEqual(set(targets), {"TubeShuffle", "TubeShuffleTests"})
+        source_phases = {}
+        for target, phases in targets.items():
+            sources = [objects[p] for p in phases if 'isa = PBXSourcesBuildPhase;' in objects[p]]
+            self.assertEqual(len(sources), 1)
+            source_phases[target] = set(re.findall(r'[A-F0-9]{24}', sources[0]))
+        for path in paths:
+            text = (ROOT / path).read_text().strip()
+            self.assertTrue(text.startswith('#if DEBUG && LOCAL_OAUTH_DIAGNOSTIC\n'), path)
+            self.assertTrue(text.endswith('\n#endif'), path)
+            depth = 0
+            for line in text.splitlines():
+                directive = line.strip()
+                if directive.startswith('#if '):
+                    depth += 1
+                elif directive == '#endif':
+                    depth -= 1
+                    self.assertGreaterEqual(depth, 0, path)
+                elif depth == 1:
+                    self.assertFalse(directive == '#else' or directive.startswith('#elseif '), path)
+                if depth == 0:
+                    self.assertEqual(directive, '#endif', path)
+            self.assertEqual(depth, 0, path)
+            refs = [key for key, obj in objects.items() if f'path = {path};' in obj]
+            self.assertEqual(len(refs), 1, path)
+            builds = [key for key, obj in objects.items()
+                      if 'isa = PBXBuildFile;' in obj and f'fileRef = {refs[0]};' in obj]
+            self.assertEqual(len(builds), 1, path)
+            self.assertIn(builds[0], source_phases['TubeShuffleTests'])
+            self.assertNotIn(builds[0], source_phases['TubeShuffle'])
+
 
 if __name__ == "__main__":
     unittest.main()

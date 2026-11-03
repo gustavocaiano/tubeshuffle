@@ -49,6 +49,14 @@ The log records sanitized events and last accepted item, not verified video iden
 YouTube's background-player policy conflict remains release-blocking; the owner-authorized diagnostic is not YouTube permission. The hidden-window autoplay interaction is a separate unresolved issue: YouTube's required-minimum-functionality rules govern automatic and scripted initiation relative to player visibility, and whether a new occurrence's scripted initiation or a natural advancement is delayed, blocked, or throttled while the window is hidden, minimized, or occluded is unverified; the prototype neither observes nor influences that behavior, and the readiness and evaluation safeguards above treat an instance that never becomes ready or stops answering as restart-required rather than working around it. Occurrence identity itself remains unverified: every safeguard attributes callbacks to coordinator-issued player instances, never to authenticated remote video identity. No visibility or identity spoofing, keepalive, extraction, ad suppression or playback bypass is implemented. See [restrictions](../docs/production-restrictions.md).
 # Native account scaffolding
 
+The separate test-target-only two-account read diagnostic has no live caller. A
+successful result means that one limited owner read returned an owner-owned row
+and the second account's limited read returned no rows. This is only a one-row,
+two-account read result: it does not establish general RLS isolation or that the
+owner cannot see other users' rows. The checks use fixed read-only requests; they
+do not authorize a live run or a broader query. Email shape and confirmation
+metadata do not prove deliverability or Google verification of the email.
+
 The app declares a proposed native callback locally. A custom URL scheme is not exclusive to this app. The temporary diagnostic allowlist entry was removed as reported above; the diagnostic does not establish a production callback configuration.
 
 Sign-in remains unavailable by default. A **private local Debug diagnostic** can be explicitly enabled as described below. With the checked-in build settings, a normal Release build does not enable it, even with the launch argument. Build setting overrides can define both compilation conditions in another configuration and are outside this guarantee. No origin or key is taken from build settings or Info.plist. This experiment is not production account integration.
