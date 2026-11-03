@@ -69,6 +69,14 @@ struct LibrarySnapshot: Equatable {
     let history: [LibraryHistoryEvent]
 
     static let empty = LibrarySnapshot(playlists: [], occurrences: [], history: [])
+
+    // Filter by local occurrence identity, never by YouTube video identity.
+    func unwatchedOccurrences(for playlistId: PlaylistID) -> [LibraryOccurrence] {
+        let completed = Set(history.lazy
+            .filter { $0.playlistId == playlistId && $0.completed }
+            .map(\.videoId))
+        return occurrences.filter { $0.playlistId == playlistId && !completed.contains($0.id) }
+    }
 }
 
 protocol LibraryRepository {
