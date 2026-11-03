@@ -14,8 +14,8 @@ final class TransientOAuthTransport: NSObject, URLSessionDataDelegate, @unchecke
 
     private let lock = NSLock()
     private let protocolClasses: [AnyClass]?
-    // TEMPORARY: only the focused synthetic test supplies this fixed-event probe.
-    private let oversizeProbe: ((String) -> Void)?
+    // Injectable to observe cancellation requests in delegate tests; production cancels the task directly.
+    private let cancelTask: (URLSessionDataTask) -> Void
     private var continuation: CheckedContinuation<(Data, URLResponse), Error>?
     private var session: URLSession?
     private var task: URLSessionDataTask?
@@ -24,9 +24,9 @@ final class TransientOAuthTransport: NSObject, URLSessionDataDelegate, @unchecke
     private var response: URLResponse?
     private var body = Data()
 
-    init(protocolClasses: [AnyClass]? = nil, oversizeProbe: ((String) -> Void)? = nil) {
+    init(protocolClasses: [AnyClass]? = nil, cancelTask: @escaping (URLSessionDataTask) -> Void = { $0.cancel() }) {
         self.protocolClasses = protocolClasses
-        self.oversizeProbe = oversizeProbe
+        self.cancelTask = cancelTask
     }
 
     func fetch(_ request: URLRequest) async throws -> (Data, URLResponse) {
@@ -67,13 +67,12 @@ final class TransientOAuthTransport: NSObject, URLSessionDataDelegate, @unchecke
     }
 
     private func cancel() {
-        oversizeProbe?("cancel_requested")
         finish(.failure(CancellationError()))
     }
 
     private func finish(_ result: Result<(Data, URLResponse), Error>) {
         lock.lock()
-        guard !finished else { lock.unlock(); probeFinish(result, selected: false); return }
+        guard !finished else { lock.unlock(); return }
         finished = true
         let continuation = self.continuation
         self.continuation = nil
@@ -81,31 +80,9 @@ final class TransientOAuthTransport: NSObject, URLSessionDataDelegate, @unchecke
         self.task = nil; self.session = nil
         body = Data(); response = nil
         lock.unlock()
-        probeFinish(result, selected: true)
-        task?.cancel()
+        if let task { cancelTask(task) }
         session?.invalidateAndCancel()
         continuation?.resume(with: result)
-    }
-
-    // TEMPORARY: classify only fixed terminal categories; never log raw errors or data.
-    private func probeFinish(_ result: Result<(Data, URLResponse), Error>, selected: Bool) {
-        guard let oversizeProbe else { return }
-        let category: String
-        switch result {
-        case .success: category = "success"
-        case .failure(let error):
-            if let failure = error as? Failure {
-                switch failure {
-                case .responseTooLarge: category = "oversize"
-                case .network: category = "network"
-                case .redirect: category = "redirect"
-                case .invalidResponse: category = "invalid"
-                case .alreadyUsed: category = "already_used"
-                }
-            } else if error is CancellationError { category = "cancel" }
-            else { category = "other" }
-        }
-        oversizeProbe("finish_\(selected ? "selected" : "ignored")_\(category)")
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask,
@@ -117,10 +94,6 @@ final class TransientOAuthTransport: NSObject, URLSessionDataDelegate, @unchecke
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
                     completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-        oversizeProbe?("delegate_response")
-        if response.expectedContentLength < 0 { oversizeProbe?("length_unknown") }
-        else if response.expectedContentLength > Int64(Self.responseLimit) { oversizeProbe?("length_oversize") }
-        else { oversizeProbe?("length_within_limit") }
         guard let http = response as? HTTPURLResponse else {
             finish(.failure(Failure.invalidResponse)); completionHandler(.cancel); return
         }
@@ -131,7 +104,6 @@ final class TransientOAuthTransport: NSObject, URLSessionDataDelegate, @unchecke
             let trimmed = length.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty, trimmed.utf8.allSatisfy({ (48...57).contains($0) }),
                   let value = UInt64(trimmed), value <= UInt64(Self.responseLimit) else {
-                oversizeProbe?("header_rejected")
                 finish(.failure(Failure.responseTooLarge)); completionHandler(.cancel); return
             }
         }
@@ -153,10 +125,6 @@ final class TransientOAuthTransport: NSObject, URLSessionDataDelegate, @unchecke
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let urlError = error as? URLError, urlError.code == .timedOut { oversizeProbe?("delegate_complete_timeout") }
-        else if let urlError = error as? URLError, urlError.code == .cancelled { oversizeProbe?("delegate_complete_cancelled") }
-        else if error != nil { oversizeProbe?("delegate_complete_other_error") }
-        else { oversizeProbe?("delegate_complete_success") }
         if error != nil { finish(.failure(Failure.network)); return }
         lock.lock()
         let response = self.response, body = self.body

@@ -4,12 +4,8 @@ import Foundation
 import XCTest
 @testable import TubeShuffle
 
-// TEMPORARY: keep the watchdog outcome safe to read across concurrent tasks.
-private final class OversizeWatchdogState: @unchecked Sendable {
-    private let lock = NSLock()
-    private var fired = false
-    func recordFired() { lock.lock(); fired = true; lock.unlock() }
-    func didFire() -> Bool { lock.lock(); defer { lock.unlock() }; return fired }
+private final class OversizedExpectedLengthResponse: HTTPURLResponse, @unchecked Sendable {
+    override var expectedContentLength: Int64 { Int64(TransientOAuthTransport.responseLimit) + 1 }
 }
 
 private final class SyntheticOAuthProtocol: URLProtocol {
@@ -178,37 +174,37 @@ final class TransientOAuthTransportTests: XCTestCase {
         await fulfillment(of: [stopped], timeout: 1)
     }
     func testEarlyOversizeCancelsUnderlyingTask() async {
-        let stopped = expectation(description: "oversized request stopped")
-        configure({ instance in
-            print("[DEBUG-oauth-oversize] protocol_start")
-            let response = HTTPURLResponse(url: instance.request.url!, statusCode: 200, httpVersion: nil,
-                headerFields: ["Content-Length": "\(TransientOAuthTransport.responseLimit + 1)"])!
-            print(instance.client == nil ? "[DEBUG-oauth-oversize] protocol_client_missing" : "[DEBUG-oauth-oversize] protocol_response_sending")
-            instance.client?.urlProtocol(instance, didReceive: response, cacheStoragePolicy: .notAllowed)
-            print("[DEBUG-oauth-oversize] protocol_response_returned")
-        }, stopped: {
-            print("[DEBUG-oauth-oversize] protocol_stop")
-            stopped.fulfill()
+        let started = expectation(description: "pending request started")
+        let cancellationRequested = expectation(description: "underlying task cancellation requested")
+        let completed = expectation(description: "oversized response rejected")
+        configure { _ in started.fulfill() }
+        let transport = TransientOAuthTransport(protocolClasses: [SyntheticOAuthProtocol.self], cancelTask: { task in
+            cancellationRequested.fulfill()
+            task.cancel()
         })
-        let transport = TransientOAuthTransport(protocolClasses: [SyntheticOAuthProtocol.self], oversizeProbe: {
-            print("[DEBUG-oauth-oversize] \($0)")
-        })
-        let operation = Task { try await transport.fetch(request) }
-        let watchdogState = OversizeWatchdogState()
-        // TEMPORARY: attempt cancellation after five seconds; this does not bound the process.
-        let watchdog = Task {
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
-            guard !Task.isCancelled else { return }
-            watchdogState.recordFired()
-            print("[DEBUG-oauth-oversize] watchdog_timeout_cancel")
-            operation.cancel()
+        let operation = Task {
+            do { _ = try await transport.fetch(request); XCTFail("oversized response accepted") }
+            catch { XCTAssertEqual(error as? TransientOAuthTransport.Failure, .responseTooLarge) }
+            completed.fulfill()
         }
-        do { _ = try await operation.value; XCTFail("oversized response accepted") }
-        catch { XCTAssertEqual(error as? TransientOAuthTransport.Failure, .responseTooLarge) }
-        watchdog.cancel()
-        await watchdog.value
-        XCTAssertFalse(watchdogState.didFire(), "watchdog fired before the synthetic operation completed")
-        await fulfillment(of: [stopped], timeout: 1)
+        let session = URLSession(configuration: .ephemeral)
+        defer { operation.cancel(); session.invalidateAndCancel() }
+        await fulfillment(of: [started], timeout: 1)
+
+        // Direct injection tests the delegate decision, not Foundation delivery.
+        // No Content-Length header: rejection must use expectedContentLength.
+        let response = OversizedExpectedLengthResponse(url: request.url!, statusCode: 200,
+                                                        httpVersion: nil, headerFields: nil)!
+        XCTAssertNil(response.value(forHTTPHeaderField: "Content-Length"))
+        XCTAssertEqual(response.expectedContentLength, Int64(TransientOAuthTransport.responseLimit) + 1)
+        let dummy = session.dataTask(with: request)
+        var completionCount = 0
+        transport.urlSession(session, dataTask: dummy, didReceive: response) { disposition in
+            completionCount += 1
+            XCTAssertEqual(disposition, .cancel)
+        }
+        XCTAssertEqual(completionCount, 1)
+        await fulfillment(of: [cancellationRequested, completed], timeout: 1)
     }
     func testReuseAndConcurrentInvocationAreRejected() async throws {
         let started = expectation(description: "first request started")
