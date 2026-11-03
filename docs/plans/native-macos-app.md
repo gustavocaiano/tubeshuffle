@@ -2,7 +2,14 @@
 
 ## Status and chosen direction
 
-Planning document plus an isolated P0 prototype handoff. Saving this plan creates no application code, infrastructure, branch, commit, or pull request. The separate P0 prototype exists as uncommitted working-tree files under `macos/`; no dedicated prototype commit, PR, or Mac evidence exists yet.
+This plan includes historical planning and P0 handoff records; later evidence does not close the outstanding acceptance gates.
+
+### Current evidence — 2026-11-03
+
+- The owner reported successful Mac `xcodebuild` test runs at `4517340` and `8880af3`. At `ca96cb0`, a diagnostic live login reached a callback with an empty fragment, the exchange succeeded, and the UI showed Signed in. The owner confirmed removal of the temporary native callback allowlist entry. This is diagnostic evidence, not release authorization.
+- Local synthetic auth tests passed: 38 unit and 6 integration. In isolated PostgreSQL 16, `owner_links` SQL tests including the claims matrix passed; concurrency tests passed for same and different IDs at 4,999 and for rollback/retry.
+- Today's authorized GET-only live probe observed an anonymous permission-denied response, an inconclusive invalid-bearer result, and a private-schema exposure error response. All results are inconclusive without an independent positive control for the key, route, and project.
+- These observations do not establish owner/non-owner access, real JWT validation, live release security, production deployment, background playback, or safe native import. Existing security, history/transfer, and YouTube policy gates remain open.
 
 **Chosen direction:** a genuinely native SwiftUI application under `macos/`, sharing authenticated Vercel data APIs with the existing website. Use a WKWebView-based official YouTube embedded player only for video playback—not for the application interface.
 

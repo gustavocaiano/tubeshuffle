@@ -1,5 +1,11 @@
 # Owner links database
 
+## Recent evidence — 2026-11-03
+
+Local synthetic auth tests passed (38 unit, 6 integration). In isolated PostgreSQL 16, `owner_links` SQL tests including the claims matrix passed; concurrency tests passed for same and different IDs at 4,999 and rollback/retry. These are not live gateway or real JWT validation.
+
+Today's authorized GET-only live probe observed an anonymous permission-denied response, an inconclusive invalid-bearer result, and a private-schema exposure error response. All observations are inconclusive without an independent positive control for the key, route, and project. They do not establish owner/non-owner access, live release security, or production deployment. All existing security, history/transfer, and policy gates remain open.
+
 The initial migration was applied to the TubeShuffle project on 2026-10-29 through the Supabase Management API and recorded as version `20261029131212`. The recorded SQL was verified to match the local migration exactly. The verified Google account has been pinned in the database; matching production server configuration and live authorization and deployment gates remain open.
 
 The follow-on owner-RPC correction was applied on 2026-10-29 through the Management API and recorded as version `20261029170816`; the recorded SQL was verified against the local migration. User-approved testing against the existing project does not establish live gateway/JWT claim isolation, direct Data API security or production readiness.
