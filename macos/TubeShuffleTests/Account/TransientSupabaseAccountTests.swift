@@ -4,6 +4,14 @@ import Foundation
 import XCTest
 @testable import TubeShuffle
 
+// TEMPORARY: keep the watchdog outcome safe to read across concurrent tasks.
+private final class OversizeWatchdogState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var fired = false
+    func recordFired() { lock.lock(); fired = true; lock.unlock() }
+    func didFire() -> Bool { lock.lock(); defer { lock.unlock() }; return fired }
+}
+
 private final class SyntheticOAuthProtocol: URLProtocol {
     typealias Handler = (SyntheticOAuthProtocol) -> Void
     private static let lock = NSLock()
@@ -172,12 +180,34 @@ final class TransientOAuthTransportTests: XCTestCase {
     func testEarlyOversizeCancelsUnderlyingTask() async {
         let stopped = expectation(description: "oversized request stopped")
         configure({ instance in
+            print("[DEBUG-oauth-oversize] protocol_start")
             let response = HTTPURLResponse(url: instance.request.url!, statusCode: 200, httpVersion: nil,
                 headerFields: ["Content-Length": "\(TransientOAuthTransport.responseLimit + 1)"])!
+            print(instance.client == nil ? "[DEBUG-oauth-oversize] protocol_client_missing" : "[DEBUG-oauth-oversize] protocol_response_sending")
             instance.client?.urlProtocol(instance, didReceive: response, cacheStoragePolicy: .notAllowed)
-        }, stopped: { stopped.fulfill() })
-        do { _ = try await fetch(); XCTFail("oversized response accepted") }
+            print("[DEBUG-oauth-oversize] protocol_response_returned")
+        }, stopped: {
+            print("[DEBUG-oauth-oversize] protocol_stop")
+            stopped.fulfill()
+        })
+        let transport = TransientOAuthTransport(protocolClasses: [SyntheticOAuthProtocol.self], oversizeProbe: {
+            print("[DEBUG-oauth-oversize] \($0)")
+        })
+        let operation = Task { try await transport.fetch(request) }
+        let watchdogState = OversizeWatchdogState()
+        // TEMPORARY: attempt cancellation after five seconds; this does not bound the process.
+        let watchdog = Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled else { return }
+            watchdogState.recordFired()
+            print("[DEBUG-oauth-oversize] watchdog_timeout_cancel")
+            operation.cancel()
+        }
+        do { _ = try await operation.value; XCTFail("oversized response accepted") }
         catch { XCTAssertEqual(error as? TransientOAuthTransport.Failure, .responseTooLarge) }
+        watchdog.cancel()
+        await watchdog.value
+        XCTAssertFalse(watchdogState.didFire(), "watchdog fired before the synthetic operation completed")
         await fulfillment(of: [stopped], timeout: 1)
     }
     func testReuseAndConcurrentInvocationAreRejected() async throws {
