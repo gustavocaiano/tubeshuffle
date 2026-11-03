@@ -4,6 +4,236 @@ import Foundation
 import XCTest
 @testable import TubeShuffle
 
+private final class SyntheticOAuthProtocol: URLProtocol {
+    typealias Handler = (SyntheticOAuthProtocol) -> Void
+    private static let lock = NSLock()
+    private static var handlers: [String: Handler] = [:]
+    private static var stops: [String: () -> Void] = [:]
+
+    static func configure(_ id: String, handler: @escaping Handler, stopped: (() -> Void)? = nil) {
+        lock.lock(); defer { lock.unlock() }
+        handlers[id] = handler
+        stops[id] = stopped
+    }
+    static func remove(_ id: String) {
+        lock.lock(); defer { lock.unlock() }
+        handlers.removeValue(forKey: id)
+        stops.removeValue(forKey: id)
+    }
+    override class func canInit(with request: URLRequest) -> Bool {
+        guard let host = request.url?.host else { return false }
+        lock.lock(); defer { lock.unlock() }
+        return handlers[host] != nil
+    }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        Self.lock.lock(); let handler = Self.handlers[request.url!.host!]; Self.lock.unlock()
+        handler?(self)
+    }
+    override func stopLoading() {
+        Self.lock.lock(); let stopped = Self.stops[request.url!.host!]; Self.lock.unlock()
+        stopped?()
+    }
+    func respond(status: Int = 200, headers: [String: String] = [:], chunks: [Data] = []) {
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        for chunk in chunks { client?.urlProtocol(self, didLoad: chunk) }
+        client?.urlProtocolDidFinishLoading(self)
+    }
+}
+
+final class TransientOAuthTransportTests: XCTestCase {
+    private let id = UUID().uuidString.lowercased() + ".invalid"
+    private var request: URLRequest { URLRequest(url: URL(string: "https://\(id)/token?code=code-sentinel")!) }
+
+    override func tearDown() {
+        SyntheticOAuthProtocol.remove(id)
+        super.tearDown()
+    }
+    private func configure(_ handler: @escaping SyntheticOAuthProtocol.Handler, stopped: (() -> Void)? = nil) {
+        SyntheticOAuthProtocol.configure(id, handler: handler, stopped: stopped)
+    }
+    private func fetch() async throws -> (Data, URLResponse) {
+        try await TransientOAuthTransport(protocolClasses: [SyntheticOAuthProtocol.self]).fetch(request)
+    }
+    func testSuccessAndExactBound() async throws {
+        for size in [12, TransientOAuthTransport.responseLimit] {
+            let bytes = Data(repeating: 42, count: size)
+            configure { $0.respond(headers: ["Content-Length": "\(size)"], chunks: [bytes]) }
+            let (body, response) = try await fetch()
+            XCTAssertEqual(body, bytes)
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        }
+    }
+    func testDeliveredOverBoundWithMisleadingLengthFailsClosed() async {
+        let limit = TransientOAuthTransport.responseLimit
+        // Direct delegate injection proves the byte accounting even if an HTTP
+        // stack would truncate a mismatched wire Content-Length. It does not
+        // test actual decompression or Foundation's internal buffering.
+        for headers in [[:], ["Content-Length": "1"]] {
+            let started = expectation(description: "request started")
+            let stopped = expectation(description: "over-limit request stopped")
+            configure({ _ in started.fulfill() }, stopped: { stopped.fulfill() })
+            let transport = TransientOAuthTransport(protocolClasses: [SyntheticOAuthProtocol.self])
+            let operation = Task { try await transport.fetch(request) }
+            await fulfillment(of: [started], timeout: 1)
+            let session = URLSession(configuration: .ephemeral)
+            let dummy = session.dataTask(with: request)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: headers)!
+            transport.urlSession(session, dataTask: dummy, didReceive: response) { _ in }
+            transport.urlSession(session, dataTask: dummy, didReceive: Data(repeating: 1, count: limit))
+            transport.urlSession(session, dataTask: dummy, didReceive: Data([2]))
+            do { _ = try await operation.value; XCTFail("oversized response accepted") }
+            catch { XCTAssertEqual(error as? TransientOAuthTransport.Failure, .responseTooLarge) }
+            await fulfillment(of: [stopped], timeout: 1)
+            session.invalidateAndCancel()
+        }
+    }
+    func testBoundedNonSuccessResponseIsReturned() async throws {
+        let data = Data("synthetic error".utf8)
+        configure { $0.respond(status: 400, chunks: [data]) }
+        let (body, response) = try await fetch()
+        XCTAssertEqual(body, data)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 400)
+    }
+    func testRedirectStatusRejectedWithoutFollowing() async {
+        let requests = expectation(description: "only initial request")
+        requests.assertForOverFulfill = true
+        configure { protocolInstance in
+            requests.fulfill()
+            protocolInstance.respond(status: 302, headers: ["Location": "/secret"])
+        }
+        do { _ = try await fetch(); XCTFail("redirect accepted") }
+        catch { XCTAssertEqual(error as? TransientOAuthTransport.Failure, .redirect) }
+        await fulfillment(of: [requests], timeout: 1)
+    }
+    func testURLProtocolRedirectNotificationRejected() async {
+        // This confirms the synthetic protocol emitted a redirect notification,
+        // not that Foundation invoked the transport's redirect delegate callback.
+        let redirected = expectation(description: "protocol emitted redirect notification")
+        let initial = expectation(description: "only initial request")
+        initial.assertForOverFulfill = true
+        configure { instance in
+            initial.fulfill()
+            let destination = URLRequest(url: instance.request.url!.deletingLastPathComponent().appendingPathComponent("secret"))
+            let response = HTTPURLResponse(url: instance.request.url!, statusCode: 302, httpVersion: nil,
+                                           headerFields: ["Location": destination.url!.absoluteString])!
+            instance.client?.urlProtocol(instance, wasRedirectedTo: destination, redirectResponse: response)
+            redirected.fulfill()
+        }
+        do { _ = try await fetch(); XCTFail("redirect accepted") }
+        catch { XCTAssertEqual(error as? TransientOAuthTransport.Failure, .redirect) }
+        await fulfillment(of: [redirected, initial], timeout: 1)
+    }
+    func testRedirectDelegateRejectsProposedRequest() async {
+        let started = expectation(description: "initial request started")
+        let stopped = expectation(description: "initial request stopped")
+        let redirectedRequest = expectation(description: "no redirected request")
+        redirectedRequest.isInverted = true
+        configure({ instance in
+            if instance.request.url?.path == "/secret" { redirectedRequest.fulfill() }
+            else { started.fulfill() }
+        }, stopped: { stopped.fulfill() })
+        let transport = TransientOAuthTransport(protocolClasses: [SyntheticOAuthProtocol.self])
+        let operation = Task { try await transport.fetch(request) }
+        await fulfillment(of: [started], timeout: 1)
+
+        // Direct invocation tests the delegate decision, not Foundation's
+        // redirect delivery or real HTTP redirect integration.
+        let session = URLSession(configuration: .ephemeral)
+        let dummy = session.dataTask(with: request)
+        let destination = URLRequest(url: request.url!.deletingLastPathComponent().appendingPathComponent("secret"))
+        let response = HTTPURLResponse(url: request.url!, statusCode: 302, httpVersion: nil,
+                                       headerFields: ["Location": destination.url!.absoluteString])!
+        var completionCount = 0
+        transport.urlSession(session, task: dummy, willPerformHTTPRedirection: response, newRequest: destination) { proposedRequest in
+            completionCount += 1
+            XCTAssertNil(proposedRequest, "the redirect must not be followed")
+        }
+        XCTAssertEqual(completionCount, 1)
+        do { _ = try await operation.value; XCTFail("redirect accepted") }
+        catch { XCTAssertEqual(error as? TransientOAuthTransport.Failure, .redirect) }
+        await fulfillment(of: [stopped], timeout: 1)
+        // This bounded observation only covers the synthetic protocol, not HTTP integration.
+        await fulfillment(of: [redirectedRequest], timeout: 0.1)
+        session.invalidateAndCancel()
+    }
+    func testCancellationStopsPendingRequest() async {
+        let started = expectation(description: "request started")
+        let stopped = expectation(description: "request stopped")
+        configure({ _ in started.fulfill() }, stopped: { stopped.fulfill() })
+        let task = Task { try await fetch() }
+        await fulfillment(of: [started], timeout: 1)
+        task.cancel()
+        do { _ = try await task.value; XCTFail("cancellation ignored") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        await fulfillment(of: [stopped], timeout: 1)
+    }
+    func testEarlyOversizeCancelsUnderlyingTask() async {
+        let stopped = expectation(description: "oversized request stopped")
+        configure({ instance in
+            let response = HTTPURLResponse(url: instance.request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: ["Content-Length": "\(TransientOAuthTransport.responseLimit + 1)"])!
+            instance.client?.urlProtocol(instance, didReceive: response, cacheStoragePolicy: .notAllowed)
+        }, stopped: { stopped.fulfill() })
+        do { _ = try await fetch(); XCTFail("oversized response accepted") }
+        catch { XCTAssertEqual(error as? TransientOAuthTransport.Failure, .responseTooLarge) }
+        await fulfillment(of: [stopped], timeout: 1)
+    }
+    func testReuseAndConcurrentInvocationAreRejected() async throws {
+        let started = expectation(description: "first request started")
+        configure { _ in started.fulfill() }
+        let transport = TransientOAuthTransport(protocolClasses: [SyntheticOAuthProtocol.self])
+        let first = Task { try await transport.fetch(request) }
+        await fulfillment(of: [started], timeout: 1)
+        do { _ = try await transport.fetch(request); XCTFail("concurrent use accepted") }
+        catch { XCTAssertEqual(error as? TransientOAuthTransport.Failure, .alreadyUsed) }
+        first.cancel()
+        do { _ = try await first.value; XCTFail("cancellation ignored") } catch { XCTAssertTrue(error is CancellationError) }
+        do { _ = try await transport.fetch(request); XCTFail("reuse accepted") }
+        catch { XCTAssertEqual(error as? TransientOAuthTransport.Failure, .alreadyUsed) }
+    }
+    func testCompletionBeforeCancellationRemainsSuccessful() async throws {
+        configure { $0.respond(chunks: [Data([1])]) }
+        let task = Task { try await fetch() }
+        let (body, _) = try await task.value
+        task.cancel()
+        XCTAssertEqual(body, Data([1]))
+    }
+    func testCancellationRacingCompletionSelectsOneTerminalResult() async {
+        // Invoke delegate callbacks directly to race terminal selection without
+        // sending URLProtocol callbacks after stopLoading (which is invalid).
+        for _ in 0..<20 {
+            let started = expectation(description: "request started")
+            configure { _ in started.fulfill() }
+            let transport = TransientOAuthTransport(protocolClasses: [SyntheticOAuthProtocol.self])
+            let operation = Task { try await transport.fetch(request) }
+            await fulfillment(of: [started], timeout: 1)
+            let session = URLSession(configuration: .ephemeral)
+            let dummy = session.dataTask(with: request)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            transport.urlSession(session, dataTask: dummy, didReceive: response) { _ in }
+            DispatchQueue.global().async { operation.cancel() }
+            transport.urlSession(session, task: dummy, didCompleteWithError: nil)
+            do {
+                let (_, result) = try await operation.value
+                XCTAssertEqual((result as? HTTPURLResponse)?.statusCode, 200)
+            } catch { XCTAssertTrue(error is CancellationError) }
+            session.invalidateAndCancel()
+        }
+    }
+    func testErrorsDoNotExposeSensitiveRequestOrResponse() async {
+        configure { $0.respond(status: 302, headers: ["Location": "/token-sentinel"]) }
+        do { _ = try await fetch(); XCTFail("redirect accepted") }
+        catch {
+            let description = String(reflecting: error)
+            XCTAssertFalse(description.contains("code-sentinel"))
+            XCTAssertFalse(description.contains("token-sentinel"))
+            XCTAssertFalse(description.contains("secret.invalid"))
+        }
+    }
+}
+
 #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
 final class LocalOAuthDiagnosticConfigurationTests: XCTestCase {
     func testPrivateRuntimeFileFailsClosed() throws {

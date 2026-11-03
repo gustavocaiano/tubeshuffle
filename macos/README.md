@@ -49,7 +49,7 @@ The log records sanitized events and last accepted item, not verified video iden
 YouTube's background-player policy conflict remains release-blocking; the owner-authorized diagnostic is not YouTube permission. The hidden-window autoplay interaction is a separate unresolved issue: YouTube's required-minimum-functionality rules govern automatic and scripted initiation relative to player visibility, and whether a new occurrence's scripted initiation or a natural advancement is delayed, blocked, or throttled while the window is hidden, minimized, or occluded is unverified; the prototype neither observes nor influences that behavior, and the readiness and evaluation safeguards above treat an instance that never becomes ready or stops answering as restart-required rather than working around it. Occurrence identity itself remains unverified: every safeguard attributes callbacks to coordinator-issued player instances, never to authenticated remote video identity. No visibility or identity spoofing, keepalive, extraction, ad suppression or playback bypass is implemented. See [restrictions](../docs/production-restrictions.md).
 # Native account scaffolding
 
-The separate test-target-only two-account read diagnostic has no live caller. A
+The private Debug-only two-account read diagnostic has an explicitly opted-in app caller. A
 successful result means that one limited owner read returned an owner-owned row
 and the second account's limited read returned no rows. This is only a one-row,
 two-account read result: it does not establish general RLS isolation or that the
@@ -83,3 +83,9 @@ Do not run live authentication until the parent security review and Mac verifica
 4. Quit the app, remove the launch argument, and delete `~/Library/Containers/com.tubeshuffle.playbacklab/Data/oauth-diagnostic-key`. Do not commit the runtime file. Remove it even after failure; deletion is not guaranteed secure erasure. Review provider-side session/revocation separately if required. A normal subsequent run remains unavailable.
 
 The reported diagnostic result above is limited to that run; broader browser, PKCE, callback correlation, sandbox and cleanup behavior still require verification. No token is stored in Keychain by this diagnostic.
+
+### Private two-account read diagnostic
+
+Do not run live authentication or reads until the parent security review and Mac verification are complete and the owner separately authorizes the run. Follow the trusted-machine and sandbox publishable-key-file preparation and cleanup above. The publishable key is the only credential exempted from the no-credentials-in-files requirement. Do not add the single-account launch argument at the same time. Instead, opt in with `--local-two-account-diagnostic` in the Debug scheme. Open **Private check**, sign in as the owner, then sign in as a different account. No account data is displayed. Close the panel or cancel to clear the app's sessions locally; provider-side sessions are not revoked. The browser and OS are outside the app's persistence guarantees.
+
+The fixed GET-only checks read both identities and owner-approval status, and at most one link row per account. They do not access the local library or write application data remotely. OAuth itself may create provider-side sessions. If the owner has no usable row, the row result is inconclusive. A positive result only means the selected owner row was hidden from the second account in this limited check; it is not a general security or current-provider claim. No live run, callback allowlist change, deployment, or remote configuration change is authorized by this implementation. Remove the argument and key file afterward.

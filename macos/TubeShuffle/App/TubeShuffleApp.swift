@@ -22,12 +22,21 @@ final class AccountViewModel: NSObject, ObservableObject {
     private var expiryTask: Task<Void, Never>?
     private var expiry: Date?
     private var generation = UUID()
+    #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+    private(set) var twoAccountDiagnostic: TwoAccountDiagnosticModel?
+    #endif
 
     init(factory: Factory? = nil) {
         self.factory = factory
         state = factory == nil ? .unavailable : .signedOut
         super.init()
     }
+    #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+    convenience init(twoAccountDiagnostic: TwoAccountDiagnosticModel) {
+        self.init()
+        self.twoAccountDiagnostic = twoAccountDiagnostic
+    }
+    #endif
 
     func attach(window: NSWindow) {
         if self.window === window { return }
@@ -36,6 +45,9 @@ final class AccountViewModel: NSObject, ObservableObject {
             clearAccount()
         }
         self.window = window
+        #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+        twoAccountDiagnostic?.attach(window: window)
+        #endif
         NotificationCenter.default.addObserver(self, selector: #selector(windowWillClose(_:)),
                                                name: NSWindow.willCloseNotification, object: window)
     }
@@ -44,6 +56,9 @@ final class AccountViewModel: NSObject, ObservableObject {
         guard let window = notification.object as? NSWindow, self.window === window else { return }
         NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: window)
         self.window = nil
+        #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+        twoAccountDiagnostic?.detach()
+        #endif
         clearAccount()
     }
 
@@ -85,6 +100,9 @@ final class AccountViewModel: NSObject, ObservableObject {
     }
 
     private func clearAccount() {
+        #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+        twoAccountDiagnostic?.reset()
+        #endif
         generation = UUID()
         operation?.cancel(); operation = nil
         expiryTask?.cancel(); expiryTask = nil
@@ -116,6 +134,9 @@ struct TubeShuffleApp: App {
     @StateObject private var coordinator = PlayerCoordinator()
     @StateObject private var account: AccountViewModel = {
         #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+        if ProcessInfo.processInfo.arguments.contains("--local-two-account-diagnostic") {
+            return AccountViewModel(twoAccountDiagnostic: TwoAccountDiagnosticModel())
+        }
         if ProcessInfo.processInfo.arguments.contains("--local-oauth-diagnostic") {
             return AccountViewModel(factory: { try LocalOAuthDiagnosticService(window: $0) })
         }
@@ -277,13 +298,40 @@ private struct AccountControl: View {
         }
     }
 
-    var body: some View {
+    @ViewBuilder var body: some View {
+        #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+        if let diagnostic = account.twoAccountDiagnostic {
+            Button { showingAccount = true } label: { Label("Private check", systemImage: "person.2") }
+                .sheet(isPresented: $showingAccount, onDismiss: { diagnostic.reset() }) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        TwoAccountDiagnosticControl(model: diagnostic)
+                        Divider()
+                        HStack { Spacer(); Button("Close") { diagnostic.reset(); showingAccount = false } }
+                    }.padding(20).frame(width: 360)
+                }
+        } else {
+            standardControl
+        }
+        #else
+        standardControl
+        #endif
+    }
+
+    private var standardControl: some View {
         Button { showingAccount.toggle() } label: {
             Label(label, systemImage: account.state == .signedIn ? "person.crop.circle.fill" : "person.crop.circle")
         }
         .popover(isPresented: $showingAccount, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Account").font(.headline)
+                accountContent
+            }
+            .padding(16).frame(width: 300, alignment: .leading)
+        }
+    }
+
+    private var accountContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
                 Text("Sign-in is temporary and stays in memory while the app is open. Signing out here only clears this app’s session; it does not sign you out elsewhere.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Divider()
@@ -300,11 +348,53 @@ private struct AccountControl: View {
                     Text("Couldn’t sign in. Please try again.").font(.callout)
                     Button("Try again") { account.signIn() }
                 }
-            }
-            .padding(16).frame(width: 300, alignment: .leading)
         }
     }
 }
+
+#if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
+private struct TwoAccountDiagnosticControl: View {
+    @ObservedObject var model: TwoAccountDiagnosticModel
+    private func resultText(_ result: TwoAccountReadOnlyDiagnostic.Outcome) -> String {
+        switch result {
+        case .confirmedLinkedAccountsAndSelectedOwnerRowHiddenFromSecondAccount:
+            return "The selected owner row was hidden from the second account. This single check does not establish general isolation or the provider used for either sign-in."
+        case .rowIsolationInconclusive:
+            return "Inconclusive: the owner read did not establish a usable owner row."
+        case .rowIsolationFailure:
+            return "The second account returned a row. This check did not pass."
+        case .sameIdentity:
+            return "Both sign-ins resolved to the same account. Try again with two accounts."
+        case .linkedAccountInconclusive:
+            return "Account evidence was inconclusive."
+        default:
+            return "The check could not be completed. No broader conclusion can be drawn."
+        }
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Private two-account check").font(.headline)
+            Text("Sign in as the owner, then as a different account. The check only reads fixed account and link endpoints. On cancel, panel close, or quit, the app drops its local sessions; in-flight operations may briefly retain copies. Provider sessions are not revoked.")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            switch model.state {
+            case .idle:
+                Button("Sign in as owner") { model.startOwner() }.disabled(model.draining)
+            case .ownerSigningIn, .secondSigningIn, .checking:
+                HStack { ProgressView().controlSize(.small); Text("Working…"); Spacer(); Button("Cancel") { model.reset() } }
+            case .secondReady:
+                Button("Sign in as second account") { model.startSecond() }.disabled(model.draining)
+                Button("Cancel") { model.reset() }
+            case .result(let result):
+                Text(resultText(result)).font(.callout).fixedSize(horizontal: false, vertical: true)
+                Button("Done") { model.reset() }.disabled(model.draining)
+            case .failure:
+                Text("The check could not be completed. The app dropped its local sessions; in-flight operations may briefly retain copies. Provider sessions were not revoked.").font(.callout)
+                Button("Try again") { model.reset() }.disabled(model.draining)
+            }
+        }
+    }
+}
+#endif
 
 private struct PlayerWebView: NSViewRepresentable {
     let player: DirectPlayer

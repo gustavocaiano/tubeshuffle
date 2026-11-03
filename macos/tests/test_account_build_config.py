@@ -30,6 +30,8 @@ class AccountBuildConfigTests(unittest.TestCase):
         self.assertIsNotNone(initializer)
         self.assertRegex(initializer.group(1),
                          r'#if DEBUG && LOCAL_OAUTH_DIAGNOSTIC\s+'
+                         r'if ProcessInfo\.processInfo\.arguments\.contains\("--local-two-account-diagnostic"\) \{\s+'
+                         r'return AccountViewModel\(twoAccountDiagnostic: TwoAccountDiagnosticModel\(\)\)\s+\}\s+'
                          r'if ProcessInfo\.processInfo\.arguments\.contains\("--local-oauth-diagnostic"\) \{\s+'
                          r'return AccountViewModel\(factory: \{ try LocalOAuthDiagnosticService\(window: \$0\) \}\)\s+'
                          r'\}\s+#endif\s+return AccountViewModel\(\)')
@@ -100,9 +102,9 @@ class AccountBuildConfigTests(unittest.TestCase):
         for source in sources:
             self.assertIsNone(forbidden.search(source.read_text()), str(source))
 
-    def test_two_account_diagnostic_is_debug_guarded_and_test_target_only(self):
+    def test_two_account_diagnostic_is_debug_guarded_and_targeted(self):
         project = (ROOT / "TubeShuffle.xcodeproj/project.pbxproj").read_text()
-        paths = ("TubeShuffleTests/Account/TwoAccountReadOnlyDiagnostic.swift",
+        paths = ("TubeShuffle/Account/TwoAccountReadOnlyDiagnostic.swift",
                  "TubeShuffleTests/Account/TwoAccountReadOnlyDiagnosticTests.swift")
         objects = dict(re.findall(r'^\s*([A-F0-9]{24}) = \{(.*?)\};', project, re.M))
         targets = {}
@@ -138,8 +140,10 @@ class AccountBuildConfigTests(unittest.TestCase):
             builds = [key for key, obj in objects.items()
                       if 'isa = PBXBuildFile;' in obj and f'fileRef = {refs[0]};' in obj]
             self.assertEqual(len(builds), 1, path)
-            self.assertIn(builds[0], source_phases['TubeShuffleTests'])
-            self.assertNotIn(builds[0], source_phases['TubeShuffle'])
+            target = 'TubeShuffle' if path.startswith('TubeShuffle/') else 'TubeShuffleTests'
+            other = 'TubeShuffleTests' if target == 'TubeShuffle' else 'TubeShuffle'
+            self.assertIn(builds[0], source_phases[target])
+            self.assertNotIn(builds[0], source_phases[other])
 
 
 if __name__ == "__main__":

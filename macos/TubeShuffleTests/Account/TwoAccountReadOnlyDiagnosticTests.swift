@@ -1,5 +1,6 @@
 #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
 import Foundation
+import AppKit
 import XCTest
 @testable import TubeShuffle
 
@@ -27,6 +28,79 @@ final class TwoAccountReadOnlyDiagnosticTests: XCTestCase {
     private let key = "sb_publishable_abcdefghijklmnopqrstuv_12345678"
     private let owner = "owner.synthetic.token"
     private let second = "second.synthetic.token"
+
+    private final class FakeAccount: DiagnosticAccount {
+        var pending: CheckedContinuation<(String, Date), Error>?
+        var started: XCTestExpectation?
+        var revocations = 0
+        func signInCredential() async throws -> (String, Date) {
+            try await withCheckedThrowingContinuation { pending = $0; started?.fulfill() }
+        }
+        func revoke() { revocations += 1 }
+        func finish(_ token: String, expiry: Date = Date().addingTimeInterval(3600)) {
+            pending?.resume(returning: (token, expiry)); pending = nil
+        }
+    }
+
+    func testSequentialFlowAndLocalCleanup() async {
+        let first = FakeAccount(), secondAccount = FakeAccount()
+        first.started = expectation(description: "owner starts")
+        secondAccount.started = expectation(description: "second starts")
+        let stub = Stub(); stub.bodies = fixture()
+        var calls = 0
+        let model = TwoAccountDiagnosticModel(factory: { _, _ in
+            calls += 1; return calls == 1 ? first : secondAccount
+        }, readKey: { self.key }, diagnostic: TwoAccountReadOnlyDiagnostic(transport: stub))
+        let window = NSWindow(); model.attach(window: window)
+        model.startSecond(); XCTAssertEqual(calls, 0)
+        model.startOwner()
+        await fulfillment(of: [first.started!], timeout: 1)
+        model.startSecond(); XCTAssertEqual(calls, 1)
+        let firstOperation = model.operation
+        first.finish(owner); await firstOperation?.value
+        XCTAssertEqual(model.state, .secondReady)
+        model.startSecond()
+        await fulfillment(of: [secondAccount.started!], timeout: 1)
+        let secondOperation = model.operation
+        secondAccount.finish(second); await secondOperation?.value
+        XCTAssertEqual(model.state, .result(.confirmedLinkedAccountsAndSelectedOwnerRowHiddenFromSecondAccount))
+        XCTAssertEqual(first.revocations, 1); XCTAssertEqual(secondAccount.revocations, 1)
+        XCTAssertEqual(stub.requests.count, 6)
+        withExtendedLifetime(window) {}
+    }
+
+    func testCloseFencesLateCompletionAndBlocksRetryUntilDrained() async {
+        let account = FakeAccount(); account.started = expectation(description: "owner starts")
+        var calls = 0
+        let model = TwoAccountDiagnosticModel(factory: { _, _ in calls += 1; return account }, readKey: { self.key })
+        let window = NSWindow(); model.attach(window: window); model.startOwner()
+        await fulfillment(of: [account.started!], timeout: 1)
+        let operation = model.operation
+        model.detach()
+        XCTAssertEqual(account.revocations, 1)
+        model.attach(window: window); model.startOwner()
+        XCTAssertEqual(calls, 1)
+        account.finish(owner); await operation?.value
+        XCTAssertEqual(model.state, .idle)
+        XCTAssertFalse(model.draining)
+        withExtendedLifetime(window) {}
+    }
+
+    func testExpiredOwnerSessionFailsAndRevokesWithoutReads() async {
+        let account = FakeAccount(); account.started = expectation(description: "owner starts")
+        let stub = Stub()
+        let model = TwoAccountDiagnosticModel(factory: { _, _ in account }, readKey: { self.key },
+            diagnostic: TwoAccountReadOnlyDiagnostic(transport: stub))
+        let window = NSWindow(); model.attach(window: window); model.startOwner()
+        await fulfillment(of: [account.started!], timeout: 1)
+        let operation = model.operation
+        account.finish(owner, expiry: Date().addingTimeInterval(-1))
+        await operation?.value
+        XCTAssertEqual(model.state, .failure)
+        XCTAssertEqual(account.revocations, 1)
+        XCTAssertTrue(stub.requests.isEmpty)
+        withExtendedLifetime(window) {}
+    }
 
     func testRealTransportRejectsOversizeOfflineBody() async {
         OfflineDiagnosticURLProtocol.holdOpen = false
@@ -235,6 +309,87 @@ final class TwoAccountReadOnlyDiagnosticTests: XCTestCase {
             let response = HTTPURLResponse(url: request!.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             continuation?.resume(returning: (Data(#"{"id":"00000000-0000-0000-0000-000000000001"}"#.utf8), response))
             continuation = nil; request = nil
+        }
+    }
+
+    // Ignores task cancellation and returns a valid response only when released.
+    private final class StagedTransport: DiagnosticTransport {
+        let heldIndex: Int
+        let started: XCTestExpectation
+        let bodies: [String]
+        var requests: [URLRequest] = []
+        var pending: CheckedContinuation<(Data, URLResponse), Error>?
+        init(heldIndex: Int, started: XCTestExpectation, bodies: [String]) {
+            self.heldIndex = heldIndex; self.started = started; self.bodies = bodies
+        }
+        func get(_ request: URLRequest) async throws -> (Data, URLResponse) {
+            let index = requests.count
+            requests.append(request)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if index == heldIndex {
+                return try await withCheckedThrowingContinuation { continuation in
+                    pending = continuation; started.fulfill()
+                }
+            }
+            return (Data(bodies[index].utf8), response)
+        }
+        func release() {
+            let response = HTTPURLResponse(url: requests[heldIndex].url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            pending?.resume(returning: (Data(bodies[heldIndex].utf8), response)); pending = nil
+        }
+    }
+
+    func testCancellationAtEveryReadRejectsNoncooperativeLateResults() async {
+        for index in 0..<6 {
+            for revoke in [false, true] {
+                let started = expectation(description: "read \(index), revoke \(revoke)")
+                let stub = StagedTransport(heldIndex: index, started: started, bodies: fixture())
+                let diagnostic = TwoAccountReadOnlyDiagnostic(transport: stub)
+                let task = Task { await diagnostic.verify(ownerToken: owner, secondToken: second, publishableKey: key) }
+                await fulfillment(of: [started], timeout: 2)
+                if revoke { diagnostic.revoke() } else { task.cancel() }
+                let busy = await diagnostic.verify(ownerToken: owner, secondToken: second, publishableKey: key)
+                XCTAssertEqual(busy, .busy)
+                stub.release()
+                let result = await task.value
+                XCTAssertEqual(result, .cancelled, "read \(index), revoke \(revoke)")
+                XCTAssertEqual(stub.requests.count, index + 1)
+            }
+        }
+    }
+
+    func testResetAndCloseAtEveryReadFenceLateModelResults() async {
+        for index in 0..<6 {
+            for close in [false, true] {
+                let first = FakeAccount(), secondAccount = FakeAccount()
+                first.started = expectation(description: "owner starts")
+                secondAccount.started = expectation(description: "second starts")
+                let started = expectation(description: "read \(index), close \(close)")
+                let stub = StagedTransport(heldIndex: index, started: started, bodies: fixture())
+                var calls = 0
+                let model = TwoAccountDiagnosticModel(factory: { _, _ in
+                    calls += 1; return calls == 1 ? first : secondAccount
+                }, readKey: { self.key }, diagnostic: TwoAccountReadOnlyDiagnostic(transport: stub))
+                let window = NSWindow(); model.attach(window: window); model.startOwner()
+                await fulfillment(of: [first.started!], timeout: 2)
+                let ownerOperation = model.operation
+                first.finish(owner); await ownerOperation?.value
+                model.startSecond()
+                await fulfillment(of: [secondAccount.started!], timeout: 2)
+                let operation = model.operation
+                secondAccount.finish(second)
+                await fulfillment(of: [started], timeout: 2)
+                if close { model.detach(); model.attach(window: window) } else { model.reset() }
+                XCTAssertEqual(model.state, .idle)
+                XCTAssertEqual(first.revocations, 1); XCTAssertEqual(secondAccount.revocations, 1)
+                XCTAssertTrue(model.draining)
+                model.startOwner(); XCTAssertEqual(calls, 2)
+                stub.release(); await operation?.value
+                XCTAssertEqual(model.state, .idle)
+                XCTAssertFalse(model.draining)
+                XCTAssertEqual(stub.requests.count, index + 1)
+                withExtendedLifetime(window) {}
+            }
         }
     }
 

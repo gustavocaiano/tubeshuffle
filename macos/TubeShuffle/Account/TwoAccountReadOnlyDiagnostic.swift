@@ -1,9 +1,134 @@
 #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
 import Foundation
-@testable import TubeShuffle
+import AppKit
+import Combine
 
-// Test-target only. Constructing this type never starts authentication or network
-// traffic. A future live caller needs separate authorization and reviewed wiring.
+@MainActor
+protocol DiagnosticAccount: AnyObject {
+    func signInCredential() async throws -> (String, Date)
+    func revoke()
+}
+
+@MainActor
+private final class DiagnosticTransientAccount: DiagnosticAccount {
+    private let account: TransientSupabaseAccount
+    init(window: NSWindow, key: String) throws {
+        let origin = LocalOAuthDiagnosticConfiguration.origin
+        account = try TransientSupabaseAccount(authURL: origin.appendingPathComponent("auth/v1"),
+            trustedProjectOrigin: origin, publishableKey: key,
+            baseRedirect: LocalOAuthDiagnosticConfiguration.redirect, browser: TransientAuthBrowser(anchor: window))
+    }
+    func signInCredential() async throws -> (String, Date) {
+        let session = try await account.signIn()
+        return (session.accessToken, Date(timeIntervalSince1970: session.expiresAt))
+    }
+    func revoke() { account.logout() }
+}
+
+/// Only fixed, sanitized states reach the UI. A cancelled operation must drain
+/// before a new one starts, even if its underlying service ignores cancellation.
+@MainActor
+final class TwoAccountDiagnosticModel: ObservableObject {
+    enum State: Equatable { case idle, ownerSigningIn, secondReady, secondSigningIn, checking, result(TwoAccountReadOnlyDiagnostic.Outcome), failure }
+    typealias Factory = @MainActor (NSWindow, String) throws -> any DiagnosticAccount
+    @Published private(set) var state: State = .idle
+    @Published private(set) var draining = false
+    private weak var window: NSWindow?
+    private let factory: Factory
+    private let readKey: () throws -> String
+    private let diagnostic: TwoAccountReadOnlyDiagnostic
+    private var owner: (any DiagnosticAccount)?
+    private var second: (any DiagnosticAccount)?
+    private var ownerCredential: (String, Date)?
+    private var publishableKey: String?
+    private var expiryTask: Task<Void, Never>?
+    private(set) var operation: Task<Void, Never>?
+    private var generation = UUID()
+
+    init(factory: Factory? = nil,
+         readKey: @escaping () throws -> String = { try LocalOAuthDiagnosticConfiguration.readKey(path: NSHomeDirectory() + "/oauth-diagnostic-key") },
+         diagnostic: TwoAccountReadOnlyDiagnostic? = nil) {
+        self.factory = factory ?? { try DiagnosticTransientAccount(window: $0, key: $1) }; self.readKey = readKey
+        self.diagnostic = diagnostic ?? TwoAccountReadOnlyDiagnostic(transport: DiagnosticEphemeralTransport())
+    }
+    func attach(window: NSWindow) { self.window = window }
+    func detach() { reset(); window = nil }
+    func reset() {
+        generation = UUID()
+        operation?.cancel(); diagnostic.revoke()
+        owner?.revoke(); second?.revoke()
+        owner = nil; second = nil; ownerCredential = nil; publishableKey = nil
+        expiryTask?.cancel(); expiryTask = nil
+        state = .idle
+    }
+    func startOwner() {
+        guard state == .idle, !draining, let window else { return }
+        do {
+            let key = try readKey()
+            let account = try factory(window, key)
+            publishableKey = key
+            owner = account
+            state = .ownerSigningIn
+            run { [weak self] epoch in
+                let credential = try await account.signInCredential()
+                guard let self, self.current(epoch), self.valid(credential.1) else { throw CancellationError() }
+                self.ownerCredential = credential
+                self.state = .secondReady
+                self.watchExpiry(credential.1, epoch: epoch)
+            }
+        } catch { fail() }
+    }
+    func startSecond() {
+        guard state == .secondReady, !draining, let window, let ownerCredential, let key = publishableKey else { return }
+        guard valid(ownerCredential.1) else { fail(); return }
+        do {
+            let account = try factory(window, key)
+            second = account
+            state = .secondSigningIn
+            run { [weak self] epoch in
+                let credential = try await account.signInCredential()
+                guard let self, self.current(epoch), let ownerCredential = self.ownerCredential,
+                      self.valid(ownerCredential.1), self.valid(credential.1) else { throw CancellationError() }
+                self.watchExpiry(min(ownerCredential.1, credential.1), epoch: epoch)
+                self.state = .checking
+                let result = await self.diagnostic.verify(ownerToken: ownerCredential.0, secondToken: credential.0, publishableKey: key)
+                guard self.current(epoch), self.valid(ownerCredential.1), self.valid(credential.1) else { throw CancellationError() }
+                self.owner?.revoke(); self.second?.revoke()
+                self.owner = nil; self.second = nil; self.ownerCredential = nil; self.publishableKey = nil
+                self.expiryTask?.cancel(); self.expiryTask = nil
+                self.state = .result(result)
+            }
+        } catch { fail() }
+    }
+    private func valid(_ expiry: Date) -> Bool { expiry.timeIntervalSinceNow.isFinite && expiry.timeIntervalSinceNow > 0 }
+    private func current(_ epoch: UUID) -> Bool { epoch == generation && !Task.isCancelled }
+    private func fail() { reset(); state = .failure }
+    private func run(_ body: @escaping @MainActor (UUID) async throws -> Void) {
+        let epoch = generation
+        draining = true
+        operation = Task { [weak self] in
+            do { try await body(epoch) }
+            catch { if let self, self.current(epoch) { self.fail() } }
+            guard let self else { return }
+            self.draining = false
+            self.operation = nil
+        }
+    }
+    private func watchExpiry(_ expiry: Date, epoch: UUID) {
+        expiryTask?.cancel()
+        expiryTask = Task { [weak self] in
+            while !Task.isCancelled {
+                let remaining = expiry.timeIntervalSinceNow
+                if remaining <= 0 {
+                    if let self, self.generation == epoch { self.fail() }
+                    return
+                }
+                try? await Task.sleep(nanoseconds: UInt64(min(remaining, 60) * 1_000_000_000))
+            }
+        }
+    }
+}
+// Construction never starts authentication or network traffic.
 protocol DiagnosticTransport {
     func get(_ request: URLRequest) async throws -> (Data, URLResponse)
 }

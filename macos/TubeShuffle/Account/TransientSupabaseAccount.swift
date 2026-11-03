@@ -4,6 +4,131 @@ import Foundation
 import Security
 import Darwin
 
+/// One ephemeral session per fetch. Only response bytes retained by this delegate
+/// are bounded; Foundation may transiently deliver a larger individual chunk or
+/// decompress before delivery. The limit is an application policy, not a bound on
+/// Foundation's internal buffering, decompression, or total process memory.
+final class TransientOAuthTransport: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    static let responseLimit = 256 * 1024
+    enum Failure: Error { case responseTooLarge, redirect, invalidResponse, network, alreadyUsed }
+
+    private let lock = NSLock()
+    private let protocolClasses: [AnyClass]?
+    private var continuation: CheckedContinuation<(Data, URLResponse), Error>?
+    private var session: URLSession?
+    private var task: URLSessionDataTask?
+    private var started = false
+    private var finished = false
+    private var response: URLResponse?
+    private var body = Data()
+
+    init(protocolClasses: [AnyClass]? = nil) { self.protocolClasses = protocolClasses }
+
+    func fetch(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        guard claim() else { throw Failure.alreadyUsed }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                lock.lock()
+                if finished {
+                    lock.unlock()
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                self.continuation = continuation
+                let configuration = URLSessionConfiguration.ephemeral
+                configuration.urlCache = nil
+                configuration.urlCredentialStorage = nil
+                configuration.httpCookieStorage = nil
+                configuration.httpShouldSetCookies = false
+                configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+                if let protocolClasses { configuration.protocolClasses = protocolClasses }
+                let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+                var request = request
+                request.httpShouldHandleCookies = false
+                let task = session.dataTask(with: request)
+                self.session = session
+                self.task = task
+                task.resume()
+                lock.unlock()
+            }
+        } onCancel: { self.cancel() }
+    }
+
+    private func claim() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard !started else { return false }
+        started = true
+        return true
+    }
+
+    private func cancel() {
+        finish(.failure(CancellationError()))
+    }
+
+    private func finish(_ result: Result<(Data, URLResponse), Error>) {
+        lock.lock()
+        guard !finished else { lock.unlock(); return }
+        finished = true
+        let continuation = self.continuation
+        self.continuation = nil
+        let task = self.task, session = self.session
+        self.task = nil; self.session = nil
+        body = Data(); response = nil
+        lock.unlock()
+        task?.cancel()
+        session?.invalidateAndCancel()
+        continuation?.resume(with: result)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        finish(.failure(Failure.redirect))
+        completionHandler(nil)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        guard let http = response as? HTTPURLResponse else {
+            finish(.failure(Failure.invalidResponse)); completionHandler(.cancel); return
+        }
+        guard !(300...399).contains(http.statusCode) else {
+            finish(.failure(Failure.redirect)); completionHandler(.cancel); return
+        }
+        if let length = http.value(forHTTPHeaderField: "Content-Length") {
+            let trimmed = length.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty, trimmed.utf8.allSatisfy({ (48...57).contains($0) }),
+                  let value = UInt64(trimmed), value <= UInt64(Self.responseLimit) else {
+                finish(.failure(Failure.responseTooLarge)); completionHandler(.cancel); return
+            }
+        }
+        guard response.expectedContentLength <= Int64(Self.responseLimit) else {
+            finish(.failure(Failure.responseTooLarge)); completionHandler(.cancel); return
+        }
+        lock.lock()
+        if !finished { self.response = response }
+        lock.unlock()
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        lock.lock()
+        let tooLarge = !finished && data.count > Self.responseLimit - body.count
+        if !finished && !tooLarge { body.append(data) }
+        lock.unlock()
+        if tooLarge { finish(.failure(Failure.responseTooLarge)) }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if error != nil { finish(.failure(Failure.network)); return }
+        lock.lock()
+        let response = self.response, body = self.body
+        lock.unlock()
+        guard let response else { finish(.failure(Failure.invalidResponse)); return }
+        finish(.success((body, response)))
+    }
+}
+
 #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
 /// Private, opt-in diagnostic configuration. The file contains only the modern
 /// publishable key, never a URL or a privileged credential.
@@ -81,11 +206,10 @@ final class TransientSupabaseAccount {
 
     convenience init(authURL: URL, trustedProjectOrigin: URL, publishableKey: String,
          baseRedirect: URL, browser: TransientAuthBrowser) throws {
-        let session = URLSession(configuration: .ephemeral, delegate: RejectRedirects(), delegateQueue: nil)
         try self.init(authURL: authURL, trustedProjectOrigin: trustedProjectOrigin,
                       publishableKey: publishableKey, baseRedirect: baseRedirect,
                       launch: { try await browser.start(url: $0, callbackScheme: $1) },
-                      closeBrowser: { browser.cancel() }, fetch: { try await session.data(for: $0) })
+                      closeBrowser: { browser.cancel() }, fetch: { try await TransientOAuthTransport().fetch($0) })
     }
 
     // The injected transport is for deterministic tests; it must not follow redirects.
@@ -131,14 +255,6 @@ final class TransientSupabaseAccount {
         guard key.hasPrefix(prefix), key.utf8.count > prefix.utf8.count else { return false }
         return key.utf8.allSatisfy {
             (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || $0 == 95 || $0 == 45
-        }
-    }
-
-    private final class RejectRedirects: NSObject, URLSessionTaskDelegate {
-        func urlSession(_ session: URLSession, task: URLSessionTask,
-                        willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
-                        completionHandler: @escaping (URLRequest?) -> Void) {
-            completionHandler(nil)
         }
     }
 
@@ -198,7 +314,9 @@ final class TransientSupabaseAccount {
     private struct NonRetryableExchangeFailure: Error {}
 
     // In SDK 2.55.5 the retry interceptor retries only URLError or selected
-    // statuses. Convert failures for the one-shot PKCE POST to a private error.
+    // statuses. Convert retryable transport failures and selected statuses for
+    // the one-shot PKCE POST to a private error; retain other bounded responses
+    // for the SDK's normal error handling and preserve non-URL policy failures.
     // This controls SDK retries, not provider-side behavior or URLSession internals.
     private static func noPKCERetry(_ fetch: @escaping AuthClient.FetchHandler) -> AuthClient.FetchHandler {
         { request in
@@ -214,7 +332,10 @@ final class TransientSupabaseAccount {
                     throw NonRetryableExchangeFailure()
                 }
                 return response
-            } catch { throw NonRetryableExchangeFailure() }
+            } catch is CancellationError { throw CancellationError() }
+              catch let error as TransientOAuthTransport.Failure { throw error }
+              catch is URLError { throw NonRetryableExchangeFailure() }
+              catch { throw error }
         }
     }
 }
