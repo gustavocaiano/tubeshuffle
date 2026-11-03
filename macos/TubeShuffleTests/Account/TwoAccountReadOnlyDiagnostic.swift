@@ -1,5 +1,6 @@
 #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
 import Foundation
+@testable import TubeShuffle
 
 // Test-target only. Constructing this type never starts authentication or network
 // traffic. A future live caller needs separate authorization and reviewed wiring.
