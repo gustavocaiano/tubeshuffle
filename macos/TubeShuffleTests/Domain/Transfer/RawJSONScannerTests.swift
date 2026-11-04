@@ -185,6 +185,58 @@ final class RawJSONScannerTests: XCTestCase {
         XCTAssertEqual(unsafeInteger, "9007199254740993")
     }
 
+    func testNestedObjectStateAllowsRepeatedKeysAndPreservesMixedNodes() throws {
+        let result = try scan(
+            #"{"x":-0,"child":{"x":1.00e+02},"mixed":[{"x":2},{"x":9007199254740993}],"empty":{},"emptyArray":[]}"#)
+        XCTAssertEqual(result.nodes.count, 11)
+        XCTAssertEqual(
+            result.nodes.map(\.key),
+            [nil, "x", "child", "x", "mixed", nil, "x", nil, "x", "empty", "emptyArray"])
+        XCTAssertEqual(result.nodes.map(\.parent), [nil, 0, 0, 2, 0, 4, 5, 4, 7, 0, 0])
+        guard case .number(let rootNumber) = result.nodes[1].value,
+              case .number(let childNumber) = result.nodes[3].value,
+              case .number(let firstMixed) = result.nodes[6].value,
+              case .number(let secondMixed) = result.nodes[8].value else {
+            return XCTFail("number lexemes lost")
+        }
+        XCTAssertEqual(rootNumber, "-0")
+        XCTAssertEqual(childNumber, "1.00e+02")
+        XCTAssertEqual(firstMixed, "2")
+        XCTAssertEqual(secondMixed, "9007199254740993")
+    }
+
+    func testEscapedDuplicateChildAndOuterDuplicatesAfterNestedReturns() {
+        let samples = [
+            #"{"child":{"x":1,"\u0078":2}}"#,
+            #"{"a":1,"empty":{},"\u0061":2}"#,
+            #"{"a":1,"nested":{"b":2},"\u0061":3}"#,
+            #"{"a":1,"array":[{"b":2}],"\u0061":3}"#
+        ]
+        for text in samples {
+            XCTAssertThrowsError(try scan(text)) { XCTAssertEqual($0 as? RawJSONError, .duplicateKey) }
+        }
+    }
+
+    func testWholeInputUTF8ValidationPrecedesDuplicateAndMalformedJSONErrors() {
+        var duplicateThenInvalid = Data(#"{"a":1,"a":2}"#.utf8)
+        duplicateThenInvalid.append(0xff)
+        XCTAssertThrowsError(try RawJSONScanner.scan(duplicateThenInvalid)) {
+            XCTAssertEqual($0 as? RawJSONError, .invalidUTF8)
+        }
+
+        var malformedThenInvalid = Data(#"{"a":1"#.utf8)
+        malformedThenInvalid.append(0xff)
+        XCTAssertThrowsError(try RawJSONScanner.scan(malformedThenInvalid)) {
+            XCTAssertEqual($0 as? RawJSONError, .invalidUTF8)
+        }
+
+        var duplicateAndMalformedThenInvalid = Data(#"{"a":1,"a":2"#.utf8)
+        duplicateAndMalformedThenInvalid.append(0xff)
+        XCTAssertThrowsError(try RawJSONScanner.scan(duplicateAndMalformedThenInvalid)) {
+            XCTAssertEqual($0 as? RawJSONError, .invalidUTF8)
+        }
+    }
+
     func testRawJSONErrorsPrecedeEnvelopeVersionAndPlaylistCount() {
         // A v1-like envelope with version 2 and 5,001 playlist entries. The
         // first trailing object carries both a decoded duplicate key and an
@@ -209,6 +261,30 @@ final class RawJSONScannerTests: XCTestCase {
         let key: String?
         let value: RawJSONDocument.Node.Value
     }
+
+    // Exact pre-change Frame layout; object-only state is now separate.
+    private struct PreviousFrameLayout {
+        let node: Int
+        let object: Bool
+        var state = 0
+        var keys = Set<Data>()
+        var key: String?
+    }
+
+#if DEBUG
+    func testFrameRepresentationAndObjectStateMeasurement() throws {
+        let arrayOnly = try RawJSONScanner.measureForTesting(Data(#"[[],[[]],0]"#.utf8))
+        let nestedObjects = try RawJSONScanner.measureForTesting(Data(#"{"a":{"b":1}}"#.utf8))
+        let previousStride = MemoryLayout<PreviousFrameLayout>.stride
+        print("RawJSONScanner Frame stride: current=\(arrayOnly.frameStride) previous=\(previousStride); peak object state: array-only=\(arrayOnly.peakObjectStateCount) nested-two-objects=\(nestedObjects.peakObjectStateCount)")
+        XCTAssertLessThanOrEqual(arrayOnly.frameStride, previousStride)
+        XCTAssertEqual(arrayOnly.peakObjectStateCount, 0)
+        XCTAssertEqual(nestedObjects.peakObjectStateCount, 2)
+        // Positive control: two open nested objects reach exactly two states.
+        // Frame stride is reported only; read Mac output before claiming a
+        // measured saving. This is not a total memory bound or import readiness.
+    }
+#endif
 
     func testNodeStrideIsNotLargerThanPreviousParentLayout() {
         let current = MemoryLayout<RawJSONDocument.Node>.stride

@@ -453,3 +453,9 @@ Across the three native acceptance runs, **no Playing was observed for item 2 at
 - These results do not establish physical read-only operation, migration-free opening of an existing store, database/file integrity, or durability across power loss or crashes. Same-user adversarial or noncooperative writers are out of scope.
 - The snapshot reader remains unbounded and not actor-confined.
 - Full Xcode test runs for the new store boundary, including negative-path Swift behavioral XCTest coverage, are not established. These probe results do not extend to later commits, uncommitted changes or later phases, and imply no production readiness or release approval.
+
+### Owner-reported full Xcode scheme success — e6d6584 (2026-11-04)
+
+- **Attributed evidence.** The owner reported `** TEST SUCCEEDED **` after a `git pull` for `e6d6584` and the full Xcode scheme command from the prior conversation. This is a full-scheme success report only. The new scalar-exact snapshot equality and compact scanner tests were intended to be part of that scheme, but individual test execution, passing, count, and skip status were not supplied; no claim is made that those specific tests ran or passed. Exact node-stride values were not provided, so no measured memory saving is claimed.
+- **Host/network limit.** The Xcode suite is hosted by the app, and the owner reports that hosted app can load YouTube. This does not establish network isolation for the test suite, and no such claim is made.
+- **Still unresolved.** The scanner's total memory bound, occurrence/history continuity, production storage/migration, and real-data import remain open. This owner-reported pass does not close those gates or imply production readiness, policy compliance, or release approval.

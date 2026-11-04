@@ -51,11 +51,15 @@ enum RawJSONScanner {
     static let maximumBytes = 10_485_760
 
     static func scan(_ input: Data) throws -> RawJSONDocument {
+        var parser = try makeParser(input)
+        return try parser.parse()
+    }
+
+    private static func makeParser(_ input: Data) throws -> Parser {
         guard input.count <= maximumBytes else { throw RawJSONError.tooLarge }
         guard !input.starts(with: [0xef, 0xbb, 0xbf]),
               String(data: input, encoding: .utf8) != nil else { throw RawJSONError.invalidUTF8 }
-        var parser = Parser(bytes: Array(input))
-        return try parser.parse()
+        return Parser(bytes: Array(input))
     }
 
     private struct Frame {
@@ -64,6 +68,11 @@ enum RawJSONScanner {
         let node: Int
         let object: Bool
         var state = 0
+    }
+
+    /// Object-only parser state, separate so array container frames do not
+    /// reserve a duplicate-key set or pending key.
+    private struct ObjectState {
         var keys = Set<Data>()
         var key: String?
     }
@@ -73,10 +82,27 @@ enum RawJSONScanner {
         var index = 0
         var nodes: [RawJSONDocument.Node] = []
         var stack: [Frame] = []
+        var objectStack: [ObjectState] = []
+#if DEBUG
+        var peakObjectStateCount = 0
+#endif
 
         var current: UInt8? { index < bytes.count ? bytes[index] : nil }
         mutating func whitespace() {
             while let c = current, c == 0x20 || c == 0x09 || c == 0x0a || c == 0x0d { index += 1 }
+        }
+        mutating func pushObjectState() {
+            objectStack.append(ObjectState())
+#if DEBUG
+            peakObjectStateCount = max(peakObjectStateCount, objectStack.count)
+#endif
+        }
+        mutating func popFrame() {
+            let frame = stack.removeLast()
+            if frame.object {
+                precondition(!objectStack.isEmpty, "object state stack out of sync")
+                objectStack.removeLast()
+            }
         }
         mutating func parse() throws -> RawJSONDocument {
             whitespace()
@@ -88,18 +114,25 @@ enum RawJSONScanner {
                 let state = stack[last].state
                 guard let c = current else { throw RawJSONError.invalidJSON }
                 if state == 1 {
-                    if c == (isObject ? 0x7d : 0x5d) { index += 1; stack.removeLast(); continue }
+                    if c == (isObject ? 0x7d : 0x5d) {
+                        index += 1
+                        popFrame()
+                        continue
+                    }
                     guard c == 0x2c else { throw RawJSONError.invalidJSON }
                     index += 1; stack[last].state = 2; continue
                 }
                 if state == 0 && c == (isObject ? 0x7d : 0x5d) {
-                    index += 1; stack.removeLast(); continue
+                    index += 1
+                    popFrame()
+                    continue
                 }
                 if isObject && (state == 0 || state == 2) {
                     guard c == 0x22 else { throw RawJSONError.invalidJSON }
                     let key = try string()
-                    guard stack[last].keys.insert(Data(key.utf8)).inserted else { throw RawJSONError.duplicateKey }
-                    stack[last].key = key; stack[last].state = 3; continue
+                    let object = objectStack.count - 1
+                    guard objectStack[object].keys.insert(Data(key.utf8)).inserted else { throw RawJSONError.duplicateKey }
+                    objectStack[object].key = key; stack[last].state = 3; continue
                 }
                 if isObject && state == 3 {
                     guard c == 0x3a else { throw RawJSONError.invalidJSON }
@@ -109,8 +142,14 @@ enum RawJSONScanner {
                     throw RawJSONError.invalidJSON
                 }
                 let parent = stack[last].node
-                let key = stack[last].key
-                stack[last].key = nil
+                let key: String?
+                if isObject {
+                    let object = objectStack.count - 1
+                    key = objectStack[object].key
+                    objectStack[object].key = nil
+                } else {
+                    key = nil
+                }
                 stack[last].state = 1
                 try value(parent: parent, key: key)
             }
@@ -134,7 +173,11 @@ enum RawJSONScanner {
             }
             let id = nodes.count
             nodes.append(.init(parent: parent, key: key, value: v))
-            if c == 0x7b || c == 0x5b { stack.append(Frame(node: id, object: c == 0x7b)) }
+            if c == 0x7b || c == 0x5b {
+                let object = c == 0x7b
+                stack.append(Frame(node: id, object: object))
+                if object { pushObjectState() }
+            }
         }
         mutating func literal(_ text: String) throws {
             for c in text.utf8 {
@@ -217,4 +260,13 @@ enum RawJSONScanner {
             throw RawJSONError.invalidJSON
         }
     }
+
+#if DEBUG
+    /// Debug-app-target measurement seam, not test-target-only; no app caller.
+    static func measureForTesting(_ input: Data) throws -> (frameStride: Int, peakObjectStateCount: Int) {
+        var parser = try makeParser(input)
+        _ = try parser.parse()
+        return (MemoryLayout<Frame>.stride, parser.peakObjectStateCount)
+    }
+#endif
 }
