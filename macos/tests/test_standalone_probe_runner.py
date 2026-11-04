@@ -769,5 +769,85 @@ class StandaloneRunnerLifecycleTests(unittest.TestCase):
             store)
 
 
+class RootValidationDiagnosticSourceTests(unittest.TestCase):
+    """Scoped structural checks for the temporary DEBUG-ROOT-A4F2 probe.
+
+    These do not compile Swift. They pin the fixed literal tags and the
+    existing failure events so the temporary diagnostic cannot silently widen
+    into paths, identifiers, device/inode numbers, or extra stdout events.
+    """
+
+    TAGS = (
+        "absolute",
+        "original-lstat",
+        "original-type",
+        "original-uid",
+        "original-mode",
+        "original-dev",
+        "original-ino",
+        "inherited-fstat",
+        "inherited-type",
+        "inherited-uid",
+        "inherited-mode",
+        "inherited-dev",
+        "inherited-ino",
+        "inherited-identity-dev",
+        "inherited-identity-ino",
+        "base-lstat",
+        "base-type",
+        "base-canonical",
+        "resolved-prefix",
+        "resolved-basename",
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        cls.source = (runner.MACOS / "tests/standalone_library_probe.swift").read_text()
+
+    def test_each_fixed_reason_tag_is_a_literal_once(self):
+        self.assertIn('rootFailureTag = "DEBUG-ROOT-A4F2:" + tag', self.source)
+        for tag in self.TAGS:
+            call = f'recordRootFailure("{tag}")'
+            self.assertEqual(self.source.count(call), 1, tag)
+
+    def test_record_calls_use_only_fixed_literal_tags(self):
+        calls = [line.strip() for line in self.source.splitlines()
+                 if "recordRootFailure(" in line
+                 and "private static func" not in line]
+        self.assertEqual(len(calls), len(self.TAGS))
+        for line in calls:
+            self.assertRegex(line, r'^recordRootFailure\("[a-z-]+"\)$')
+
+    def test_reason_is_only_a_field_on_existing_failure_events(self):
+        self.assertIn(
+            'emit("error", failure: failureName(error), reason: rootReason(for: error))',
+            self.source)
+        self.assertEqual(self.source.count('\\"reason\\"'), 1)
+        self.assertIn('fields.append("\\"reason\\":\\"\\(reason)\\"")',
+                      self.source)
+        for line in self.source.splitlines():
+            if "emit(" in line and "failure:" in line:
+                self.assertIn("reason:", line)
+
+    def test_create_hold_caught_failure_uses_reason(self):
+        create_hold = self.source.split('case "create-hold":', 1)[1].split(
+            'case "open-success":', 1)[0]
+        self.assertIn("createNew(arguments)", create_hold)
+        self.assertIn("case .failure(let failure, let reason)", create_hold)
+        self.assertIn(
+            'emit("failed", failure: failure, reason: reason)', create_hold)
+
+    def test_caught_open_failures_derive_reason_only_from_root_errors(self):
+        self.assertEqual(
+            self.source.count(
+                "return .failure(failureName(error), rootReason(for: error))"),
+            2)
+        self.assertIn(
+            "guard let usage = error as? ProbeUsage, case .root = usage "
+            "else { return nil }",
+            self.source)
+        self.assertIn("defer { rootFailureTag = nil }", self.source)
+
+
 if __name__ == "__main__":
     unittest.main()

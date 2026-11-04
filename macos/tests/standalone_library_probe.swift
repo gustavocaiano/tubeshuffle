@@ -47,7 +47,7 @@ struct StandaloneLibraryProbe {
 
     private enum OpenOutcome {
         case success
-        case failure(String)
+        case failure(String, String?)
     }
 
     // Fixed canonical base, independent of TMPDIR/TEMP/TMP and of Foundation's
@@ -57,12 +57,31 @@ struct StandaloneLibraryProbe {
     // Greater than the sum of the parent's bounded waits, but still finite.
     private static let holdBudgetSeconds: UInt64 = 120
 
+    // TEMP DEBUG-ROOT-A4F2: fixed reason tag for the root-validation
+    // diagnostic. It carries no path, identifier, device, inode, or errno.
+    // Remove this property and recordRootFailure with the probe below.
+    private static var rootFailureTag: String?
+
+    private static func recordRootFailure(_ tag: String) {
+        rootFailureTag = "DEBUG-ROOT-A4F2:" + tag
+    }
+
+    // Read the tag only for a root-validation error, then clear it so a later
+    // non-root failure cannot inherit a stale reason. The tag itself is fixed.
+    private static func rootReason(for error: Error) -> String? {
+        defer { rootFailureTag = nil }
+        guard let usage = error as? ProbeUsage, case .root = usage else { return nil }
+        return rootFailureTag
+    }
+
     static func main() {
         do {
             let arguments = try parseArguments()
             try run(arguments)
         } catch {
-            emit("error", failure: failureName(error))
+            // Preserve the existing event and failure; append the fixed tag
+            // only for a failed root validation.
+            emit("error", failure: failureName(error), reason: rootReason(for: error))
             exit(2)
         }
     }
@@ -96,31 +115,73 @@ struct StandaloneLibraryProbe {
     }
 
     private static func validatedRoot(_ arguments: Arguments) throws -> URL {
-        guard arguments.root.hasPrefix("/") else { throw ProbeUsage.root }
+        rootFailureTag = nil
+        if !arguments.root.hasPrefix("/") {
+            recordRootFailure("absolute")
+            throw ProbeUsage.root
+        }
         let root = URL(fileURLWithPath: arguments.root)
 
         // Original no-follow lstat before any symlink resolution.
         var original = stat()
-        guard lstat(arguments.root, &original) == 0,
-              (original.st_mode & S_IFMT) == S_IFDIR,
-              original.st_uid == arguments.uid,
-              UInt32(original.st_mode & 0o777) == arguments.modeBits,
-              Int64(original.st_dev) == arguments.dev,
-              UInt64(original.st_ino) == arguments.ino else {
+        if lstat(arguments.root, &original) != 0 {
+            recordRootFailure("original-lstat")
+            throw ProbeUsage.root
+        }
+        if (original.st_mode & S_IFMT) != S_IFDIR {
+            recordRootFailure("original-type")
+            throw ProbeUsage.root
+        }
+        if original.st_uid != arguments.uid {
+            recordRootFailure("original-uid")
+            throw ProbeUsage.root
+        }
+        if UInt32(original.st_mode & 0o777) != arguments.modeBits {
+            recordRootFailure("original-mode")
+            throw ProbeUsage.root
+        }
+        if Int64(original.st_dev) != arguments.dev {
+            recordRootFailure("original-dev")
+            throw ProbeUsage.root
+        }
+        if UInt64(original.st_ino) != arguments.ino {
+            recordRootFailure("original-ino")
             throw ProbeUsage.root
         }
 
         // The parent opens this descriptor without following the final path
         // component and passes it through subprocess pass_fds.
         var inherited = stat()
-        guard fstat(arguments.rootFD, &inherited) == 0,
-              (inherited.st_mode & S_IFMT) == S_IFDIR,
-              inherited.st_uid == arguments.uid,
-              UInt32(inherited.st_mode & 0o777) == arguments.modeBits,
-              Int64(inherited.st_dev) == arguments.dev,
-              UInt64(inherited.st_ino) == arguments.ino,
-              inherited.st_dev == original.st_dev,
-              inherited.st_ino == original.st_ino else {
+        if fstat(arguments.rootFD, &inherited) != 0 {
+            recordRootFailure("inherited-fstat")
+            throw ProbeUsage.root
+        }
+        if (inherited.st_mode & S_IFMT) != S_IFDIR {
+            recordRootFailure("inherited-type")
+            throw ProbeUsage.root
+        }
+        if inherited.st_uid != arguments.uid {
+            recordRootFailure("inherited-uid")
+            throw ProbeUsage.root
+        }
+        if UInt32(inherited.st_mode & 0o777) != arguments.modeBits {
+            recordRootFailure("inherited-mode")
+            throw ProbeUsage.root
+        }
+        if Int64(inherited.st_dev) != arguments.dev {
+            recordRootFailure("inherited-dev")
+            throw ProbeUsage.root
+        }
+        if UInt64(inherited.st_ino) != arguments.ino {
+            recordRootFailure("inherited-ino")
+            throw ProbeUsage.root
+        }
+        if inherited.st_dev != original.st_dev {
+            recordRootFailure("inherited-identity-dev")
+            throw ProbeUsage.root
+        }
+        if inherited.st_ino != original.st_ino {
+            recordRootFailure("inherited-identity-ino")
             throw ProbeUsage.root
         }
 
@@ -130,15 +191,26 @@ struct StandaloneLibraryProbe {
         var baseInfo = stat()
         let canonicalBase = URL(fileURLWithPath: temporaryBase)
             .resolvingSymlinksInPath().path
-        guard lstat(temporaryBase, &baseInfo) == 0,
-              (baseInfo.st_mode & S_IFMT) == S_IFDIR,
-              canonicalBase == temporaryBase else {
+        if lstat(temporaryBase, &baseInfo) != 0 {
+            recordRootFailure("base-lstat")
+            throw ProbeUsage.root
+        }
+        if (baseInfo.st_mode & S_IFMT) != S_IFDIR {
+            recordRootFailure("base-type")
+            throw ProbeUsage.root
+        }
+        if canonicalBase != temporaryBase {
+            recordRootFailure("base-canonical")
             throw ProbeUsage.root
         }
         let resolved = root.resolvingSymlinksInPath()
         let prefix = temporaryBase + "/"
-        guard resolved.path.hasPrefix(prefix),
-              resolved.lastPathComponent.hasPrefix("tubeshuffle-standalone-") else {
+        if !resolved.path.hasPrefix(prefix) {
+            recordRootFailure("resolved-prefix")
+            throw ProbeUsage.root
+        }
+        if !resolved.lastPathComponent.hasPrefix("tubeshuffle-standalone-") {
+            recordRootFailure("resolved-basename")
             throw ProbeUsage.root
         }
         return root
@@ -147,26 +219,26 @@ struct StandaloneLibraryProbe {
     private static func run(_ arguments: Arguments) throws {
         switch arguments.mode {
         case "create-hold":
-            if case .failure(let failure) = createNew(arguments) {
-                emit("failed", failure: failure)
+            if case .failure(let failure, let reason) = createNew(arguments) {
+                emit("failed", failure: failure, reason: reason)
                 exit(1)
             }
             emit("holding")
             try holdOrExit()
 
         case "open-success":
-            if case .failure(let failure) = openExisting(arguments) {
-                emit("failed", failure: failure)
+            if case .failure(let failure, let reason) = openExisting(arguments) {
+                emit("failed", failure: failure, reason: reason)
                 exit(1)
             }
             emit("opened")
 
         case "contend":
-            guard case .failure(let failure) = openExisting(arguments) else {
+            guard case .failure(let failure, let reason) = openExisting(arguments) else {
                 emit("unexpected-success")
                 exit(1)
             }
-            emit("denied", failure: failure)
+            emit("denied", failure: failure, reason: reason)
             guard failure == "alreadyOwned" else { exit(1) }
 
         case "preflight-hold":
@@ -180,7 +252,7 @@ struct StandaloneLibraryProbe {
                 afterObserved = true
                 emit("unexpected-after-container")
             }
-            guard case .failure(let first) = openExisting(arguments) else {
+            guard case .failure(let first, let firstReason) = openExisting(arguments) else {
                 ExperimentalLocalLibraryStore.beforeContainerConstructionForTesting = nil
                 ExperimentalLocalLibraryStore.afterContainerAssignedForTesting = nil
                 emit("unexpected-success")
@@ -188,15 +260,15 @@ struct StandaloneLibraryProbe {
             }
             ExperimentalLocalLibraryStore.beforeContainerConstructionForTesting = nil
             ExperimentalLocalLibraryStore.afterContainerAssignedForTesting = nil
-            emit("failed", failure: first)
+            emit("failed", failure: first, reason: firstReason)
             guard first == "invalidStore", !beforeObserved, !afterObserved else { exit(1) }
             emit("preflight-no-constructor")
 
-            guard case .failure(let retained) = openExisting(arguments) else {
+            guard case .failure(let retained, let retainedReason) = openExisting(arguments) else {
                 emit("unexpected-success")
                 exit(1)
             }
-            emit("retained", failure: retained)
+            emit("retained", failure: retained, reason: retainedReason)
             guard retained == "alreadyOwned" else { exit(1) }
             emit("holding")
             try holdOrExit()
@@ -209,7 +281,7 @@ struct StandaloneLibraryProbe {
                 emit("container-assigned")
                 throw ExperimentalLocalLibraryStore.Failure.invalidStore
             }
-            guard case .failure(let first) = createNew(arguments) else {
+            guard case .failure(let first, let firstReason) = createNew(arguments) else {
                 ExperimentalLocalLibraryStore.beforeContainerConstructionForTesting = nil
                 ExperimentalLocalLibraryStore.afterContainerAssignedForTesting = nil
                 emit("unexpected-success")
@@ -217,14 +289,14 @@ struct StandaloneLibraryProbe {
             }
             ExperimentalLocalLibraryStore.beforeContainerConstructionForTesting = nil
             ExperimentalLocalLibraryStore.afterContainerAssignedForTesting = nil
-            emit("failed", failure: first)
+            emit("failed", failure: first, reason: firstReason)
             guard first == "invalidStore" else { exit(1) }
 
-            guard case .failure(let retained) = openExisting(arguments) else {
+            guard case .failure(let retained, let retainedReason) = openExisting(arguments) else {
                 emit("unexpected-success")
                 exit(1)
             }
-            emit("retained", failure: retained)
+            emit("retained", failure: retained, reason: retainedReason)
             guard retained == "alreadyOwned" else { exit(1) }
             emit("holding")
             try holdOrExit()
@@ -240,7 +312,7 @@ struct StandaloneLibraryProbe {
                 afterObserved = true
                 emit("unexpected-after-container")
             }
-            guard case .failure(let failure) = openExisting(arguments) else {
+            guard case .failure(let failure, let reason) = openExisting(arguments) else {
                 ExperimentalLocalLibraryStore.beforeContainerConstructionForTesting = nil
                 ExperimentalLocalLibraryStore.afterContainerAssignedForTesting = nil
                 emit("unexpected-success")
@@ -248,7 +320,7 @@ struct StandaloneLibraryProbe {
             }
             ExperimentalLocalLibraryStore.beforeContainerConstructionForTesting = nil
             ExperimentalLocalLibraryStore.afterContainerAssignedForTesting = nil
-            emit("failed", failure: failure)
+            emit("failed", failure: failure, reason: reason)
             guard failure == "invalidStore", !beforeObserved, !afterObserved else { exit(1) }
             emit("open-fail-no-constructor")
 
@@ -266,7 +338,7 @@ struct StandaloneLibraryProbe {
             _ = try ExperimentalLocalLibraryStore.testing(.createNew, root: root)
             return .success
         } catch {
-            return .failure(failureName(error))
+            return .failure(failureName(error), rootReason(for: error))
         }
     }
 
@@ -276,7 +348,7 @@ struct StandaloneLibraryProbe {
             _ = try ExperimentalLocalLibraryStore.testing(.openExisting, root: root)
             return .success
         } catch {
-            return .failure(failureName(error))
+            return .failure(failureName(error), rootReason(for: error))
         }
     }
 
@@ -324,9 +396,10 @@ struct StandaloneLibraryProbe {
         }
     }
 
-    private static func emit(_ event: String, failure: String? = nil) {
+    private static func emit(_ event: String, failure: String? = nil, reason: String? = nil) {
         var fields = ["\"event\":\"\(event)\""]
         if let failure { fields.append("\"failure\":\"\(failure)\"") }
+        if let reason { fields.append("\"reason\":\"\(reason)\"") }
         FileHandle.standardOutput.write(Data(("{" + fields.joined(separator: ",") + "}\n").utf8))
     }
 }
