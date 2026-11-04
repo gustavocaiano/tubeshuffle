@@ -1,6 +1,10 @@
 // Native IndexedDB integration test. Set CHROMIUM_PATH to a local Chrome/Chromium executable.
 // No existing browser profile, server, database, or user data is used.
 //
+// JOURNAL_GUARD_MODE=upgrade selects the separate test-only schema-upgrade
+// rehearsal. JOURNAL_GUARD_TEST_CLEANUP_FAULT=1 runs a focused, inert-by-default
+// self-check of the fail-closed fixture-removal decision.
+//
 // Isolation is deliberately layered but not absolute: Chrome runs in a fresh
 // profile with HOME/XDG/TMPDIR redirected under one exclusive fixture directory,
 // the server binds only to 127.0.0.1, and the page is served with CSP plus a
@@ -26,6 +30,14 @@ if (!chrome) {
 }
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+// The default journal mode is unchanged. `JOURNAL_GUARD_MODE=upgrade` selects
+// the separate test-only schema-upgrade rehearsal and its own exact allowlist.
+const mode = process.env.JOURNAL_GUARD_MODE ?? "journal";
+if (mode !== "journal" && mode !== "upgrade") {
+  throw new Error(
+    `JOURNAL_GUARD_MODE must be "journal" or "upgrade", got ${JSON.stringify(mode)}.`,
+  );
+}
 const tempPrefix = "completion-journal-guard-";
 const timeoutMs = 60_000;
 let temp;
@@ -215,6 +227,168 @@ async function verifyExclusiveFixture() {
   return { ok: true };
 }
 
+function recordCleanupFailure(message) {
+  cleanupFailure = cleanupFailure ? `${cleanupFailure}; ${message}` : message;
+  console.error(message);
+}
+
+async function pathExists(target) {
+  try {
+    await lstat(target);
+    return true;
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+// Removal is fail-closed: any uncertainty retains the fixture and reports a
+// failure. `removed` becomes true only after the removal call actually succeeds.
+async function removeFixtureIfConfirmedSafe(
+  fixturePath,
+  { reaped, groupGone, ownershipOk, ownershipReason, remove = rm },
+) {
+  if (!fixturePath) {
+    return { removed: false, failure: "no exclusive fixture path" };
+  }
+  if (!ownershipOk) {
+    return {
+      removed: false,
+      failure: `Fixture ownership check failed: ${ownershipReason ?? "unknown reason"}`,
+    };
+  }
+  if (!reaped) {
+    return {
+      removed: false,
+      failure:
+        "Chrome reap was not confirmed; retaining the disposable fixture",
+    };
+  }
+  if (!groupGone) {
+    return {
+      removed: false,
+      failure:
+        "Chrome process group was not confirmed gone; retaining the disposable fixture",
+    };
+  }
+  try {
+    await remove(fixturePath, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
+    return { removed: true };
+  } catch (error) {
+    return {
+      removed: false,
+      failure: `Fixture removal failed: ${String(error)}`,
+    };
+  }
+}
+
+// Focused, opt-in fault injection for the cleanup decision. It uses probe
+// directories inside the exclusive fixture root and a throwing fake remover;
+// it never changes how the real browser profile is removed. Default is inert.
+async function runCleanupFaultInjectionCheck() {
+  if (process.env.JOURNAL_GUARD_TEST_CLEANUP_FAULT !== "1") return;
+  if (!temp) {
+    throw new Error("cleanup fault injection requires the exclusive fixture root");
+  }
+  const retainedProbe = join(temp, `cleanup-probe-retained-${randomUUID()}`);
+  const removedProbe = join(temp, `cleanup-probe-removed-${randomUUID()}`);
+  mkdirSync(retainedProbe, { recursive: true, mode: 0o700 });
+  mkdirSync(removedProbe, { recursive: true, mode: 0o700 });
+  try {
+    const unconfirmedReap = await removeFixtureIfConfirmedSafe(retainedProbe, {
+      reaped: false,
+      groupGone: true,
+      ownershipOk: true,
+    });
+    if (unconfirmedReap.removed) {
+      throw new Error("unconfirmed reap reported removed");
+    }
+    if (!/reap was not confirmed/i.test(unconfirmedReap.failure ?? "")) {
+      throw new Error(
+        `unconfirmed reap did not report a failure: ${String(
+          unconfirmedReap.failure,
+        )}`,
+      );
+    }
+    if (!(await pathExists(retainedProbe))) {
+      throw new Error("unconfirmed reap removed the fixture");
+    }
+
+    const unconfirmedGroup = await removeFixtureIfConfirmedSafe(
+      retainedProbe,
+      {
+        reaped: true,
+        groupGone: false,
+        ownershipOk: true,
+      },
+    );
+    if (unconfirmedGroup.removed) {
+      throw new Error("unconfirmed process-group exit reported removed");
+    }
+    if (!/process group was not confirmed gone/i.test(unconfirmedGroup.failure ?? "")) {
+      throw new Error(
+        `unconfirmed process-group exit did not report a failure: ${String(
+          unconfirmedGroup.failure,
+        )}`,
+      );
+    }
+    if (!(await pathExists(retainedProbe))) {
+      throw new Error("unconfirmed process-group exit removed the fixture");
+    }
+
+    const failedRemoval = await removeFixtureIfConfirmedSafe(retainedProbe, {
+      reaped: true,
+      groupGone: true,
+      ownershipOk: true,
+      remove: async () => {
+        throw new Error("injected removal failure");
+      },
+    });
+    if (failedRemoval.removed || !failedRemoval.failure) {
+      throw new Error("failed removal was reported as removed");
+    }
+    if (!(await pathExists(retainedProbe))) {
+      throw new Error("failed removal removed the fixture");
+    }
+
+    const confirmedRemoval = await removeFixtureIfConfirmedSafe(removedProbe, {
+      reaped: true,
+      groupGone: true,
+      ownershipOk: true,
+    });
+    if (!confirmedRemoval.removed || confirmedRemoval.failure) {
+      throw new Error(
+        `confirmed removal did not report removed: ${String(
+          confirmedRemoval.failure,
+        )}`,
+      );
+    }
+    if (await pathExists(removedProbe)) {
+      throw new Error("confirmed removal left the fixture on disk");
+    }
+
+    console.error("cleanup fault-injection check: passed");
+  } finally {
+    await rm(retainedProbe, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    }).catch(() => undefined);
+    await rm(removedProbe, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    }).catch(() => undefined);
+  }
+}
+
 async function cleanup() {
   if (cleanupPromise) return cleanupPromise;
   cleanupPromise = (async () => {
@@ -223,44 +397,32 @@ async function cleanup() {
     try {
       reaped = await stopBrowser(browser);
     } catch (error) {
-      cleanupFailure = `Chrome stop failed: ${String(error)}`;
-      console.error(cleanupFailure);
+      recordCleanupFailure(`Chrome stop failed: ${String(error)}`);
     }
 
     let groupGone = true;
     if (browser?.pid) {
       groupGone = await waitForGroupGone(browser.pid, 2_000);
-      if (!groupGone) {
-        cleanupFailure = `Chrome process group ${browser.pid} did not disappear`;
-        console.error(cleanupFailure);
-      }
     }
 
     try {
       await closeServer(server);
     } catch (error) {
-      cleanupFailure = `Loopback server close failed: ${String(error)}`;
-      console.error(cleanupFailure);
+      recordCleanupFailure(`Loopback server close failed: ${String(error)}`);
     }
 
     const ownership = await verifyExclusiveFixture();
-    if (!ownership.ok) {
-      cleanupFailure = `Fixture ownership check failed: ${ownership.reason}`;
-      console.error(cleanupFailure);
+    const removal = await removeFixtureIfConfirmedSafe(temp, {
+      reaped,
+      groupGone,
+      ownershipOk: ownership.ok,
+      ownershipReason: ownership.reason,
+    });
+    if (removal.failure) {
+      recordCleanupFailure(removal.failure);
     }
-
-    if (temp && reaped && groupGone && ownership.ok) {
-      try {
-        await rm(temp, {
-          recursive: true,
-          force: true,
-          maxRetries: 10,
-          retryDelay: 100,
-        });
-      } catch (error) {
-        cleanupFailure = `Fixture removal failed: ${String(error)}`;
-        console.error(cleanupFailure);
-      }
+    if (removal.removed) {
+      console.error(`Removed the disposable fixture at ${temp}`);
     } else if (temp) {
       console.error(
         `Retaining the disposable fixture at ${temp}; cleanup is not confirmed safe`,
@@ -270,7 +432,7 @@ async function cleanup() {
     if (cleanupFailure) {
       process.exitCode = Math.max(process.exitCode ?? 0, 1);
     }
-    return { removed: Boolean(temp) && !cleanupFailure, failure: cleanupFailure };
+    return { removed: removal.removed, failure: cleanupFailure };
   })();
   return cleanupPromise;
 }
@@ -336,7 +498,18 @@ const iframeDbName = `tubeshuffle-journal-test-${randomUUID()}`;
 if (new Set([journalDbName, wrongDbName, iframeDbName]).size !== 3) {
   throw new Error("Runner generated colliding fixture database names.");
 }
-const bootstrap = `(() => {
+// The upgrade rehearsal gets its own four runtime-unique names and exact
+// per-mode allowlist. These are never used by the default journal mode.
+const upgradeDbNames = [
+  `tubeshuffle-journal-upgrade-test-${randomUUID()}`,
+  `tubeshuffle-journal-upgrade-test-${randomUUID()}`,
+  `tubeshuffle-journal-upgrade-test-${randomUUID()}`,
+  `tubeshuffle-journal-upgrade-test-${randomUUID()}`,
+];
+if (new Set(upgradeDbNames).size !== 4) {
+  throw new Error("Runner generated colliding upgrade fixture database names.");
+}
+const journalBootstrap = `(() => {
   const allowed = new Set(${JSON.stringify([journalDbName, wrongDbName, iframeDbName])});
   const production = "tubeshuffle_local";
   const nativeOpen = indexedDB.open.bind(indexedDB);
@@ -406,6 +579,79 @@ const bootstrap = `(() => {
   }
 })();`;
 
+// Upgrade mode uses the same isolation layers but allows only its four
+// runtime-unique fixture names. It blocks every deleteDatabase call, including
+// fixture names: only removal of the whole ephemeral profile is permitted.
+const upgradeBootstrap = `(() => {
+  const names = ${JSON.stringify(upgradeDbNames)};
+  const allowed = new Set(names);
+  const production = "tubeshuffle_local";
+  const nativeOpen = indexedDB.open.bind(indexedDB);
+  const nativeFetch = window.fetch.bind(window);
+  const guard = {
+    mode: "upgrade",
+    dbNames: names,
+    allowed,
+    openedNames: [],
+    deleteNames: [],
+    unexpectedOpenAttempts: [],
+    productionOpenAttempts: 0,
+    networkAttempts: 0,
+    nativeFetch,
+  };
+  Object.defineProperty(window, "__journalGuard", {
+    value: guard,
+    enumerable: false,
+    writable: false,
+    configurable: false,
+  });
+  indexedDB.open = function (name, version) {
+    const text = String(name);
+    guard.openedNames.push(text);
+    if (!allowed.has(text)) {
+      if (text === production) guard.productionOpenAttempts++;
+      guard.unexpectedOpenAttempts.push(text);
+      throw new Error("Unexpected IndexedDB open blocked: " + text);
+    }
+    return nativeOpen(name, version);
+  };
+  indexedDB.deleteDatabase = function (name) {
+    const text = String(name);
+    guard.deleteNames.push(text);
+    throw new Error("deleteDatabase is not allowed in upgrade mode: " + text);
+  };
+  window.fetch = function (input) {
+    guard.networkAttempts++;
+    return Promise.reject(new Error("Network access is not allowed: " + String(input)));
+  };
+  if (window.XMLHttpRequest) {
+    XMLHttpRequest.prototype.open = function () {
+      guard.networkAttempts++;
+      throw new Error("Network access is not allowed: XMLHttpRequest");
+    };
+  }
+  for (const name of ["WebSocket", "EventSource"]) {
+    if (name in window) {
+      window[name] = function () {
+        guard.networkAttempts++;
+        throw new Error("Network access is not allowed: " + name);
+      };
+    }
+  }
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon = function () {
+      guard.networkAttempts++;
+      return false;
+    };
+  }
+})();`;
+
+const bootstrap = mode === "upgrade" ? upgradeBootstrap : journalBootstrap;
+const entryFile =
+  mode === "upgrade"
+    ? "tests/browser/journal-upgrade-guard.ts"
+    : "tests/browser/completion-journal-guard.ts";
+
 let finish;
 const result = new Promise((resolveResult) => {
   finish = resolveResult;
@@ -420,10 +666,12 @@ function complete(report) {
 let report;
 try {
   throwIfInterrupted("before bundle build");
+  await runCleanupFaultInjectionCheck();
+  throwIfInterrupted("cleanup fault-injection check");
   await pauseForStartupTest("before-build");
   throwIfInterrupted("before bundle build");
   const bundle = await build({
-    entryPoints: [resolve(root, "tests/browser/completion-journal-guard.ts")],
+    entryPoints: [resolve(root, entryFile)],
     bundle: true,
     write: false,
     platform: "browser",
