@@ -6,10 +6,39 @@ struct RawJSONDocument {
         enum Value {
             case object, array, string(String), number(String), bool(Bool), null
         }
-        let parent: Int?
+        /// 0 means no parent; otherwise this is the parent node's index plus one.
+        ///
+        /// A node is appended only after its value consumes at least one input
+        /// byte, so `nodes.count <= RawJSONScanner.maximumBytes` (10,485,760).
+        /// The decoded parent index is therefore bounded by `maximumBytes`,
+        /// well below `UInt32.max` (4,294,967,295).
+        private let encodedParent: UInt32
         /// Present only for object members; compare its UTF-8 bytes, not String equality.
         let key: String?
         let value: Value
+
+        var parent: Int? {
+            guard encodedParent != 0 else { return nil }
+            guard let parent = Int(exactly: encodedParent - 1) else {
+                preconditionFailure("encoded JSON node parent does not fit Int")
+            }
+            return parent
+        }
+
+        fileprivate init(parent: Int?, key: String?, value: Value) {
+            if let parent {
+                guard let index = UInt32(exactly: parent) else {
+                    preconditionFailure("JSON node parent index does not fit UInt32")
+                }
+                let (encoded, overflow) = index.addingReportingOverflow(1)
+                precondition(!overflow, "JSON node parent index overflow")
+                encodedParent = encoded
+            } else {
+                encodedParent = 0
+            }
+            self.key = key
+            self.value = value
+        }
     }
     let nodes: [Node]
 }
