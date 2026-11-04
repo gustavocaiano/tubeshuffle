@@ -144,6 +144,18 @@ Use a separate versioned JSON exchange format, shared by browser and Mac:
 - Omit/report orphan history without silently attaching it to unrelated videos. Invalid input must not partially replace the existing library.
 - Native export produces the same portable format. Browser restore/import can be a later addition; browser export and native import/export are required initially.
 
+### Completion events, export scope, and journal experiment — 2026-11-04
+
+- **Owner decision.** Suggestion- and unknown-provenance completion events may remain browser-local and be excluded from the current transfer export temporarily. The export/UI must clearly disclose that omission rather than imply completeness. Existing play history must not be deleted or rewritten. This is a temporary scope decision, not a final schema or retention policy.
+- **Inert fact module.** Commit `43c29f7` adds a pure, immutable playback-completion contract with no store, network, player, repository, history, or app wiring. It validates and copies caller input but proves no playback occurrence, lineage, or exactly-once behavior.
+- **Disposable journal experiment (experimental/inert).** `src/lib/storage/disposable-completion-journal.ts` and `tests/browser/completion-journal-guard.*` write unresolved assertion rows through a caller-owned IndexedDB handle. There is no app, production schema, or history integration. The test-name prefix is only a guard, not proof of disposability. The native-IndexedDB browser guard uses a fresh loopback origin, ephemeral Chrome profile, and runtime-unique fixture names with observed `oldVersion 0` creation. Local Linux validation (not owner Mac) reported the isolated guard run twice, both `ok` with 25 outcomes: runtime-unique synthetic databases were created only after observed `oldVersion 0`, the temporary profile was cleaned up, and no application database was opened. Browser controls remain best-effort, not an OS firewall. No production protection or durability is claimed.
+- **Schema upgrade unresolved.** The experiment neither opens, creates, upgrades, nor migrates a database; a production schema version and upgrade path for `completionJournal` remain unimplemented and unverified.
+- **Blocked tabs unresolved.** Cross-tab open/upgrade/delete blocking is not established; the guard fails on blocked fixture operations, and production multi-tab behavior is untested.
+- **Incarnation proof unresolved.** Issuance authority is a module-instance `WeakMap`; clones, other realms, and reloaded module instances must reissue. There is no durable tab/process incarnation, retry, or exactly-once proof, and equal IDs alone do not establish continuity.
+- **Export disclosure unresolved.** The agreed temporary omission of suggestion/unknown completion events from export has not been implemented or verified in user-facing disclosure.
+- **Local failure unresolved.** Journal writes may reject, including an indeterminate completion after a queued add commits. App-level retry, reconciliation, and history projection behavior are absent.
+- **Old history unresolved.** This experiment does not delete, rewrite, backfill, or reconcile existing history. The guard only checks that a synthetic pre-existing history row stays unchanged; old-history continuity remains open.
+
 ### Native player and design boundary
 
 An app-owned coordinator retains one player instance through SwiftUI view updates. Native state owns queue intent; actual iframe events own observed playback state. There must be one advancement authority—not competing iframe and Swift next-track loops.
