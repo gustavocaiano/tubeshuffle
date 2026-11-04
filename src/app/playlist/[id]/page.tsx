@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink, Music } from "lucide-react";
@@ -21,9 +21,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { shuffleVideos } from "@/lib/shuffle/shuffle-service";
 import { usePlayerStore, type VideoItem } from "@/stores/player-store";
-import { playlistRepository } from "@/stores/playlist-store";
+import { playlistRepository, type LocalPlaylistBundle } from "@/stores/playlist-store";
 import { useUiPreferencesStore } from "@/stores/ui-preferences-store";
 import type { ShufflePreset } from "@/types/playlist";
+
+interface ShuffleInvocation {
+  requestId: number;
+  routePlaylistId: string;
+  bundle: LocalPlaylistBundle;
+  preset: ShufflePreset;
+  shouldExcludeWatched: boolean;
+}
 
 function ListeningView({
   currentVideo,
@@ -72,6 +80,37 @@ export default function PlaylistPage() {
   const { setQueue, currentVideo, queue, currentIndex } = usePlayerStore();
   const { focusMode, hideThumbnails } = useUiPreferencesStore();
 
+  // Hook-level mutation callbacks can run after unmount or a route change.
+  // Track the mounted instance, active playlist, and newest invocation so
+  // superseded requests cannot touch the shared player store or toasts.
+  const shuffleRequestIdRef = useRef(0);
+  const mountedRef = useRef(false);
+  const routePlaylistIdRef = useRef(playlistId);
+
+  useLayoutEffect(() => {
+    mountedRef.current = true;
+
+    if (routePlaylistIdRef.current !== playlistId) {
+      routePlaylistIdRef.current = playlistId;
+      // Any request from the previous route is stale even if navigation
+      // returns to the same playlist before the request settles.
+      shuffleRequestIdRef.current += 1;
+    }
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [playlistId]);
+
+  const isCurrentShuffle = useCallback(
+    (request: ShuffleInvocation) =>
+      mountedRef.current &&
+      routePlaylistIdRef.current === request.routePlaylistId &&
+      request.bundle.playlist.id === routePlaylistIdRef.current &&
+      request.requestId === shuffleRequestIdRef.current,
+    [],
+  );
+
   const playlistQuery = useQuery({
     queryKey: ["playlist", playlistId],
     queryFn: () => playlistRepository.getPlaylist(playlistId),
@@ -80,20 +119,16 @@ export default function PlaylistPage() {
 
   const shuffleMutation = useMutation({
     mutationFn: async ({
+      bundle,
       preset,
       shouldExcludeWatched,
-    }: {
-      preset: ShufflePreset;
-      shouldExcludeWatched: boolean;
-    }) => {
-      const data = playlistQuery.data;
-      if (!data) return [];
-
-      let videosToShuffle = data.videos;
+    }: ShuffleInvocation) => {
+      let videosToShuffle = bundle.videos;
 
       if (shouldExcludeWatched) {
-        const watchedIds =
-          await playlistRepository.getCompletedVideoIds(playlistId);
+        const watchedIds = await playlistRepository.getCompletedVideoIds(
+          bundle.playlist.id,
+        );
         videosToShuffle = videosToShuffle.filter(
           (video) => !watchedIds.has(video.id),
         );
@@ -101,9 +136,12 @@ export default function PlaylistPage() {
 
       return shuffleVideos(videosToShuffle, preset);
     },
-    onSuccess: (shuffledVideos) => {
-      const bundle = playlistQuery.data;
-      if (bundle && shuffledVideos.length > 0) {
+    onSuccess: (shuffledVideos, request) => {
+      if (!isCurrentShuffle(request)) return;
+
+      const { bundle } = request;
+
+      if (shuffledVideos.length > 0) {
         const queueVideos = shuffledVideos.map((v) => ({
           id: v.id,
           youtubeId: v.youtubeId,
@@ -114,11 +152,12 @@ export default function PlaylistPage() {
         }));
         setQueue(queueVideos, bundle.playlist.id, bundle.playlist.title);
         toast.success(`Shuffled ${shuffledVideos.length} videos`);
-      } else if (bundle && shuffledVideos.length === 0) {
+      } else {
         toast.error("No videos available with the current filters.");
       }
     },
-    onError: (error: Error) => {
+    onError: (error: Error, request) => {
+      if (!isCurrentShuffle(request)) return;
       toast.error(error.message);
     },
   });
@@ -134,9 +173,19 @@ export default function PlaylistPage() {
   const handleShuffle = useCallback(
     (preset: ShufflePreset) => {
       setShufflePreset(preset);
-      shuffleMutation.mutate({ preset, shouldExcludeWatched: excludeWatched });
+
+      const bundle = playlistQuery.data;
+      if (!bundle || routePlaylistIdRef.current !== playlistId) return;
+
+      shuffleMutation.mutate({
+        requestId: ++shuffleRequestIdRef.current,
+        routePlaylistId: playlistId,
+        bundle,
+        preset,
+        shouldExcludeWatched: excludeWatched,
+      });
     },
-    [excludeWatched, shuffleMutation],
+    [excludeWatched, playlistId, playlistQuery.data, shuffleMutation],
   );
 
   const handleVideoEnd = useCallback(
