@@ -180,13 +180,22 @@ struct ContentView: View {
                     .frame(minWidth: 480, minHeight: 270)
                     .aspectRatio(16 / 9, contentMode: .fit)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Queue").font(.headline)
-                    ForEach(coordinator.queue) { item in
+                    HStack {
+                        Text("Queue").font(.headline)
+                        Text("SAMPLE").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                    }
+                    Button(action: coordinator.shuffleUpcoming) {
+                        Label("Shuffle upcoming", systemImage: "shuffle")
+                    }
+                    .disabled(!coordinator.canShuffleUpcoming)
+                    .help("Shuffle the upcoming items in this sample queue, leaving the current item in place.")
+                    .accessibilityHint("Changes the order of upcoming items without changing the current item.")
+                    ForEach(Array(coordinator.queue.enumerated()), id: \.element.id) { position, item in
                         HStack(spacing: 8) {
-                            Image(systemName: item.id == coordinator.index ? "play.fill" : "circle")
-                                .frame(width: 16).foregroundStyle(item.id == coordinator.index ? Color.blue : Color.secondary)
-                            Text("\(item.id + 1). \(item.videoID)").font(.system(.caption, design: .monospaced))
-                        }.accessibilityLabel("Item \(item.id + 1), \(item.videoID)\(item.id == coordinator.index ? ", last accepted" : "")")
+                            Image(systemName: position == coordinator.index ? "play.fill" : "circle")
+                                .frame(width: 16).foregroundStyle(position == coordinator.index ? Color.blue : Color.secondary)
+                            Text("\(position + 1). \(item.videoID)").font(.system(.caption, design: .monospaced))
+                        }.accessibilityLabel("Item \(position + 1), \(item.videoID)\(position == coordinator.index ? ", last accepted" : "")")
                     }
                     Spacer(minLength: 0)
                     Text("Natural observed: \(coordinator.queueState.observedNatural)").font(.caption).foregroundStyle(.secondary)

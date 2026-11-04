@@ -12,7 +12,7 @@ final class PlayerCoordinator: ObservableObject {
     }
 
     // Fixed public examples; availability and embed permission can change.
-    let queue = ["ScMzIvxBSi4", "jNQXAC9IVRw", "dQw4w9WgXcQ", "M7lc1UVf-VE", "aqz-KE-bpKQ", "ysz5S6PUM-U"]
+    @Published private(set) var queue = ["ScMzIvxBSi4", "jNQXAC9IVRw", "dQw4w9WgXcQ", "M7lc1UVf-VE", "aqz-KE-bpKQ", "ysz5S6PUM-U"]
         .enumerated().map { Item(id: $0.offset, videoID: $0.element) }
     let player = DirectPlayer()
     @Published private(set) var queueState = QueueState(count: 6)
@@ -40,7 +40,7 @@ final class PlayerCoordinator: ObservableObject {
     @Published private(set) var recoveryRequired = false
     private let remoteEligibility = RemoteEligibility()
     @Published private(set) var occurrence = 0
-    private var progressAdmission = ProgressAdmission()
+    @Published private var progressAdmission = ProgressAdmission()
     private var progressTimeoutLogged = false
     private var remoteHandlers: [(MPRemoteCommand, Any)] = []
     private var subscriptions = Set<AnyCancellable>()
@@ -300,6 +300,22 @@ final class PlayerCoordinator: ObservableObject {
     func next() { select(queueState.nextTarget) }
     var canTransport: Bool { ready && windowOpen && !recoveryRequired && !mutationInFlight && !seekGate.seeking && queueState.pending == nil }
     var canNext: Bool { windowOpen && (ready || playerError) && !recoveryRequired && !mutationInFlight && !seekGate.seeking && queueState.pending == nil && queueState.nextTarget < queue.count }
+
+    var canShuffleUpcoming: Bool {
+        UpcomingShuffleAdmission(
+            ready: ready, windowOpen: windowOpen, recoveryRequired: recoveryRequired,
+            playerError: playerError, pendingLoad: queueState.pending != nil || queueState.failedTarget != nil,
+            mutationInFlight: mutationInFlight || mutationGate.busy, seeking: seekGate.seeking,
+            deferredSeekEnd: deferredSeekEnd, readinessAwaiting: readinessGate.awaiting,
+            restartRequired: mutationGate.restartRequired || readinessGate.restartRequired,
+            progressInFlight: progressAdmission.inFlight
+        ).allows(count: queue.count, index: index)
+    }
+
+    func shuffleUpcoming() {
+        guard canShuffleUpcoming else { return }
+        queue = shuffledUpcoming(queue, after: index) { Double.random(in: 0..<1) }
+    }
 
     var canSeek: Bool { canTransport && duration.isFinite && duration > 0 }
 

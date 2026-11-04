@@ -2,6 +2,52 @@
 @main
 enum QueueStateTests {
     static func main() {
+        struct Occurrence: Equatable { let id: Int; let videoID: String }
+        let items = [Occurrence(id: 0, videoID: "old"), Occurrence(id: 1, videoID: "same"),
+                     Occurrence(id: 2, videoID: "same"), Occurrence(id: 3, videoID: "other"),
+                     Occurrence(id: 4, videoID: "same")]
+        var draws = 0
+        let reordered = shuffledUpcoming(items, after: 1) { draws += 1; return 0 }
+        assert(draws == 2 && reordered.map(\.id) == [0, 1, 3, 4, 2])
+        assert(reordered[1] == items[1]) // accepted duplicate occurrence, not merely its video ID
+        assert(reordered[2...].map(\.id).sorted() == [2, 3, 4])
+        var shuffledState = QueueState(count: items.count)
+        let selected = shuffledState.request(1, reason: .manual, allowed: true)!
+        _ = shuffledState.complete(selected, success: true)
+        shuffledState.playing()
+        let active = shuffledState.activeGeneration
+        assert(shuffledState.index == 1 && shuffledState.nextTarget == 2)
+        assert(reordered[shuffledState.nextTarget].id == 3)
+        assert(shuffledState.activeGeneration == active && shuffledState.requested == 1 && shuffledState.accepted == 1)
+        assert(shuffledState.ended()) // existing playback observation remains armed
+        let next = shuffledState.request(shuffledState.nextTarget, reason: .natural, allowed: true)!
+        assert(reordered[next.target].id == 3 && next.generation == active + 1)
+        assert(shuffledUpcoming([Int](), after: 0) { assertionFailure(); return 0 }.isEmpty)
+        assert(shuffledUpcoming([0], after: 0) { assertionFailure(); return 0 } == [0])
+        assert(shuffledUpcoming([0, 1], after: 0) { assertionFailure(); return 0 } == [0, 1])
+
+        func admission(ready: Bool = true, window: Bool = true, recovery: Bool = false,
+                       error: Bool = false, pending: Bool = false, mutation: Bool = false,
+                       seek: Bool = false, deferred: Bool = false, awaiting: Bool = false,
+                       restart: Bool = false, progress: Bool = false) -> UpcomingShuffleAdmission {
+            .init(ready: ready, windowOpen: window, recoveryRequired: recovery, playerError: error,
+                  pendingLoad: pending, mutationInFlight: mutation, seeking: seek,
+                  deferredSeekEnd: deferred, readinessAwaiting: awaiting, restartRequired: restart,
+                  progressInFlight: progress)
+        }
+        assert(admission().allows(count: 5, index: 1))
+        for blocked in [admission(ready: false), admission(window: false), admission(recovery: true),
+                        admission(error: true), admission(pending: true), admission(mutation: true),
+                        admission(seek: true), admission(deferred: true), admission(awaiting: true),
+                        admission(restart: true), admission(progress: true)] {
+            assert(!blocked.allows(count: 5, index: 1))
+        }
+        assert(!admission().allows(count: 0, index: 0))
+        assert(!admission().allows(count: 1, index: 0))
+        assert(!admission().allows(count: 2, index: 0))
+        assert(!admission().allows(count: 5, index: -1))
+        assert(!admission().allows(count: 5, index: 5))
+
         var startup = StartupGate()
         assert(startup.timeout())
         assert(!startup.ready() && !startup.timeout() && !startup.fail())

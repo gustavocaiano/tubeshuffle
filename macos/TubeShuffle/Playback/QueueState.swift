@@ -96,6 +96,7 @@ struct ProgressAdmission {
     private(set) var generation = 0
     private var serial = 0
     private var tasks: [Int: Double] = [:]
+    var inFlight: Bool { !tasks.isEmpty }
     var saturated: Bool { tasks.count >= 2 }
     func stalled(now: Double) -> Bool { saturated && tasks.values.allSatisfy { now - $0 >= 10 } }
     mutating func invalidate() { generation += 1 }
@@ -107,6 +108,43 @@ struct ProgressAdmission {
     }
     func isCurrent(id: Int, generation: Int) -> Bool { self.generation == generation && serial == id && tasks[id] != nil }
     mutating func finish(id: Int) { tasks.removeValue(forKey: id) }
+}
+
+// Reordering is local to the unplayed suffix. The caller supplies all admission
+// state so both the UI and the operation use the same fail-closed decision.
+struct UpcomingShuffleAdmission {
+    let ready: Bool
+    let windowOpen: Bool
+    let recoveryRequired: Bool
+    let playerError: Bool
+    let pendingLoad: Bool
+    let mutationInFlight: Bool
+    let seeking: Bool
+    let deferredSeekEnd: Bool
+    let readinessAwaiting: Bool
+    let restartRequired: Bool
+    let progressInFlight: Bool
+
+    func allows(count: Int, index: Int) -> Bool {
+        ready && windowOpen && !recoveryRequired && !playerError && !pendingLoad &&
+        !mutationInFlight && !seeking && !deferredSeekEnd && !readinessAwaiting &&
+        !restartRequired && !progressInFlight && index >= 0 && index < count && count - index > 2
+    }
+}
+
+// Fisher–Yates operates on occurrences, never video IDs. No player or queue
+// state is touched; an unchanged random permutation is a valid outcome.
+func shuffledUpcoming<Element>(_ queue: [Element], after index: Int, draw: () -> Double) -> [Element] {
+    guard index >= 0, index < queue.count, queue.count - index > 2 else { return queue }
+    var result = queue
+    let start = index + 1
+    for i in stride(from: result.count - 1, through: start + 1, by: -1) {
+        let value = draw()
+        precondition(value.isFinite && value >= 0 && value < 1, "Shuffle draws must be finite and in [0, 1)")
+        let j = start + Int(value * Double(i - start + 1))
+        result.swapAt(i, j)
+    }
+    return result
 }
 
 // A timed-out bridge mutation remains quarantined even if it later completes.
