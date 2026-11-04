@@ -441,9 +441,11 @@ Across the three native acceptance runs, **no Playing was observed for item 2 at
 
 **Limits/policy decision.** Actual outgoing HTTP Referer remains unverified; no numeric 153 was captured. WebKit/app update behavior, broad media-key ownership, keyboard/VoiceOver seeking and actual sleep/wake recovery are not established. These are diagnostic observations, not support promises. YouTube restrictions remain unresolved and release-blocking; owner authorization and technical success are **not YouTube permission, compliance, or release approval**. No P1, backend, authentication, storage, sync or polished-UI work began. Both players, the navigation probe and the log collector are stopped; the generated QuickTime document is closed and original Wi-Fi On/Ethernet Enabled settings are restored. Results and sanitized logs are included in this handoff commit.
 
-### Experimental local store lifecycle probe — 486038b (test-only)
+### Experimental local store lifecycle probe — 486038b → f73200a (test-only)
 
-**Owner Mac evidence — 2026-11-04.** The owner reported the standalone process lifecycle probe passing all cases at commit `486038b`: create/hold with a contender denied, then exit/reap and a separate-process reopen; SIGKILL release followed by reopen; a preflight failure retaining the lock; a deterministic failure injected immediately after container assignment retaining the lock, with an incomplete reopen rejected; and an incomplete fixture rejected. This is probe-level evidence for that exact commit only.
+**Owner Mac evidence — 2026-11-04.** The owner reported the standalone process lifecycle probe passing all cases at commit `486038b`: create/hold with a contender denied, then exit/reap and a separate-process reopen; SIGKILL release followed by reopen; a preflight failure retaining the lock; a deterministic failure injected immediately after container assignment retaining the lock, with an incomplete reopen rejected; and an incomplete fixture rejected.
+
+**Final clean run — f73200a.** After removing the temporary root-validation diagnostic, the owner reported the same five lifecycle scenarios passing on the clean commit `f73200a`. Only the standalone helper was compiled; no full Xcode test suite was run. This is probe-level evidence for those exact commits only.
 
 **Bounded scope and open gates.**
 
