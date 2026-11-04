@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import SwiftData
 import XCTest
 @testable import TubeShuffle
@@ -163,6 +164,121 @@ final class SwiftDataLibraryRepositoryTests: XCTestCase {
         context.insert(StoredOccurrence(occurrence("b", 0)))
         XCTAssertThrowsError(try ExperimentalExclusiveStoreDestinationInvariantReader(context: context).readAssumingExternallyExclusiveStore()) {
             guard case LibrarySnapshotStorageError.duplicatePosition = $0 else { return XCTFail("unexpected error: \($0)") }
+        }
+    }
+
+    // mkdir must create the directory exclusively: createDirectory can accept an
+    // existing directory, which would make cleanup of an unknown fixture unsafe.
+    private func withRehearsalDirectory(_ directory: URL, _ body: (URL) throws -> Void) throws {
+        guard mkdir(directory.path, 0o700) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try body(directory)
+    }
+
+    private func rehearsalDirectory() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("TubeShuffle-Rehearsal-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    // Sequential, single-owner use of a private disposable directory supplies
+    // the exclusivity assumption for this test, not the ModelContext itself.
+    // Opening a SwiftData store may still write physical database metadata.
+    private func withRehearsalContext<T>(_ url: URL, _ body: (ModelContext) throws -> T) throws -> T {
+        try autoreleasepool {
+            let container = try disk(url)
+            let context = ModelContext(container)
+            context.autosaveEnabled = false
+            return try body(context)
+        }
+    }
+
+    private func readRehearsal(_ url: URL) throws -> LibrarySnapshot {
+        try withRehearsalContext(url) { context in
+            try ExperimentalExclusiveStoreDestinationInvariantReader(context: context)
+                .readAssumingExternallyExclusiveStore()
+        }
+    }
+
+    func testDisposableDiskRehearsalReopenFilterShuffleAndReopen() throws {
+        let first = playlist("a"), second = playlist("b")
+        let composed = occurrence("é", 0, playlist: "a")
+        let decomposed = occurrence("e\u{301}", 1, playlist: "a")
+        let remaining = occurrence("remaining", 2, playlist: "a")
+        let other = occurrence("other", 0, playlist: "b")
+        let completed = event("event-a", video: "é", playlist: "a")
+        let partial = LibraryHistoryEvent(id: HistoryID("event-b"), playlistId: PlaylistID("a"),
+                                          videoId: decomposed.id, watchedAt: "later", watchedSeconds: 0.5,
+                                          completed: false)
+        let expected = LibrarySnapshot(playlists: [first, second],
+                                       occurrences: [composed, decomposed, remaining, other],
+                                       history: [completed, partial])
+        try withRehearsalDirectory(rehearsalDirectory()) { directory in
+            let url = directory.appendingPathComponent("library.store")
+            try withRehearsalContext(url) { context in
+                for value in expected.playlists { context.insert(StoredPlaylist(value)) }
+                for value in expected.occurrences { context.insert(StoredOccurrence(value)) }
+                for value in expected.history { context.insert(StoredHistoryEvent(value)) }
+                try context.save()
+            }
+            let snapshot = try readRehearsal(url)
+            XCTAssertEqual(snapshot, expected)
+            XCTAssertEqual(snapshot.occurrences.map(\.youtubeId), ["repeat", "repeat", "repeat", "repeat"])
+            for mode in [LibraryQueueBuilder.Mode.normal, .smart] {
+                let queue = LibraryQueueBuilder.build(snapshot: snapshot, playlistId: PlaylistID("a"),
+                                                      mode: mode, excludeWatched: true) { 0 }
+                XCTAssertEqual(queue.count, 2)
+                XCTAssertEqual(Set(queue.map(\.id)), Set([decomposed.id, remaining.id]))
+                XCTAssertEqual(queue.first(where: { $0.id == decomposed.id }).map { Array($0.id.rawValue.utf8) },
+                               Array("e\u{301}".utf8))
+                XCTAssertFalse(queue.contains { $0.id == composed.id || $0.id == other.id })
+            }
+            XCTAssertEqual(snapshot, expected)
+            XCTAssertEqual(try readRehearsal(url), expected)
+        }
+    }
+
+    func testDisposableDiskRehearsalPropagatesInvariantFailureAfterReopen() throws {
+        try withRehearsalDirectory(rehearsalDirectory()) { directory in
+            let url = directory.appendingPathComponent("library.store")
+            try withRehearsalContext(url) { context in
+                context.insert(StoredPlaylist(playlist()))
+                context.insert(StoredOccurrence(occurrence("one", 0)))
+                context.insert(StoredOccurrence(occurrence("two", 0)))
+                try context.save()
+            }
+            XCTAssertThrowsError(try readRehearsal(url)) {
+                guard case LibrarySnapshotStorageError.duplicatePosition = $0 else {
+                    return XCTFail("unexpected error: \($0)")
+                }
+            }
+        }
+    }
+
+    func testDisposableDiskRehearsalPropagatesOpenFailureWithoutReplacingFixture() throws {
+        try withRehearsalDirectory(rehearsalDirectory()) { directory in
+            let blocked = directory.appendingPathComponent("not-a-directory")
+            let sentinel = Data("synthetic fixture".utf8)
+            try sentinel.write(to: blocked, options: .withoutOverwriting)
+            XCTAssertThrowsError(try readRehearsal(blocked.appendingPathComponent("library.store")))
+            XCTAssertEqual(try Data(contentsOf: blocked), sentinel)
+        }
+    }
+
+    func testDisposableDiskRehearsalRefusesPreexistingDirectory() throws {
+        try withRehearsalDirectory(rehearsalDirectory()) { directory in
+            let occupied = directory.appendingPathComponent("occupied", isDirectory: true)
+            try FileManager.default.createDirectory(at: occupied, withIntermediateDirectories: false)
+            let sentinel = occupied.appendingPathComponent("sentinel")
+            let bytes = Data("do not replace".utf8)
+            try bytes.write(to: sentinel, options: .withoutOverwriting)
+            XCTAssertThrowsError(try withRehearsalDirectory(occupied) { _ in
+                XCTFail("Existing fixture must not be used")
+            }) {
+                XCTAssertEqual(($0 as? POSIXError)?.code, .EEXIST)
+            }
+            XCTAssertEqual(try Data(contentsOf: sentinel), bytes)
         }
     }
 }

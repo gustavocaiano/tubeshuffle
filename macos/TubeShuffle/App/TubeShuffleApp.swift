@@ -158,6 +158,7 @@ struct ContentView: View {
     @State private var seeking = false
     @State private var seekPosition: Double = 0
     @State private var seekOccurrence: Int?
+    @State private var showingSampleLibrary = false
 
     private func timeLabel(_ seconds: Double) -> String {
         let value = Int(max(0, seconds.isFinite ? seconds : 0))
@@ -173,6 +174,12 @@ struct ContentView: View {
                 }
                 Spacer()
                 Text("P0 PROTOTYPE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Button { showingSampleLibrary = true } label: {
+                    Label("Sample library", systemImage: "books.vertical")
+                }
+                .sheet(isPresented: $showingSampleLibrary) {
+                    SampleLibraryView()
+                }
                 AccountControl(account: account)
             }
             HStack(alignment: .top, spacing: 16) {
