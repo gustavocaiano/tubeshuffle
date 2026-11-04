@@ -377,7 +377,7 @@ describe("playlist shuffle request identity", () => {
     expect(usePlayerStore.getState().playlistId).toBe("playlist-a");
   });
 
-  it("invalidates a pending shuffle on read failure and retries automatically after recovery", async () => {
+  it("invalidates a pending shuffle on read failure and recovers after explicit refetch", async () => {
     const pending = deferred<LocalVideo[]>();
     shuffleMocks.shuffleVideos.mockReturnValueOnce(pending.promise).mockImplementation((videos: LocalVideo[]) => videos);
     const { client } = renderPage();
@@ -389,7 +389,7 @@ describe("playlist shuffle request identity", () => {
     await act(async () => { pending.resolve([videoA2]); });
     expect(usePlayerStore.getState().queue).toEqual([]);
     repositoryMocks.getPlaylist.mockResolvedValueOnce(bundleA);
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await act(async () => { await client.refetchQueries({ queryKey: ["playlist", "playlist-a"] }); });
     await waitFor(() => expect(usePlayerStore.getState().queue.map((v) => v.id)).toEqual(["a1", "a2"]));
     expect(shuffleMocks.shuffleVideos).toHaveBeenCalledTimes(2);
     expect(screen.queryByText(/private detail/)).toBeNull();

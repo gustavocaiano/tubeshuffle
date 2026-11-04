@@ -92,8 +92,6 @@ function PlaylistView({ playlistId }: { playlistId: string }) {
   const routePlaylistIdRef = useRef(playlistId);
   const autoShuffleKeyRef = useRef<string | null>(null);
   const canUsePlaylistRef = useRef(false);
-  const retryFocusRef = useRef(false);
-  const contentRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     mountedRef.current = true;
@@ -130,12 +128,6 @@ function PlaylistView({ playlistId }: { playlistId: string }) {
     refetchOnMount: "always",
   });
   const showReadError = playlistQuery.isError || (playlistQuery.isPending && playlistQuery.errorUpdatedAt > 0);
-  useEffect(() => {
-    if (retryFocusRef.current && playlistQuery.isSuccess && !showReadError) {
-      retryFocusRef.current = false;
-      contentRef.current?.focus();
-    }
-  }, [playlistQuery.isSuccess, showReadError]);
 
   const canUsePlaylist = playlistQuery.isSuccess && playlistQuery.isFetchedAfterMount && playlistQuery.data?.playlist.id === playlistId;
   useLayoutEffect(() => {
@@ -278,7 +270,7 @@ function PlaylistView({ playlistId }: { playlistId: string }) {
           <div className="absolute inset-0 bg-gradient-to-b from-[#080807]/10 via-[#080807]/75 to-[#080807]" />
         </div>
 
-        <div ref={contentRef} tabIndex={-1} className="relative mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="relative mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-center gap-4">
             <Link href="/dashboard">
               <Button
@@ -328,7 +320,7 @@ function PlaylistView({ playlistId }: { playlistId: string }) {
           </div>
 
           {showReadError && (
-            <QueryReadError subject="playlist" stale={Boolean(playlist)} onRetry={() => { retryFocusRef.current = true; void playlistQuery.refetch(); }} isFetching={playlistQuery.isFetching} />
+            <QueryReadError subject="playlist" stale={Boolean(playlist)} />
           )}
 
           {playlistQuery.isPending || (!playlistQuery.isError && !playlistQuery.isFetchedAfterMount) ? (

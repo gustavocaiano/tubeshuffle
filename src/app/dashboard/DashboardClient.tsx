@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { playlistRepository } from "@/stores/playlist-store";
 import { PlaylistCard } from "@/components/playlist/PlaylistCard";
 import { ImportPlaylistModal } from "@/components/playlist/ImportPlaylistModal";
@@ -28,8 +28,6 @@ const Navbar = dynamic(
 
 export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
   const [importModalOpen, setImportModalOpen] = useState(false);
-  const retryFocusRef = useRef(false);
-  const headingRef = useRef<HTMLHeadingElement>(null);
   const queryClient = useQueryClient();
   const { hideThumbnails, toggleHideThumbnails } = useUiPreferencesStore();
 
@@ -41,12 +39,6 @@ export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
   });
   const showReadError = playlistsQuery.isError || (playlistsQuery.isPending && playlistsQuery.errorUpdatedAt > 0);
   const readOnly = showReadError || !playlistsQuery.isFetchedAfterMount || playlistsQuery.isPaused;
-  useEffect(() => {
-    if (retryFocusRef.current && playlistsQuery.isSuccess && !showReadError) {
-      retryFocusRef.current = false;
-      headingRef.current?.focus();
-    }
-  }, [playlistsQuery.isSuccess, showReadError]);
 
   const deleteMutation = useMutation({
     networkMode: "always",
@@ -74,7 +66,7 @@ export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em] text-white/40">
                 Your library
               </p>
-              <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-black tracking-tight md:text-5xl">
+              <h1 className="text-3xl font-black tracking-tight md:text-5xl">
                 My Playlists
               </h1>
               <div className="mt-2 text-white/55">
@@ -112,7 +104,7 @@ export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
           <AccountPanel appOrigin={appOrigin} readOnly={readOnly} />
 
           {showReadError && (
-            <QueryReadError subject="library" stale={playlists.length > 0} onRetry={() => { retryFocusRef.current = true; void playlistsQuery.refetch(); }} isFetching={playlistsQuery.isFetching} />
+            <QueryReadError subject="library" stale={playlists.length > 0} />
           )}
 
           {/* Playlists Grid */}

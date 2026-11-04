@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ query: {} as Record<string, unknown>, refetch: vi.fn() }));
@@ -43,14 +43,15 @@ beforeEach(() => state.refetch.mockReset());
 afterEach(cleanup);
 
 describe("library and playlist read states", () => {
-  it("shows a retryable library error rather than an empty library", () => {
+  it("shows a library error rather than an empty library", () => {
     setQuery(undefined, true);
     render(<Dashboard appOrigin="https://example.test" />);
-    expect(screen.getByRole("alert").textContent).toContain("Could not load your library");
+    expect(screen.getByRole("alert").textContent).toContain("Could not confirm your library");
+    expect(screen.getByRole("alert").textContent).toContain("do not clear its site data");
     expect(screen.queryByText("No playlists yet")).toBeNull();
     expect(screen.queryByText("0 playlists ready to shuffle")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(state.refetch).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: /retry|reload/i })).toBeNull();
+    expect(state.refetch).not.toHaveBeenCalled();
   });
   it("shows the actual empty and populated library states", () => {
     setQuery([]);
@@ -66,13 +67,13 @@ describe("library and playlist read states", () => {
     expect(screen.getByText("Saved playlist")).toBeTruthy();
     expect(screen.getByRole("alert").textContent).toContain("out of date");
   });
-  it("shows a retryable playlist error rather than not found", () => {
+  it("shows a playlist error rather than not found", () => {
     setQuery(undefined, true);
     render(<Playlist />);
-    expect(screen.getByRole("alert").textContent).toContain("Could not load your playlist");
+    expect(screen.getByRole("alert").textContent).toContain("Could not confirm your playlist");
     expect(screen.queryByText("Playlist not found")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(state.refetch).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: /retry|reload/i })).toBeNull();
+    expect(state.refetch).not.toHaveBeenCalled();
   });
   it("distinguishes not found and empty successful playlist reads", () => {
     setQuery(null);

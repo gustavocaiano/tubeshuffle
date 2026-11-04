@@ -51,24 +51,15 @@ it("attempts a local library read while offline without exposing cached actions 
   expect(await screen.findByRole("link", { name: "Cached playlist" })).toBeTruthy();
 });
 
-it("keeps retry focused and announces progress during a retry without cached data", async () => {
-  let resolveRetry!: (value: typeof playlist[]) => void;
-  repository.listPlaylists.mockRejectedValueOnce(new Error("private error")).mockImplementationOnce(
-    () => new Promise((resolve) => { resolveRetry = resolve; }),
-  );
+it("shows cautious guidance without retrying or prompting reload after a read failure", async () => {
+  repository.listPlaylists.mockRejectedValueOnce(new Error("private error"));
   show(createClient());
-  await screen.findByRole("alert");
-  const retry = screen.getByRole("button", { name: "Retry" });
-  retry.focus();
-  fireEvent.click(retry);
-  await waitFor(() => expect(screen.getByRole("button", { name: "Trying again…" })).toBe(retry));
-  expect(document.activeElement).toBe(retry);
-  expect(screen.getByRole("alert").textContent).toContain("Trying again…");
+  const alert = await screen.findByRole("alert");
+  expect(alert.textContent).toContain("Keep this browser profile and do not clear its site data.");
+  expect(alert.textContent).not.toMatch(/reload|try again/i);
+  expect(screen.queryByRole("button", { name: /retry|reload/i })).toBeNull();
   expect(screen.queryByText("No playlists yet")).toBeNull();
-  await act(async () => { resolveRetry([playlist]); });
-  await screen.findByText("Cached playlist");
-  expect(screen.queryByRole("alert")).toBeNull();
-  expect(document.activeElement).toBe(screen.getByRole("heading", { name: "My Playlists" }));
+  expect(repository.listPlaylists).toHaveBeenCalledTimes(1);
 });
 
 it("preserves an open import draft while a library read fails", async () => {
