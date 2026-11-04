@@ -126,10 +126,26 @@ struct UpcomingShuffleAdmission {
     let progressInFlight: Bool
 
     func allows(count: Int, index: Int) -> Bool {
+        allowsSampleQueue(count: count, index: index) && count - index > 2
+    }
+
+    func allowsSampleQueue(count: Int, index: Int) -> Bool {
         ready && windowOpen && !recoveryRequired && !playerError && !pendingLoad &&
         !mutationInFlight && !seeking && !deferredSeekEnd && !readinessAwaiting &&
-        !restartRequired && !progressInFlight && index >= 0 && index < count && count - index > 2
+        !restartRequired && !progressInFlight && index >= 0 && index < count && count > 1
     }
+}
+
+// Full Fisher–Yates, preserving occurrence identity even when video IDs repeat.
+func shuffledSampleQueue<Element>(_ queue: [Element], draw: () -> Double) -> [Element] {
+    guard queue.count > 1 else { return queue }
+    var result = queue
+    for i in stride(from: result.count - 1, through: 1, by: -1) {
+        let value = draw()
+        precondition(value.isFinite && value >= 0 && value < 1, "Shuffle draws must be finite and in [0, 1)")
+        result.swapAt(i, Int(value * Double(i + 1)))
+    }
+    return result
 }
 
 // Fisher–Yates operates on occurrences, never video IDs. No player or queue
@@ -279,7 +295,7 @@ struct QueueState {
     }
     mutating func markSeekAssisted() { seekAssisted = true }
     // Returns whether a buffered playing/ended pair needs processing.
-    mutating func complete(_ request: Request, success: Bool) -> Bool {
+    mutating func complete(_ request: Request, success: Bool, markFailedTarget: Bool = true) -> Bool {
         guard pending?.generation == request.generation else { return false }
         pending = nil
         if success {
@@ -298,7 +314,9 @@ struct QueueState {
             pendingEnded = false
             return ended
         }
-        failedTarget = request.target
+        // A target in an uncommitted replacement queue is not an index into
+        // the retained queue. Do not label an unrelated old occurrence failed.
+        failedTarget = markFailedTarget ? request.target : nil
         awaitingNaturalObservation = false
         armed = false
         pendingPlaying = false

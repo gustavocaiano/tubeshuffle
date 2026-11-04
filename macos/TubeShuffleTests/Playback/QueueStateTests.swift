@@ -26,6 +26,45 @@ enum QueueStateTests {
         assert(shuffledUpcoming([0], after: 0) { assertionFailure(); return 0 } == [0])
         assert(shuffledUpcoming([0, 1], after: 0) { assertionFailure(); return 0 } == [0, 1])
 
+        // Full shuffle includes the current and already played occurrences, and
+        // preserves distinct identities even for repeated YouTube IDs.
+        let six = items + [Occurrence(id: 5, videoID: "old")]
+        var fullDraws = 0
+        let full = shuffledSampleQueue(six) { fullDraws += 1; return 0 }
+        assert(fullDraws == 5 && full.map(\.id) == [1, 2, 3, 4, 5, 0])
+        assert(full.map(\.id).sorted() == six.map(\.id))
+        assert(full.filter { $0.videoID == "same" }.map(\.id) == [1, 2, 4])
+        assert(shuffledSampleQueue(six) { 0.999999 }.map(\.id) == six.map(\.id))
+        assert(shuffledSampleQueue([Int]()) { assertionFailure(); return 0 }.isEmpty)
+        assert(shuffledSampleQueue([0]) { assertionFailure(); return 0 } == [0])
+
+        var fullState = QueueState(count: six.count)
+        let previous = fullState.request(4, reason: .manual, allowed: true)!
+        _ = fullState.complete(previous, success: true)
+        let replacement = fullState.request(0, reason: .manual, allowed: true)!
+        assert(replacement.generation == previous.generation + 1)
+        assert(fullState.index == 4 && fullState.activeGeneration == previous.generation)
+        assert(fullState.pending?.generation == replacement.generation)
+        assert(!fullState.expects(generation: previous.generation))
+        assert(fullState.request(0, reason: .manual, allowed: true) == nil) // double click
+        _ = fullState.complete(replacement, success: true)
+        assert(fullState.index == 0 && fullState.activeGeneration == replacement.generation)
+        var stagedFailure = QueueState(count: six.count)
+        let stagedRequest = stagedFailure.request(0, reason: .manual, allowed: true)!
+        _ = stagedFailure.complete(stagedRequest, success: false, markFailedTarget: false)
+        assert(stagedFailure.failedTarget == nil && stagedFailure.index == 0)
+        assert(full[fullState.index].id == 1)
+        let failedReplacement = fullState.request(0, reason: .manual, allowed: true)!
+        _ = fullState.complete(failedReplacement, success: false)
+        assert(fullState.index == 0 && fullState.activeGeneration == replacement.generation)
+        let newer = fullState.request(0, reason: .manual, allowed: true)!
+        assert(newer.generation == failedReplacement.generation + 1)
+        _ = fullState.complete(failedReplacement, success: true) // late completion rejected
+        assert(fullState.pending?.generation == newer.generation)
+        fullState.invalidatePlayback() // timeout, pending error, or window close
+        _ = fullState.complete(newer, success: true)
+        assert(fullState.pending == nil && fullState.index == 0 && fullState.activeGeneration == replacement.generation)
+
         func admission(ready: Bool = true, window: Bool = true, recovery: Bool = false,
                        error: Bool = false, pending: Bool = false, mutation: Bool = false,
                        seek: Bool = false, deferred: Bool = false, awaiting: Bool = false,
@@ -36,12 +75,15 @@ enum QueueStateTests {
                   progressInFlight: progress)
         }
         assert(admission().allows(count: 5, index: 1))
+        assert(admission().allowsSampleQueue(count: 6, index: 5))
         for blocked in [admission(ready: false), admission(window: false), admission(recovery: true),
                         admission(error: true), admission(pending: true), admission(mutation: true),
                         admission(seek: true), admission(deferred: true), admission(awaiting: true),
                         admission(restart: true), admission(progress: true)] {
             assert(!blocked.allows(count: 5, index: 1))
+            assert(!blocked.allowsSampleQueue(count: 6, index: 5))
         }
+        assert(!admission().allowsSampleQueue(count: 1, index: 0))
         assert(!admission().allows(count: 0, index: 0))
         assert(!admission().allows(count: 1, index: 0))
         assert(!admission().allows(count: 2, index: 0))
@@ -189,8 +231,9 @@ enum QueueStateTests {
         _ = two.complete(third, success: true)
         two.playing()
         assert(two.ended() && !two.ended()) // second natural advance
-        // Failed loads keep the previous occurrence active; retries and repeated
-        // loads of the same video ID still reserve strictly increasing generations.
+        // QueueState retains the last accepted index/generation on failure; this
+        // does not mean the previous player is still active. The coordinator
+        // quarantines failure. Repeated reservations still increase generations.
         var retryState = QueueState(count: 3)
         let failedLoad = retryState.request(1, reason: .manual, allowed: true)!
         assert(failedLoad.generation == 2)

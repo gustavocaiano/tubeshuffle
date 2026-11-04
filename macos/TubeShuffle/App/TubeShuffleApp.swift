@@ -184,6 +184,13 @@ struct ContentView: View {
                         Text("Queue").font(.headline)
                         Text("SAMPLE").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                     }
+                    Button(action: coordinator.shuffleSampleQueue) {
+                        Label("Shuffle sample queue", systemImage: "shuffle")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!coordinator.canShuffleSampleQueue)
+                    .help("Create a new shuffled queue from the sample videos.")
+                    .accessibilityHint("Creates a new shuffled queue from the sample videos.")
                     Button(action: coordinator.shuffleUpcoming) {
                         Label("Shuffle upcoming", systemImage: "shuffle")
                     }
@@ -192,18 +199,31 @@ struct ContentView: View {
                     .accessibilityHint("Changes the order of upcoming items without changing the current item.")
                     ForEach(Array(coordinator.queue.enumerated()), id: \.element.id) { position, item in
                         HStack(spacing: 8) {
-                            Image(systemName: position == coordinator.index ? "play.fill" : "circle")
-                                .frame(width: 16).foregroundStyle(position == coordinator.index ? Color.blue : Color.secondary)
-                            Text("\(position + 1). \(item.videoID)").font(.system(.caption, design: .monospaced))
+                            Image(systemName: position == coordinator.index ? "circle.inset.filled" : "circle")
+                                .frame(width: 16).foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(position + 1). \(item.videoID)").font(.system(.caption, design: .monospaced))
+                                if position == coordinator.index {
+                                    Text("Last accepted").font(.caption2).foregroundStyle(.secondary)
+                                }
+                            }
                         }.accessibilityLabel("Item \(position + 1), \(item.videoID)\(position == coordinator.index ? ", last accepted" : "")")
                     }
                     Spacer(minLength: 0)
                     Text("Natural observed: \(coordinator.queueState.observedNatural)").font(.caption).foregroundStyle(.secondary)
                     Text("Requested \(coordinator.queueState.requested) · accepted \(coordinator.queueState.accepted)").font(.caption).foregroundStyle(.secondary)
-                    if let pending = coordinator.queueState.pending { Text("Loading item \(pending.target + 1)").font(.caption) }
-                    if let failed = coordinator.queueState.failedTarget { Text("Item \(failed + 1) command failed").font(.caption) }
-                    if coordinator.index == coordinator.queue.count - 1 {
-                        Text("Last item in queue. Next is unavailable. If the video cannot play, quit and reopen to restart the queue.")
+                    if coordinator.isShuffledQueuePending {
+                        Text("Loading shuffled queue…").font(.caption)
+                    } else if let pending = coordinator.queueState.pending {
+                        Text("Loading item \(pending.target + 1)").font(.caption)
+                    }
+                    if coordinator.failedShuffledQueue {
+                        Text("Shuffled queue could not load").font(.caption)
+                    } else if let failed = coordinator.queueState.failedTarget {
+                        Text("Item \(failed + 1) command failed").font(.caption)
+                    }
+                    if !coordinator.isShuffledQueuePending && !coordinator.recoveryRequired && coordinator.index == coordinator.queue.count - 1 {
+                        Text("Last item in queue. Next is unavailable.")
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }.frame(minWidth: 180, alignment: .leading)
@@ -216,7 +236,7 @@ struct ContentView: View {
                     Button("Quit to recover") { NSApp.terminate(nil) }
                         .help("Reopen the app to create a fresh player.")
                 }
-                if !coordinator.recoveryRequired && coordinator.index == coordinator.queue.count - 1 {
+                if !coordinator.isShuffledQueuePending && !coordinator.recoveryRequired && coordinator.index == coordinator.queue.count - 1 {
                     Button("Quit to restart") { NSApp.terminate(nil) }
                         .help("Reopen the app to start the queue again.")
                 }

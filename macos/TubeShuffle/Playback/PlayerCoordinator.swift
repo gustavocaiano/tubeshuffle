@@ -11,11 +11,30 @@ final class PlayerCoordinator: ObservableObject {
         let videoID: String
     }
 
+    // Queue and accepted state share one publication, so a replacement cannot
+    // expose a new order paired with the old index (or vice versa).
+    private struct PlaybackQueue {
+        var items: [Item]
+        var state: QueueState
+    }
     // Fixed public examples; availability and embed permission can change.
-    @Published private(set) var queue = ["ScMzIvxBSi4", "jNQXAC9IVRw", "dQw4w9WgXcQ", "M7lc1UVf-VE", "aqz-KE-bpKQ", "ysz5S6PUM-U"]
-        .enumerated().map { Item(id: $0.offset, videoID: $0.element) }
+    @Published private var playbackQueue = PlaybackQueue(
+        items: ["ScMzIvxBSi4", "jNQXAC9IVRw", "dQw4w9WgXcQ", "M7lc1UVf-VE", "aqz-KE-bpKQ", "ysz5S6PUM-U"]
+            .enumerated().map { Item(id: $0.offset, videoID: $0.element) },
+        state: QueueState(count: 6)
+    )
+    private(set) var queue: [Item] {
+        get { playbackQueue.items }
+        set { playbackQueue.items = newValue }
+    }
+    private(set) var queueState: QueueState {
+        get { playbackQueue.state }
+        set { playbackQueue.state = newValue }
+    }
     let player = DirectPlayer()
-    @Published private(set) var queueState = QueueState(count: 6)
+    private var stagedShuffledQueue: [Item]?
+    @Published private(set) var isShuffledQueuePending = false
+    @Published private(set) var failedShuffledQueue = false
     var index: Int { queueState.index }
     @Published private(set) var status = "Waiting for player"
     @Published private(set) var log: [String] = []
@@ -47,11 +66,24 @@ final class PlayerCoordinator: ObservableObject {
     private weak var playerWindow: NSWindow?
     private var sequence = 0
     private let started = ProcessInfo.processInfo.systemUptime
+    // Injection is limited to the bridge boundaries exercised by coordinator
+    // tests; admission, callbacks, state transitions and completion stay real.
+    struct TestHooks {
+        var load: @MainActor (String, Int) async throws -> Void
+        var progress: @MainActor (Int) async throws -> (Double, Double)
+        var draw: () -> Double
+        var onMutationWatchdogArmed: ((@escaping @MainActor () -> Void) -> Void)? = nil
+        var onLoadFinished: (() -> Void)? = nil
+    }
+    private let testHooks: TestHooks?
 
-    init() {
-        setupRemoteCommands()
-        Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-            .sink { [weak self] _ in self?.refreshProgress() }.store(in: &subscriptions)
+    init(testHooks: TestHooks? = nil) {
+        self.testHooks = testHooks
+        if testHooks == nil {
+            setupRemoteCommands()
+            Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+                .sink { [weak self] _ in self?.refreshProgress() }.store(in: &subscriptions)
+        }
         record("Session started; bundle \(Bundle.main.bundleIdentifier ?? "missing")")
         player.onEvent = { [weak self] event in
             guard let self else { return }
@@ -66,6 +98,12 @@ final class PlayerCoordinator: ObservableObject {
                 // always require a restart, and recovery blocks every callback above.
                 guard generation == self.queueState.expectedGeneration else {
                     self.record("stale ready event generation \(generation); expected \(self.queueState.expectedGeneration); rejected")
+                    return
+                }
+                // An active occurrence's error is terminal for that occurrence;
+                // a late duplicate ready must not re-enable transport or playback.
+                guard !self.playerError || self.queueState.pending != nil else {
+                    self.record("ready after active player error rejected")
                     return
                 }
                 _ = self.startupGate.ready()
@@ -90,6 +128,8 @@ final class PlayerCoordinator: ObservableObject {
                     self.failOccurrence("player error \(Self.errorLabel(code)) while load generation \(generation) was pending")
                 } else {
                     self.playerError = true
+                    self.readyGeneration = nil
+                    self.ready = false
                     self.queueState.invalidatePlayback(); self.invalidateSeek(); self.resetProgress()
                     self.status = "Player error: \(Self.errorLabel(code))"
                     self.record(self.status); self.publishNowPlaying()
@@ -99,6 +139,7 @@ final class PlayerCoordinator: ObservableObject {
                     self.record("stale autoplay-blocked event generation \(generation); expected \(self.queueState.expectedGeneration); rejected")
                     return
                 }
+                guard !self.playerError else { return }
                 self.status = "Playback blocked; press Play"
                 self.record(self.status)
             case .failure:
@@ -106,11 +147,13 @@ final class PlayerCoordinator: ObservableObject {
                 self.failOccurrence("player bridge or navigation failed")
             }
         }
-        player.start()
-        Task { [weak self] in
-            do { try await Task.sleep(nanoseconds: 15_000_000_000) } catch { return }
-            guard let self, self.startupGate.timeout() else { return }
-            self.failOccurrence("player startup timed out")
+        if testHooks == nil {
+            player.start()
+            Task { [weak self] in
+                do { try await Task.sleep(nanoseconds: 15_000_000_000) } catch { return }
+                guard let self, self.startupGate.timeout() else { return }
+                self.failOccurrence("player startup timed out")
+            }
         }
         let app = NotificationCenter.default
         for (name, label) in [(NSApplication.didBecomeActiveNotification, "app active"),
@@ -127,6 +170,7 @@ final class PlayerCoordinator: ObservableObject {
                 guard let self, let window = notification.object as? NSWindow, window === self.playerWindow else { return }
                 self.record("\(label); window \(window.windowNumber), occlusion-visible=\(window.occlusionState.contains(.visible)), miniaturized=\(window.isMiniaturized)")
                 if name == NSWindow.willCloseNotification {
+                    self.failStagedShuffledQueueIfNeeded()
                     self.mutationGate.invalidate()
                     if self.mutationGate.restartRequired { self.requireRestart("player operation interrupted by window close") }
                     self.windowOpen = false
@@ -168,7 +212,11 @@ final class PlayerCoordinator: ObservableObject {
         if state == 2 || state == 0 { intent.observe(false) }
         publishNowPlaying()
         refreshProgress()
-        status = "Playback: \([ -1: "Unstarted", 0: "Ended", 1: "Playing", 2: "Paused", 3: "Buffering", 5: "Cued" ][state] ?? "Unknown")"
+        if queueState.pending != nil {
+            status = isShuffledQueuePending ? "Loading shuffled queue…" : "Loading item…"
+        } else {
+            status = "Playback: \([ -1: "Unstarted", 0: "Ended", 1: "Playing", 2: "Paused", 3: "Buffering", 5: "Cued" ][state] ?? "Unknown")"
+        }
         record(status)
         if state == 1 { queueState.playing() }
         if state == 0 {
@@ -199,6 +247,7 @@ final class PlayerCoordinator: ObservableObject {
     // in-flight effect is invalidated and a restart is required. Late command
     // completions are rejected by their generation and lifecycle guards.
     private func failOccurrence(_ reason: String) {
+        failStagedShuffledQueueIfNeeded()
         mutationGate.invalidate()
         readinessGate.abandon()
         ready = false
@@ -220,9 +269,17 @@ final class PlayerCoordinator: ObservableObject {
     }
 
     private func mutationWatchdog(_ token: Int) -> Task<Void, Never> {
-        Task {
+        testHooks?.onMutationWatchdogArmed? { [weak self] in self?.mutationTimedOut(token) }
+        return Task {
             do { try await Task.sleep(nanoseconds: 10_000_000_000) } catch { return }
-            if mutationGate.timeout(token) { requireRestart("player mutation stalled") }
+            mutationTimedOut(token)
+        }
+    }
+
+    private func mutationTimedOut(_ token: Int) {
+        if mutationGate.timeout(token) {
+            if isShuffledQueuePending { failOccurrence("shuffled queue load stalled") }
+            else { requireRestart("player mutation stalled") }
         }
     }
 
@@ -238,23 +295,45 @@ final class PlayerCoordinator: ObservableObject {
     }
 
     func select(_ next: Int, reason: QueueState.Reason = .manual) {
+        beginLoad(next, reason: reason, stagedQueue: nil)
+    }
+
+    private func beginLoad(_ next: Int, reason: QueueState.Reason, stagedQueue: [Item]?) {
         guard !seekGate.seeking, !mutationInFlight, !recoveryRequired,
-              let request = queueState.request(next, reason: reason, allowed: windowOpen && (ready || (reason == .manual && playerError))) else {
+              stagedQueue == nil || canShuffleSampleQueue,
+              windowOpen && (ready || (reason == .manual && playerError)),
+              let token = mutationGate.begin() else {
             record("load rejected: \(reason.rawValue), target \(next + 1)"); return
+        }
+        // Acquire the mutation before reserving a generation; even a rejected
+        // request must release it without leaving a dangling pending load.
+        guard let request = queueState.request(next, reason: reason, allowed: true) else {
+            _ = mutationGate.finish(token, current: mutationContext)
+            record("load rejected: \(reason.rawValue), target \(next + 1)")
+            return
+        }
+        // A manual selection after an active player error creates a fresh
+        // generation; it does not replay or re-enable the failed occurrence.
+        playerError = false
+        if let stagedQueue {
+            stagedShuffledQueue = stagedQueue
+            failedShuffledQueue = false
+            isShuffledQueuePending = true
         }
         seekGate.invalidate()
         resetProgress()
+        status = stagedQueue == nil ? "Loading item…" : "Loading shuffled queue…"
         // The new occurrence is not ready yet; controls stay disabled until its
         // own ready callback names this generation.
         syncReady()
-        guard let token = mutationGate.begin() else { return }
         mutationInFlight = true
         let watchdog = mutationWatchdog(token)
         let readinessTicket = readinessGate.arm(generation: request.generation)
         let readinessTask = readinessTicket.map { readinessWatchdog($0, generation: request.generation) }
         let generation = windowGeneration
         publishNowPlaying()
-        record("load requested: \(reason.rawValue), target \(next + 1) \(queue[next].videoID), generation \(request.generation)")
+        let videoID = (stagedQueue ?? queue)[next].videoID
+        record("load requested: \(reason.rawValue), target \(next + 1) \(videoID), generation \(request.generation)")
         Task {
             defer {
                 watchdog.cancel()
@@ -262,17 +341,29 @@ final class PlayerCoordinator: ObservableObject {
                 mutationInFlight = false
                 publishNowPlaying()
                 if advance && windowOpen && ready && !recoveryRequired { advanceNaturally() }
+                testHooks?.onLoadFinished?()
             }
             guard windowOpen, generation == windowGeneration else { return }
             do {
                 // The request generation is strictly greater than every earlier
                 // occurrence, including retries and duplicate video IDs, so the
                 // bridge accepts it and tags this instance's callbacks with it.
-                try await player.load(videoID: queue[next].videoID, generation: request.generation)
+                if let testHooks { try await testHooks.load(videoID, request.generation) }
+                else { try await player.load(videoID: videoID, generation: request.generation) }
                 guard !recoveryRequired, windowOpen, generation == windowGeneration, queueState.pending?.generation == request.generation else { return }
                 let playingCandidate = queueState.hasBufferedPlaying
-                let buffered = queueState.complete(request, success: true)
+                var acceptedQueue = playbackQueue
+                let buffered = acceptedQueue.state.complete(request, success: true)
+                if let stagedQueue = stagedShuffledQueue {
+                    acceptedQueue.items = stagedQueue
+                }
+                // No suspension or separate @Published assignments between the
+                // new order and its accepted index/generation.
+                playbackQueue = acceptedQueue
+                discardStagedShuffledQueue()
+                failedShuffledQueue = false
                 syncReady()
+                status = ready ? "Player ready" : "Waiting for player"
                 progressEligible = playingCandidate && !buffered && ready && windowOpen
                 publishNowPlaying()
                 refreshProgress()
@@ -284,13 +375,16 @@ final class PlayerCoordinator: ObservableObject {
             } catch {
                 guard !recoveryRequired, windowOpen, generation == windowGeneration, queueState.pending?.generation == request.generation else { return }
                 readinessTask?.cancel()
-                _ = queueState.complete(request, success: false)
+                let failedShuffle = stagedShuffledQueue != nil
+                _ = queueState.complete(request, success: false, markFailedTarget: !failedShuffle)
                 // DirectPlayer advances its generation before evaluating the load,
                 // so a failed load leaves the previous instance untrusted and its
                 // controls must never re-enable. Fail closed: quarantine the
                 // pending occurrence like a pending error; there is no manual path
                 // that reuses the old occurrence.
-                failOccurrence("load command failed for generation \(request.generation); target marked failed (details redacted)")
+                failOccurrence(failedShuffle
+                    ? "shuffled queue load failed for generation \(request.generation) (details redacted)"
+                    : "load command failed for generation \(request.generation); target marked failed (details redacted)")
             }
         }
     }
@@ -298,10 +392,14 @@ final class PlayerCoordinator: ObservableObject {
     func play() { command("play", wantsPlayback: true) { generation in try await self.player.play(generation: generation) } }
     func pause() { command("pause", wantsPlayback: false) { generation in try await self.player.pause(generation: generation) } }
     func next() { select(queueState.nextTarget) }
-    var canTransport: Bool { ready && windowOpen && !recoveryRequired && !mutationInFlight && !seekGate.seeking && queueState.pending == nil }
-    var canNext: Bool { windowOpen && (ready || playerError) && !recoveryRequired && !mutationInFlight && !seekGate.seeking && queueState.pending == nil && queueState.nextTarget < queue.count }
+    var canTransport: Bool { ready && !playerError && windowOpen && !recoveryRequired && !mutationInFlight && !mutationGate.busy && !seekGate.seeking && queueState.pending == nil }
+    var canNext: Bool { windowOpen && (ready || playerError) && !recoveryRequired && !mutationInFlight && !mutationGate.busy && !seekGate.seeking && queueState.pending == nil && queueState.nextTarget < queue.count }
 
     var canShuffleUpcoming: Bool {
+        shuffleAdmission.allows(count: queue.count, index: index)
+    }
+
+    private var shuffleAdmission: UpcomingShuffleAdmission {
         UpcomingShuffleAdmission(
             ready: ready, windowOpen: windowOpen, recoveryRequired: recoveryRequired,
             playerError: playerError, pendingLoad: queueState.pending != nil || queueState.failedTarget != nil,
@@ -309,12 +407,32 @@ final class PlayerCoordinator: ObservableObject {
             deferredSeekEnd: deferredSeekEnd, readinessAwaiting: readinessGate.awaiting,
             restartRequired: mutationGate.restartRequired || readinessGate.restartRequired,
             progressInFlight: progressAdmission.inFlight
-        ).allows(count: queue.count, index: index)
+        )
     }
 
     func shuffleUpcoming() {
         guard canShuffleUpcoming else { return }
         queue = shuffledUpcoming(queue, after: index) { Double.random(in: 0..<1) }
+    }
+
+    var canShuffleSampleQueue: Bool {
+        !isShuffledQueuePending && shuffleAdmission.allowsSampleQueue(count: queue.count, index: index)
+    }
+
+    func shuffleSampleQueue() {
+        guard canShuffleSampleQueue else { return }
+        let staged = shuffledSampleQueue(queue) { testHooks?.draw() ?? Double.random(in: 0..<1) }
+        beginLoad(0, reason: .manual, stagedQueue: staged)
+    }
+
+    private func discardStagedShuffledQueue() {
+        stagedShuffledQueue = nil
+        if isShuffledQueuePending { isShuffledQueuePending = false }
+    }
+
+    private func failStagedShuffledQueueIfNeeded() {
+        if stagedShuffledQueue != nil { failedShuffledQueue = true }
+        discardStagedShuffledQueue()
     }
 
     var canSeek: Bool { canTransport && duration.isFinite && duration > 0 }
@@ -398,9 +516,16 @@ final class PlayerCoordinator: ObservableObject {
         Task {
             defer { progressAdmission.finish(id: ticket.id) }
             do {
-                let time = try await player.getCurrentTime(generation: occurrenceGeneration)
+                let time: Double
+                let length: Double
+                if let testHooks {
+                    (time, length) = try await testHooks.progress(occurrenceGeneration)
+                } else {
+                    time = try await player.getCurrentTime(generation: occurrenceGeneration)
+                    guard progressAdmission.isCurrent(id: ticket.id, generation: ticket.generation) else { return }
+                    length = try await player.getDuration(generation: occurrenceGeneration)
+                }
                 guard progressAdmission.isCurrent(id: ticket.id, generation: ticket.generation) else { return }
-                let length = try await player.getDuration(generation: occurrenceGeneration)
                 guard progressAdmission.isCurrent(id: ticket.id, generation: ticket.generation), ready, windowOpen, !recoveryRequired, progressEligible, queueState.pending == nil, !seekGate.seeking else { return }
                 guard let snapshot = ProgressSnapshot(elapsed: time, duration: length) else {
                     elapsed = 0; duration = 0; publishNowPlaying(); return
@@ -423,6 +548,7 @@ final class PlayerCoordinator: ObservableObject {
     }
 
     private func publishNowPlaying() {
+        guard testHooks == nil else { return }
         let center = MPRemoteCommandCenter.shared()
         let available = canTransport
         remoteEligibility.update(transport: available, next: canNext, seek: canSeek, window: windowGeneration, occurrence: occurrence)
@@ -432,7 +558,7 @@ final class PlayerCoordinator: ObservableObject {
         center.nextTrackCommand.isEnabled = canNext
         center.changePlaybackPositionCommand.isEnabled = canSeek
         let nowPlaying = MPNowPlayingInfoCenter.default()
-        guard ready && windowOpen else {
+        guard nowPlayingAvailable else {
             nowPlaying.nowPlayingInfo = nil
             nowPlaying.playbackState = .stopped
             return
@@ -448,6 +574,10 @@ final class PlayerCoordinator: ObservableObject {
         }
         nowPlaying.nowPlayingInfo = info
         nowPlaying.playbackState = observedPlaying ? .playing : .paused
+    }
+
+    var nowPlayingAvailable: Bool {
+        ready && !playerError && windowOpen && !recoveryRequired && queueState.pending == nil
     }
 
     private func setupRemoteCommands() {
@@ -500,12 +630,17 @@ final class PlayerCoordinator: ObservableObject {
 
     deinit {
         for (command, token) in remoteHandlers { command.removeTarget(token) }
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
-        MPNowPlayingInfoCenter.default().playbackState = .stopped
+        if testHooks == nil {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            MPNowPlayingInfoCenter.default().playbackState = .stopped
+        }
     }
 
     func attach(window: NSWindow) {
         guard playerWindow !== window else { return }
+        if isShuffledQueuePending {
+            failOccurrence("shuffled queue load interrupted by window replacement")
+        }
         playerWindow = window
         windowGeneration += 1
         windowOpen = true
