@@ -7,7 +7,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalPlaylist, LocalVideo } from "@/types/playlist";
 
@@ -24,6 +24,7 @@ const repositoryMocks = vi.hoisted(() => ({
 const shuffleMocks = vi.hoisted(() => ({
   shuffleVideos: vi.fn(),
 }));
+const player = vi.hoisted(() => ({ onEnd: undefined as undefined | ((video: { id: string; youtubeId: string; title: string; channelTitle: string; thumbnail: string; duration: number }) => void) }));
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ id: route.playlistId }),
@@ -51,7 +52,7 @@ vi.mock("@/lib/shuffle/shuffle-service", () => shuffleMocks);
 
 vi.mock("@/components/layouts/Navbar", () => ({ Navbar: () => null }));
 vi.mock("@/components/playlist/VideoPlayer", () => ({
-  VideoPlayer: () => null,
+  VideoPlayer: ({ onVideoEnd }: { onVideoEnd: typeof player.onEnd }) => { player.onEnd = onVideoEnd; return <div data-testid="video-player" />; },
 }));
 vi.mock("@/components/playlist/PlaybackControls", () => ({
   PlaybackControls: () => null,
@@ -100,8 +101,8 @@ vi.mock("@/components/ui/badge", () => ({
   Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
 vi.mock("@/components/ui/button", () => ({
-  Button: ({ children }: { children: React.ReactNode }) => (
-    <button type="button">{children}</button>
+  Button: ({ children, onClick, disabled }: { children: React.ReactNode; onClick?: React.MouseEventHandler<HTMLButtonElement>; disabled?: boolean }) => (
+    <button type="button" onClick={onClick} disabled={disabled}>{children}</button>
   ),
 }));
 vi.mock("@/components/ui/skeleton", () => ({ Skeleton: () => null }));
@@ -201,6 +202,7 @@ beforeEach(() => {
   repositoryMocks.getCompletedVideoIds.mockReset();
   repositoryMocks.recordPlay.mockReset();
   shuffleMocks.shuffleVideos.mockReset();
+  player.onEnd = undefined;
 
   repositoryMocks.getPlaylist.mockImplementation(async (id: string) => {
     if (id === "playlist-a") return bundleA;
@@ -218,10 +220,181 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  onlineManager.setOnline(true);
   usePlayerStore.getState().clearQueue();
 });
 
 describe("playlist shuffle request identity", () => {
+  it("reads and shuffles locally while offline without a matching queue", async () => {
+    onlineManager.setOnline(false);
+    renderPage();
+    await waitFor(() => expect(usePlayerStore.getState().playlistId).toBe("playlist-a"));
+    expect(usePlayerStore.getState().queue.map((video) => video.id)).toEqual(["a1", "a2"]);
+    expect(repositoryMocks.getPlaylist).toHaveBeenCalledWith("playlist-a");
+    expect(shuffleMocks.shuffleVideos).toHaveBeenCalledTimes(1);
+    expect(repositoryMocks.getCompletedVideoIds).not.toHaveBeenCalled();
+    expect(repositoryMocks.recordPlay).not.toHaveBeenCalled();
+    expect(screen.getByTestId("video-player")).toBeTruthy();
+  });
+  it("shares the initial verification under Strict Mode", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: 300000, retry: false } } });
+    client.setQueryData(["playlist", "playlist-a"], bundleA);
+    const pending = deferred<typeof bundleA>();
+    repositoryMocks.getPlaylist.mockReturnValueOnce(pending.promise);
+    render(<React.StrictMode>{pageElement(client)}</React.StrictMode>);
+    await waitFor(() => expect(repositoryMocks.getPlaylist).toHaveBeenCalledTimes(1));
+    await act(async () => { pending.resolve(bundleA); });
+    await screen.findByText("Playlist A");
+    expect(repositoryMocks.getPlaylist).toHaveBeenCalledTimes(1);
+  });
+
+  it("revalidates fresh cached B after an in-place route change before enabling playback", async () => {
+    usePlayerStore.getState().setQueue([videoB1], "playlist-b", "Playlist B");
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: 300000, retry: false } } });
+    client.setQueryData(["playlist", "playlist-b"], bundleB);
+    const pending = deferred<typeof bundleB>();
+    repositoryMocks.getPlaylist.mockImplementation((id: string) => id === "playlist-b" ? pending.promise : Promise.resolve(bundleA));
+    const { view } = renderPage(client);
+    await screen.findByText("Playlist A");
+    route.playlistId = "playlist-b";
+    view.rerender(pageElement(client));
+    await waitFor(() => expect(repositoryMocks.getPlaylist).toHaveBeenCalledWith("playlist-b"));
+    expect(screen.queryByTestId("video-player")).toBeNull();
+    await act(async () => { pending.resolve(bundleB); });
+    await screen.findByTestId("video-player");
+  });
+
+  it("does not claim cached null is not found before route verification", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: 300000, retry: false } } });
+    client.setQueryData(["playlist", "playlist-a"], null);
+    const pending = deferred<typeof bundleA | null>();
+    repositoryMocks.getPlaylist.mockReturnValueOnce(pending.promise);
+    renderPage(client);
+    expect(screen.queryByText("Playlist not found")).toBeNull();
+    await act(async () => { pending.resolve(null); });
+    await screen.findByText("Playlist not found");
+  });
+
+  it("records healthy completions but ignores the same callback after direct unmount", async () => {
+    usePlayerStore.getState().setQueue([videoA1], "playlist-a", "Playlist A");
+    const { view } = renderPage();
+    await screen.findByTestId("video-player");
+    const onEnd = player.onEnd!;
+    act(() => onEnd(videoA1));
+    await waitFor(() => expect(repositoryMocks.recordPlay).toHaveBeenCalledTimes(1));
+    view.unmount();
+    act(() => onEnd(videoA1));
+    expect(repositoryMocks.recordPlay).toHaveBeenCalledTimes(1);
+  });
+
+  it("revalidates a fresh cached detail before mounting playback, including offline", async () => {
+    usePlayerStore.getState().setQueue([videoA1], "playlist-a", "Playlist A");
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: 300000, retry: false } } });
+    client.setQueryData(["playlist", "playlist-a"], bundleA);
+    const pending = deferred<typeof bundleA>();
+    repositoryMocks.getPlaylist.mockReturnValueOnce(pending.promise);
+    onlineManager.setOnline(false);
+    renderPage(client);
+    expect(screen.queryByTestId("video-player")).toBeNull();
+    await waitFor(() => expect(repositoryMocks.getPlaylist).toHaveBeenCalledWith("playlist-a"));
+    await act(async () => { pending.resolve(bundleA); });
+    await screen.findByTestId("video-player");
+  });
+
+  it("keeps the same player mounted during a healthy background refetch", async () => {
+    usePlayerStore.getState().setQueue([videoA1], "playlist-a", "Playlist A");
+    const { client } = renderPage();
+    const original = await screen.findByTestId("video-player");
+    const pending = deferred<typeof bundleA>();
+    repositoryMocks.getPlaylist.mockReturnValueOnce(pending.promise);
+    act(() => { void client.refetchQueries({ queryKey: ["playlist", "playlist-a"] }); });
+    await waitFor(() => expect(client.isFetching()).toBe(1));
+    expect(screen.getByTestId("video-player")).toBe(original);
+    await act(async () => { pending.resolve(bundleA); });
+    expect(screen.getByTestId("video-player")).toBe(original);
+  });
+
+  it("ignores captured completion callbacks after a read error and unmount", async () => {
+    usePlayerStore.getState().setQueue([videoA1], "playlist-a", "Playlist A");
+    const { client, view } = renderPage();
+    await screen.findByTestId("video-player");
+    const onEnd = player.onEnd!;
+    repositoryMocks.getPlaylist.mockRejectedValueOnce(new Error("read failed"));
+    await act(async () => { await client.refetchQueries({ queryKey: ["playlist", "playlist-a"] }); });
+    await screen.findByRole("alert");
+    act(() => onEnd(videoA1));
+    view.unmount();
+    act(() => onEnd(videoA1));
+    expect(repositoryMocks.recordPlay).not.toHaveBeenCalled();
+  });
+
+  it("keeps an intentionally emptied queue visible without reshuffling", async () => {
+    usePlayerStore.getState().setQueue([videoA1], "playlist-a", "Playlist A");
+    renderPage();
+    await screen.findByTestId("video-player");
+    act(() => usePlayerStore.getState().removeFromQueue(0));
+    expect(screen.getByTestId("video-player")).toBeTruthy();
+    expect(screen.getByText("Queue")).toBeTruthy();
+    expect(screen.queryByText("Preparing this playlist for playback.")).toBeNull();
+    expect(shuffleMocks.shuffleVideos).not.toHaveBeenCalled();
+  });
+  it("attempts an offline local read and does not claim not found before it completes", async () => {
+    const pending = deferred<typeof bundleA | null>();
+    repositoryMocks.getPlaylist.mockReturnValueOnce(pending.promise);
+    onlineManager.setOnline(false);
+    renderPage();
+    await waitFor(() => expect(repositoryMocks.getPlaylist).toHaveBeenCalledWith("playlist-a"));
+    expect(screen.queryByText("Playlist not found")).toBeNull();
+    expect(screen.queryByText("This playlist has no videos")).toBeNull();
+    await act(async () => { pending.resolve(null); });
+    expect(await screen.findByText("Playlist not found")).toBeTruthy();
+  });
+  it("keeps another playlist's queue untouched and player unmounted when a cached read fails", async () => {
+    usePlayerStore.getState().setQueue([videoA1], "playlist-a", "Playlist A");
+    route.playlistId = "playlist-b";
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 300000, gcTime: Infinity } } });
+    client.setQueryData(["playlist", "playlist-b"], bundleB);
+    repositoryMocks.getPlaylist.mockRejectedValue(new Error("secret database error"));
+    renderPage(client);
+    await screen.findByRole("alert");
+    expect(screen.getByText("Playlist B")).toBeTruthy();
+    expect(screen.queryByTestId("video-player")).toBeNull();
+    expect(repositoryMocks.getPlaylist).toHaveBeenCalledWith("playlist-b");
+    expect(screen.queryByText(/secret database error/)).toBeNull();
+    expect(usePlayerStore.getState().playlistId).toBe("playlist-a");
+    expect(repositoryMocks.recordPlay).not.toHaveBeenCalled();
+  });
+
+  it("does not mount another playlist's queue while replacement shuffle is pending", async () => {
+    usePlayerStore.getState().setQueue([videoA1], "playlist-a", "Playlist A");
+    route.playlistId = "playlist-b";
+    const pending = deferred<LocalVideo[]>();
+    shuffleMocks.shuffleVideos.mockReturnValue(pending.promise);
+    renderPage();
+    await screen.findByText("Playlist B");
+    await waitFor(() => expect(shuffleMocks.shuffleVideos).toHaveBeenCalled());
+    expect(screen.queryByTestId("video-player")).toBeNull();
+    expect(usePlayerStore.getState().playlistId).toBe("playlist-a");
+  });
+
+  it("invalidates a pending shuffle on read failure and retries automatically after recovery", async () => {
+    const pending = deferred<LocalVideo[]>();
+    shuffleMocks.shuffleVideos.mockReturnValueOnce(pending.promise).mockImplementation((videos: LocalVideo[]) => videos);
+    const { client } = renderPage();
+    await screen.findByText("Playlist A");
+    await waitFor(() => expect(shuffleMocks.shuffleVideos).toHaveBeenCalledTimes(1));
+    repositoryMocks.getPlaylist.mockRejectedValueOnce(new Error("private detail"));
+    await act(async () => { await client.refetchQueries({ queryKey: ["playlist", "playlist-a"] }); });
+    await screen.findByRole("alert");
+    await act(async () => { pending.resolve([videoA2]); });
+    expect(usePlayerStore.getState().queue).toEqual([]);
+    repositoryMocks.getPlaylist.mockResolvedValueOnce(bundleA);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(usePlayerStore.getState().queue.map((v) => v.id)).toEqual(["a1", "a2"]));
+    expect(shuffleMocks.shuffleVideos).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText(/private detail/)).toBeNull();
+  });
+
   it("keeps the remounted playlist queue when an unmounted playlist's deferred watched lookup finishes later", async () => {
     usePlayerStore.getState().setQueue([videoA1], "playlist-a", "Playlist A");
 
@@ -292,9 +465,7 @@ describe("playlist shuffle request identity", () => {
 
     const { client, view } = renderPage();
     await screen.findByText("Playlist A");
-    await waitFor(() =>
-      expect(shuffleMocks.shuffleVideos).toHaveBeenCalledTimes(1),
-    );
+    await waitFor(() => expect(shuffleMocks.shuffleVideos).toHaveBeenCalledTimes(1));
 
     route.playlistId = "playlist-b";
     view.rerender(pageElement(client));
@@ -582,10 +753,8 @@ describe("playlist shuffle request identity", () => {
 
     const { view } = renderPage();
     await screen.findByText("Playlist A");
-    await waitFor(() =>
-      expect(shuffleMocks.shuffleVideos).toHaveBeenCalledTimes(1),
-    );
     await settle();
+    expect(shuffleMocks.shuffleVideos).not.toHaveBeenCalled();
 
     expect(usePlayerStore.getState().queue).toEqual([]);
     expect(toastMocks.success).not.toHaveBeenCalled();

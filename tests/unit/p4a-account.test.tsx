@@ -6,6 +6,19 @@ import { responseError } from "@/lib/services/account-client";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
 
+it("allows sign-out while local library actions are read-only", async () => {
+  const fetchMock = vi.fn().mockResolvedValueOnce(Response.json({ links: [{ youtubePlaylistId: "PL1234567890", createdAt: "today" }] }))
+    .mockResolvedValueOnce(Response.json({ csrfToken: "token" }))
+    .mockResolvedValueOnce(new Response(null, { status: 204 }));
+  vi.stubGlobal("fetch", fetchMock);
+  render(<AccountPanel appOrigin={window.location.origin} readOnly />);
+  const unlink = await screen.findByRole("button", { name: /Remove saved link/ });
+  expect((unlink as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+  await screen.findByText(/Signed out. Your local library/);
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+});
+
 it("shows a fixed sign-in failure even when an existing session loads", async () => {
   window.history.replaceState(null, "", "/dashboard?auth_result=failed");
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ links: [] })));

@@ -20,9 +20,14 @@ import type { LocalPlaylist } from "@/types/playlist";
 interface PlaylistCardProps {
   playlist: LocalPlaylist;
   onDelete: (id: string) => void;
+  readOnly?: boolean;
 }
 
-export function PlaylistCard({ playlist, onDelete }: PlaylistCardProps) {
+export function PlaylistCard({ playlist, onDelete, readOnly = false }: PlaylistCardProps) {
+  return <PlaylistCardContent key={readOnly ? "read-only" : "editable"} playlist={playlist} onDelete={onDelete} readOnly={readOnly} />;
+}
+
+function PlaylistCardContent({ playlist, onDelete, readOnly = false }: PlaylistCardProps) {
   const hideThumbnails = useUiPreferencesStore((state) => state.hideThumbnails);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -59,19 +64,19 @@ export function PlaylistCard({ playlist, onDelete }: PlaylistCardProps) {
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <Link
+            {readOnly ? <span className="line-clamp-2 font-semibold tracking-tight text-white/75">{playlist.title}</span> : <Link
               href={`/playlist/${playlist.id}`}
               className="line-clamp-2 font-semibold tracking-tight text-white hover:text-white/80"
             >
               {playlist.title}
-            </Link>
+            </Link>}
             {playlist.channelTitle && (
               <p className="mt-1 text-sm text-white/50">
                 {playlist.channelTitle}
               </p>
             )}
           </div>
-          <DropdownMenu>
+          {!readOnly && <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
@@ -101,10 +106,10 @@ export function PlaylistCard({ playlist, onDelete }: PlaylistCardProps) {
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+          </DropdownMenu>}
         </div>
 
-        <div className="mt-3 flex items-center gap-2">
+        {!readOnly && <div className="mt-3 flex items-center gap-2">
           <Link href={`/playlist/${playlist.id}`} className="flex-1">
             <Button
               size="sm"
@@ -114,10 +119,10 @@ export function PlaylistCard({ playlist, onDelete }: PlaylistCardProps) {
               Shuffle & Play
             </Button>
           </Link>
-        </div>
+        </div>}
       </CardContent>
     </Card>
-    <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+    <Dialog open={confirmDelete && !readOnly} onOpenChange={setConfirmDelete}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Delete this playlist?</DialogTitle>
@@ -127,7 +132,7 @@ export function PlaylistCard({ playlist, onDelete }: PlaylistCardProps) {
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-          <Button className="bg-red-700 text-white hover:bg-red-600" onClick={() => { setConfirmDelete(false); onDelete(playlist.id); }}>Delete playlist</Button>
+          <Button className="bg-red-700 text-white hover:bg-red-600" onClick={() => { setConfirmDelete(false); if (!readOnly) onDelete(playlist.id); }}>Delete playlist</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -21,12 +21,14 @@ interface ImportPlaylistModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  readOnly?: boolean;
 }
 
 export function ImportPlaylistModal({
   open,
   onOpenChange,
   onSuccess,
+  readOnly = false,
 }: ImportPlaylistModalProps) {
   const [url, setUrl] = useState("");
 
@@ -48,7 +50,7 @@ export function ImportPlaylistModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) return;
+    if (readOnly || !url.trim()) return;
     importMutation.mutate(url.trim());
   };
 
@@ -63,6 +65,7 @@ export function ImportPlaylistModal({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
+          {readOnly && <p role="status" className="mt-3 text-sm text-amber-100">Import is unavailable while your library cannot be read. Your draft is still here.</p>}
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="playlist-url">Playlist URL</Label>
@@ -95,7 +98,7 @@ export function ImportPlaylistModal({
             <Button
               type="submit"
               className="bg-white text-black hover:bg-white/90"
-              disabled={!url.trim() || importMutation.isPending}
+              disabled={readOnly || !url.trim() || importMutation.isPending}
             >
               {importMutation.isPending ? (
                 <>

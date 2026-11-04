@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { playlistRepository } from "@/stores/playlist-store";
 import { PlaylistCard } from "@/components/playlist/PlaylistCard";
 import { ImportPlaylistModal } from "@/components/playlist/ImportPlaylistModal";
@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { useUiPreferencesStore } from "@/stores/ui-preferences-store";
 import { AccountPanel } from "@/components/playlist/AccountPanel";
 import { ExportLibrary } from "./ExportLibrary";
+import { QueryReadError } from "@/components/QueryReadError";
 
 const Navbar = dynamic(
   () => import("@/components/layouts/Navbar").then((module) => module.Navbar),
@@ -27,18 +28,32 @@ const Navbar = dynamic(
 
 export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const retryFocusRef = useRef(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const queryClient = useQueryClient();
   const { hideThumbnails, toggleHideThumbnails } = useUiPreferencesStore();
 
   const playlistsQuery = useQuery({
     queryKey: ["playlists"],
     queryFn: () => playlistRepository.listPlaylists(),
+    networkMode: "always",
+    refetchOnMount: "always",
   });
+  const showReadError = playlistsQuery.isError || (playlistsQuery.isPending && playlistsQuery.errorUpdatedAt > 0);
+  const readOnly = showReadError || !playlistsQuery.isFetchedAfterMount || playlistsQuery.isPaused;
+  useEffect(() => {
+    if (retryFocusRef.current && playlistsQuery.isSuccess && !showReadError) {
+      retryFocusRef.current = false;
+      headingRef.current?.focus();
+    }
+  }, [playlistsQuery.isSuccess, showReadError]);
 
   const deleteMutation = useMutation({
+    networkMode: "always",
     mutationFn: (id: string) => playlistRepository.deletePlaylist(id),
-    onSuccess: () => {
+    onSuccess: (_result, id) => {
       toast.success("Playlist deleted");
+      queryClient.removeQueries({ queryKey: ["playlist", id], exact: true });
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -59,12 +74,16 @@ export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.25em] text-white/40">
                 Your library
               </p>
-              <h1 className="text-3xl font-black tracking-tight md:text-5xl">
+              <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-black tracking-tight md:text-5xl">
                 My Playlists
               </h1>
               <div className="mt-2 text-white/55">
-                {playlistsQuery.isLoading ? (
+                {playlistsQuery.isPending ? (
                   <Skeleton className="inline-block h-4 w-32" />
+                ) : playlistsQuery.isError ? (
+                  "Library unavailable"
+                ) : readOnly ? (
+                  "Checking your library…"
                 ) : (
                   `${playlists.length} playlists ready to shuffle`
                 )}
@@ -80,21 +99,25 @@ export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
                 <ImageOff className="mr-2 h-4 w-4" />
                 {hideThumbnails ? "Show artwork" : "No artwork"}
               </Button>
-              <Button
+              {!readOnly && <Button
                 onClick={() => setImportModalOpen(true)}
                 className="rounded-full bg-white text-black hover:bg-white/90"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Import Playlist
-              </Button>
+              </Button>}
             </div>
           </div>
 
-          <AccountPanel appOrigin={appOrigin} />
+          <AccountPanel appOrigin={appOrigin} readOnly={readOnly} />
+
+          {showReadError && (
+            <QueryReadError subject="library" stale={playlists.length > 0} onRetry={() => { retryFocusRef.current = true; void playlistsQuery.refetch(); }} isFetching={playlistsQuery.isFetching} />
+          )}
 
           {/* Playlists Grid */}
-          {playlistsQuery.isLoading ? (
-            <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {playlistsQuery.isPending ? (
+            <div role="status" aria-label={playlistsQuery.isPaused ? "Waiting to load your library" : "Loading your library"} className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {[1, 2, 3].map((i) => (
                 <Card
                   key={i}
@@ -109,7 +132,7 @@ export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
                 </Card>
               ))}
             </div>
-          ) : playlists.length === 0 ? (
+          ) : readOnly && playlists.length === 0 ? (showReadError ? null : <p role="status" className="mt-8 text-white/70">Waiting to read your library.</p>) : playlists.length === 0 ? (
             <Card className="mt-12 overflow-hidden rounded-[2rem] border-dashed border-white/15 bg-white/[0.055] text-white shadow-2xl shadow-black/30 backdrop-blur-xl">
               <CardContent className="flex flex-col items-center justify-center py-16">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
@@ -135,7 +158,8 @@ export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
                 <PlaylistCard
                   key={playlist.id}
                   playlist={playlist}
-                  onDelete={(id) => deleteMutation.mutate(id)}
+                  readOnly={readOnly}
+                  onDelete={(id) => { if (!readOnly) deleteMutation.mutate(id); }}
                 />
               ))}
             </div>
@@ -145,6 +169,7 @@ export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
 
       <ImportPlaylistModal
         open={importModalOpen}
+        readOnly={readOnly}
         onOpenChange={setImportModalOpen}
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ["playlists"] });

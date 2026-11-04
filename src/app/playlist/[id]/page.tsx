@@ -24,6 +24,7 @@ import { usePlayerStore, type VideoItem } from "@/stores/player-store";
 import { playlistRepository, type LocalPlaylistBundle } from "@/stores/playlist-store";
 import { useUiPreferencesStore } from "@/stores/ui-preferences-store";
 import type { ShufflePreset } from "@/types/playlist";
+import { QueryReadError } from "@/components/QueryReadError";
 
 interface ShuffleInvocation {
   requestId: number;
@@ -73,11 +74,14 @@ function ListeningView({
 export default function PlaylistPage() {
   const params = useParams();
   const playlistId = params.id as string;
+  return <PlaylistView key={playlistId} playlistId={playlistId} />;
+}
 
+function PlaylistView({ playlistId }: { playlistId: string }) {
   const [shufflePreset, setShufflePreset] = useState<ShufflePreset>("RANDOM");
   const [excludeWatched, setExcludeWatched] = useState(false);
 
-  const { setQueue, currentVideo, queue, currentIndex } = usePlayerStore();
+  const { setQueue, currentVideo, queue, currentIndex, playlistId: queuePlaylistId } = usePlayerStore();
   const { focusMode, hideThumbnails } = useUiPreferencesStore();
 
   // Hook-level mutation callbacks can run after unmount or a route change.
@@ -86,6 +90,10 @@ export default function PlaylistPage() {
   const shuffleRequestIdRef = useRef(0);
   const mountedRef = useRef(false);
   const routePlaylistIdRef = useRef(playlistId);
+  const autoShuffleKeyRef = useRef<string | null>(null);
+  const canUsePlaylistRef = useRef(false);
+  const retryFocusRef = useRef(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     mountedRef.current = true;
@@ -95,16 +103,19 @@ export default function PlaylistPage() {
       // Any request from the previous route is stale even if navigation
       // returns to the same playlist before the request settles.
       shuffleRequestIdRef.current += 1;
+      autoShuffleKeyRef.current = null;
     }
 
     return () => {
       mountedRef.current = false;
+      canUsePlaylistRef.current = false;
     };
   }, [playlistId]);
 
   const isCurrentShuffle = useCallback(
     (request: ShuffleInvocation) =>
       mountedRef.current &&
+      canUsePlaylistRef.current &&
       routePlaylistIdRef.current === request.routePlaylistId &&
       request.bundle.playlist.id === routePlaylistIdRef.current &&
       request.requestId === shuffleRequestIdRef.current,
@@ -114,10 +125,29 @@ export default function PlaylistPage() {
   const playlistQuery = useQuery({
     queryKey: ["playlist", playlistId],
     queryFn: () => playlistRepository.getPlaylist(playlistId),
+    networkMode: "always",
     enabled: Boolean(playlistId),
+    refetchOnMount: "always",
   });
+  const showReadError = playlistQuery.isError || (playlistQuery.isPending && playlistQuery.errorUpdatedAt > 0);
+  useEffect(() => {
+    if (retryFocusRef.current && playlistQuery.isSuccess && !showReadError) {
+      retryFocusRef.current = false;
+      contentRef.current?.focus();
+    }
+  }, [playlistQuery.isSuccess, showReadError]);
+
+  const canUsePlaylist = playlistQuery.isSuccess && playlistQuery.isFetchedAfterMount && playlistQuery.data?.playlist.id === playlistId;
+  useLayoutEffect(() => {
+    canUsePlaylistRef.current = canUsePlaylist;
+    if (!canUsePlaylist) {
+      shuffleRequestIdRef.current += 1;
+      autoShuffleKeyRef.current = null;
+    }
+  }, [canUsePlaylist, playlistId]);
 
   const shuffleMutation = useMutation({
+    networkMode: "always",
     mutationFn: async ({
       bundle,
       preset,
@@ -175,7 +205,7 @@ export default function PlaylistPage() {
       setShufflePreset(preset);
 
       const bundle = playlistQuery.data;
-      if (!bundle || routePlaylistIdRef.current !== playlistId) return;
+      if (!bundle || !canUsePlaylistRef.current || bundle.playlist.id !== playlistId || routePlaylistIdRef.current !== playlistId) return;
 
       shuffleMutation.mutate({
         requestId: ++shuffleRequestIdRef.current,
@@ -190,7 +220,7 @@ export default function PlaylistPage() {
 
   const handleVideoEnd = useCallback(
     (video: VideoItem) => {
-      if (playlistId) {
+      if (mountedRef.current && canUsePlaylistRef.current && routePlaylistIdRef.current === playlistId && usePlayerStore.getState().playlistId === playlistId) {
         recordPlayMutation.mutate({
           playlistId,
           videoId: video.id,
@@ -203,19 +233,21 @@ export default function PlaylistPage() {
 
   // Auto-shuffle on first load
   useEffect(() => {
-    if (playlistQuery.data && playlistQuery.data.videos.length > 0) {
+    if (canUsePlaylist && playlistQuery.data && playlistQuery.data.videos.length > 0) {
       const playlist = playlistQuery.data.playlist;
-      const { playlistId: currentPlaylistId, queue } =
+      const { playlistId: currentPlaylistId } =
         usePlayerStore.getState();
 
-      if (currentPlaylistId === playlist.id && queue.length > 0) {
+      if (currentPlaylistId === playlist.id) {
         return;
       }
 
+      if (autoShuffleKeyRef.current === playlist.id) return;
+      autoShuffleKeyRef.current = playlist.id;
       handleShuffle("RANDOM");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playlistQuery.data?.playlist.id]);
+  }, [playlistQuery.data?.playlist.id, canUsePlaylist]);
 
   const playlist = playlistQuery.data?.playlist;
   const listeningView = focusMode || hideThumbnails;
@@ -224,8 +256,9 @@ export default function PlaylistPage() {
     listeningView && "aspect-auto min-h-64",
     listeningView && !hideThumbnails && "min-h-[336px]",
   );
+  const playerReady = canUsePlaylist && queuePlaylistId === playlistId;
   const showAmbientThumbnail = Boolean(
-    currentVideo?.thumbnail && !hideThumbnails,
+    playerReady && currentVideo?.thumbnail && !hideThumbnails,
   );
 
   return (
@@ -245,7 +278,7 @@ export default function PlaylistPage() {
           <div className="absolute inset-0 bg-gradient-to-b from-[#080807]/10 via-[#080807]/75 to-[#080807]" />
         </div>
 
-        <div className="relative mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
+        <div ref={contentRef} tabIndex={-1} className="relative mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-center gap-4">
             <Link href="/dashboard">
               <Button
@@ -257,7 +290,7 @@ export default function PlaylistPage() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            {playlistQuery.isLoading ? (
+            {playlistQuery.isPending || (!playlistQuery.isError && !playlistQuery.isFetchedAfterMount) ? (
               <div>
                 <Skeleton className="h-7 w-48 max-w-full bg-white/10 sm:w-64" />
                 <Skeleton className="mt-1 h-4 w-40 bg-white/10" />
@@ -271,8 +304,9 @@ export default function PlaylistPage() {
                   {playlist.channelTitle && (
                     <span>{playlist.channelTitle}</span>
                   )}
-                  <span>·</span>
-                  <span>{playlistQuery.data?.videos.length ?? 0} videos</span>
+                  {(!playlistQuery.isError || (playlistQuery.data?.videos.length ?? 0) > 0) && (
+                    <><span>·</span><span>{playlistQuery.data?.videos.length ?? 0} videos</span></>
+                  )}
                   <a
                     href={`https://youtube.com/playlist?list=${playlist.youtubeId}`}
                     target="_blank"
@@ -284,6 +318,8 @@ export default function PlaylistPage() {
                   </a>
                 </div>
               </div>
+            ) : playlistQuery.isError ? (
+              <h1 className="text-2xl font-bold">Playlist unavailable</h1>
             ) : (
               <div>
                 <h1 className="text-2xl font-bold">Playlist not found</h1>
@@ -291,8 +327,12 @@ export default function PlaylistPage() {
             )}
           </div>
 
-          {playlistQuery.isLoading ? (
-            <div className="grid gap-6 lg:grid-cols-3">
+          {showReadError && (
+            <QueryReadError subject="playlist" stale={Boolean(playlist)} onRetry={() => { retryFocusRef.current = true; void playlistQuery.refetch(); }} isFetching={playlistQuery.isFetching} />
+          )}
+
+          {playlistQuery.isPending || (!playlistQuery.isError && !playlistQuery.isFetchedAfterMount) ? (
+            <div role="status" aria-label={playlistQuery.isPaused ? "Waiting to load your playlist" : "Loading your playlist"} className="grid gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2">
                 <Skeleton className="aspect-video w-full rounded-3xl bg-white/10" />
               </div>
@@ -300,7 +340,7 @@ export default function PlaylistPage() {
                 <Skeleton className="h-[500px] rounded-3xl bg-white/10" />
               </div>
             </div>
-          ) : playlist && (playlistQuery.data?.videos.length ?? 0) > 0 ? (
+          ) : canUsePlaylist && playlist && (playlistQuery.data?.videos.length ?? 0) > 0 && playerReady ? (
             <>
               <div
                 className={cn(
@@ -382,7 +422,12 @@ export default function PlaylistPage() {
                 videos={playlistQuery.data?.videos ?? []}
               />
             </>
-          ) : playlist ? (
+          ) : canUsePlaylist && playlist && (playlistQuery.data?.videos.length ?? 0) > 0 ? (
+            <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-6">
+              <p role="status" className="mb-4 text-white/70">Preparing this playlist for playback.</p>
+              <ShuffleControls currentPreset={shufflePreset} excludeWatched={excludeWatched} onShuffle={handleShuffle} onExcludeWatchedChange={setExcludeWatched} isShuffling={shuffleMutation.isPending} />
+            </div>
+          ) : canUsePlaylist && playlist ? (
             <div className="flex flex-col items-center justify-center rounded-[2rem] border border-white/10 bg-white/[0.045] py-20 text-center shadow-2xl shadow-black/30 backdrop-blur">
               <Music className="mb-4 h-12 w-12 text-white/45" />
               <h2 className="text-xl font-semibold">
@@ -400,6 +445,10 @@ export default function PlaylistPage() {
                 </Button>
               </Link>
             </div>
+          ) : !showReadError && playlistQuery.isSuccess && playlist ? (
+            <p role="status" className="rounded-3xl border border-white/10 bg-white/[0.045] p-6 text-white/70">
+              {playlistQuery.isPaused ? "Waiting to read this playlist." : "Checking this playlist…"}
+            </p>
           ) : null}
         </div>
       </main>

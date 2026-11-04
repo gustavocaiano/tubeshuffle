@@ -6,7 +6,7 @@ import { AccountError, getCsrf, responseError, safeAccountMessage } from "@/lib/
 type Link = { youtubePlaylistId: string; createdAt: string };
 type Status = "loading" | "signed-out" | "denied" | "ready" | "error";
 
-export function AccountPanel({ appOrigin }: { appOrigin: string }) {
+export function AccountPanel({ appOrigin, readOnly = false }: { appOrigin: string; readOnly?: boolean }) {
   const [status, setStatus] = useState<Status>("loading");
   const [links, setLinks] = useState<Link[]>([]);
   const [value, setValue] = useState("");
@@ -59,7 +59,7 @@ export function AccountPanel({ appOrigin }: { appOrigin: string }) {
   }, []);
 
   function signIn(event: FormEvent<HTMLFormElement>) {
-    if (signingOutRef.current || actionRef.current) { event.preventDefault(); return; }
+    if (readOnly || signingOutRef.current || actionRef.current) { event.preventDefault(); return; }
     actionRef.current = true;
     signingInRef.current = true;
     setBusy(true); setMessage(""); setSignInFailed(false);
@@ -85,7 +85,7 @@ export function AccountPanel({ appOrigin }: { appOrigin: string }) {
   }
 
   async function changeLink(id: string, remove: boolean) {
-    if (signingOutRef.current || actionRef.current) return;
+    if (readOnly || signingOutRef.current || actionRef.current) return;
     actionRef.current = true;
     const current = generation.current;
     controller.current?.abort();
@@ -113,22 +113,24 @@ export function AccountPanel({ appOrigin }: { appOrigin: string }) {
 
   const button = "rounded-full border border-white/20 px-4 py-2 text-sm font-semibold transition hover:bg-white/10 disabled:opacity-40";
   return <section aria-labelledby="account-heading" className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.045] p-6 text-white">
+    <div>
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-200/60">Account</p><h2 id="account-heading" className="mt-2 text-xl font-bold">Saved playlist links</h2><p className="mt-1 max-w-xl text-sm text-white/55">Only links you choose to save are kept in your account. Playlist contents and listening history stay on this device.</p></div>
-      <div className="flex flex-wrap gap-2">{status === "signed-out" || status === "error" ? <form action="/api/auth/start" method="get" target="_self" onSubmit={signIn}><button type="submit" className={button} disabled={busy}>Sign in with Google</button></form> : null}{status === "ready" || status === "denied" || status === "error" || (status === "signed-out" && message.includes("could not be confirmed")) ? <button type="button" className={button} disabled={signingOut} onClick={signOut}>Sign out</button> : null}</div>
+      <div className="flex flex-wrap gap-2">{status === "signed-out" || status === "error" ? <form action="/api/auth/start" method="get" target="_self" onSubmit={signIn}><button type="submit" className={button} disabled={busy || readOnly}>Sign in with Google</button></form> : null}{status === "ready" || status === "denied" || status === "error" || (status === "signed-out" && message.includes("could not be confirmed")) ? <button type="button" className={button} disabled={signingOut} onClick={signOut}>Sign out</button> : null}</div>
     </div>
     {status === "loading" && <p className="mt-4 text-sm text-white/55" role="status">Checking account…</p>}
     {status === "denied" && <p className="mt-4 text-sm text-amber-100">This Google account is not authorized. Sign out and try another account.</p>}
     {signInFailed && <p className="mt-4 text-sm text-amber-100" role="status">Sign-in could not be completed. Please try again. If you are already signed in, sign out first to try another account.</p>}
     {message && status !== "denied" && <p className="mt-4 text-sm text-amber-100" role="status">{message}</p>}
-    {status === "error" && <button type="button" className={`${button} mt-4`} disabled={signingOut} onClick={() => void load()}>Retry account</button>}
+    {status === "error" && <button type="button" className={`${button} mt-4`} disabled={signingOut || readOnly} onClick={() => void load()}>Retry account</button>}
     {status === "ready" && <div className="mt-5 border-t border-white/10 pt-5">
       <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); if (value.trim()) void changeLink(value, false); }}>
-        <label htmlFor="account-link" className="sr-only">YouTube playlist link or ID</label><input id="account-link" value={value} onChange={(event) => setValue(event.target.value)} placeholder="YouTube playlist link or ID" className="min-w-0 flex-1 rounded-full border border-white/15 bg-black/20 px-4 py-2 text-sm outline-none focus:border-amber-200/70" /><button disabled={busy || !value.trim()} className={`${button} bg-white text-black hover:bg-white/90`}>Save link</button>
+        <label htmlFor="account-link" className="sr-only">YouTube playlist link or ID</label><input id="account-link" value={value} onChange={(event) => setValue(event.target.value)} placeholder="YouTube playlist link or ID" className="min-w-0 flex-1 rounded-full border border-white/15 bg-black/20 px-4 py-2 text-sm outline-none focus:border-amber-200/70" /><button disabled={readOnly || busy || !value.trim()} className={`${button} bg-white text-black hover:bg-white/90`}>Save link</button>
       </form>
       <p className="mt-2 text-xs text-white/45">Saving a link does not import its videos or upload your local library.</p>
-      {links.length === 0 ? <p className="mt-5 text-sm text-white/50">No saved links yet.</p> : <ul className="mt-4 divide-y divide-white/10">{links.map((link) => <li key={link.youtubePlaylistId} className="flex items-center justify-between gap-3 py-3"><span className="min-w-0 break-all font-mono text-sm text-white/75">{link.youtubePlaylistId}</span><button type="button" disabled={busy} className={button} onClick={() => void changeLink(link.youtubePlaylistId, true)} aria-label={`Remove saved link ${link.youtubePlaylistId}`}>Unlink</button></li>)}</ul>}
+      {links.length === 0 ? <p className="mt-5 text-sm text-white/50">No saved links yet.</p> : <ul className="mt-4 divide-y divide-white/10">{links.map((link) => <li key={link.youtubePlaylistId} className="flex items-center justify-between gap-3 py-3"><span className="min-w-0 break-all font-mono text-sm text-white/75">{link.youtubePlaylistId}</span><button type="button" disabled={readOnly || busy} className={button} onClick={() => void changeLink(link.youtubePlaylistId, true)} aria-label={`Remove saved link ${link.youtubePlaylistId}`}>Unlink</button></li>)}</ul>}
       <p className="mt-3 text-xs text-white/45">Unlinking never deletes your local playlist or history.</p>
     </div>}
+    </div>
   </section>;
 }
