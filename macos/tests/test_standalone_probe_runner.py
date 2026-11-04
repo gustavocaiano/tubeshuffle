@@ -669,6 +669,71 @@ class StandaloneRunnerCompilerGroupTests(HarnessTestBase):
         self.assertIn("ownership uncertain", "\n".join(errors))
 
 
+class CompileCommandTests(HarnessTestBase):
+    SDK = ("/Applications/Xcode.app/Contents/Developer/Platforms/"
+           "MacOSX.platform/Developer/SDKs/MacOSX.sdk")
+    SWIFTC = "/usr/bin/swiftc"
+
+    def compile_with(self, sdk_code=0, sdk_out=None, sdk_err=""):
+        harness = self.make_harness()
+        calls = []
+        sdk_out = self.SDK + "\n" if sdk_out is None else sdk_out
+
+        def fake_run(command, timeout, context):
+            calls.append(list(command))
+            if command[:3] == ["xcrun", "--find", "swiftc"]:
+                return 0, self.SWIFTC + "\n", ""
+            if command[:4] == ["xcrun", "--sdk", "macosx", "--show-sdk-path"]:
+                return sdk_code, sdk_out, sdk_err
+            return 0, "", ""
+
+        def invoke():
+            with mock.patch.object(runner.sys, "platform", "darwin"):
+                with mock.patch.object(
+                        runner.platform, "machine", return_value="arm64"):
+                    with mock.patch.object(
+                            harness, "_run_bounded", side_effect=fake_run):
+                        harness.compile()
+
+        return harness, calls, invoke
+
+    def test_compile_queries_sdk_and_passes_it_to_swiftc(self):
+        _harness, calls, invoke = self.compile_with()
+        invoke()
+
+        sdk_queries = [
+            call for call in calls
+            if call[:4] == ["xcrun", "--sdk", "macosx", "--show-sdk-path"]]
+        self.assertEqual(len(sdk_queries), 1)
+        swiftc_calls = [call for call in calls if call and call[0] == self.SWIFTC]
+        self.assertEqual(len(swiftc_calls), 1)
+        command = swiftc_calls[0]
+        self.assertEqual(
+            command[:5],
+            [self.SWIFTC, "-sdk", self.SDK,
+             "-target", "arm64-apple-macos14.0"])
+        self.assertIn("-parse-as-library", command)
+        self.assertIn("-DDEBUG", command)
+
+    def test_sdk_query_failure_is_clear_and_stops_before_swiftc(self):
+        _harness, calls, invoke = self.compile_with(
+            sdk_code=1, sdk_out="", sdk_err="sdk query boom")
+        with self.assertRaises(runner.HarnessFailure) as context:
+            invoke()
+        message = str(context.exception)
+        self.assertIn("xcrun --sdk macosx --show-sdk-path failed", message)
+        self.assertIn("sdk query boom", message)
+        self.assertFalse([call for call in calls if call and call[0] == self.SWIFTC])
+
+    def test_empty_sdk_path_is_clear_and_stops_before_swiftc(self):
+        _harness, calls, invoke = self.compile_with(
+            sdk_code=0, sdk_out="  \n")
+        with self.assertRaises(runner.HarnessFailure) as context:
+            invoke()
+        self.assertIn("returned no SDK path", str(context.exception))
+        self.assertFalse([call for call in calls if call and call[0] == self.SWIFTC])
+
+
 class StandaloneRunnerLifecycleTests(unittest.TestCase):
     def test_run_harness_cleans_up_after_keyboard_interrupt(self):
         class Harness:

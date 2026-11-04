@@ -437,9 +437,21 @@ class Harness:
         swiftc = located_out.strip()
         require(bool(swiftc), "xcrun --find swiftc returned no path")
 
+        # In compile mode the Swift driver does not default an SDK. Resolve it
+        # explicitly through xcrun using the same bounded/group/taint controls.
+        sdk_code, sdk_out, sdk_err = self._run_bounded(
+            ["xcrun", "--sdk", "macosx", "--show-sdk-path"],
+            30, "xcrun --sdk macosx --show-sdk-path")
+        require(sdk_code == 0,
+                "xcrun --sdk macosx --show-sdk-path failed: "
+                f"{sdk_err.strip()}")
+        sdk = sdk_out.strip()
+        require(bool(sdk), "xcrun --sdk macosx --show-sdk-path returned no SDK path")
+
         target = f"{platform.machine()}-apple-macos14.0"
         command = [
             swiftc,
+            "-sdk", sdk,
             "-target", target,
             "-parse-as-library",
             *COMPILE_FLAGS,
