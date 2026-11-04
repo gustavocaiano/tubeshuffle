@@ -779,6 +779,7 @@ class RootValidationDiagnosticSourceTests(unittest.TestCase):
 
     TAGS = (
         "absolute",
+        "root-url-path",
         "original-lstat",
         "original-type",
         "original-uid",
@@ -795,7 +796,9 @@ class RootValidationDiagnosticSourceTests(unittest.TestCase):
         "inherited-identity-ino",
         "base-lstat",
         "base-type",
+        "base-realpath",
         "base-canonical",
+        "resolved-realpath",
         "resolved-prefix",
         "resolved-basename",
     )
@@ -847,6 +850,66 @@ class RootValidationDiagnosticSourceTests(unittest.TestCase):
             "else { return nil }",
             self.source)
         self.assertIn("defer { rootFailureTag = nil }", self.source)
+
+    @staticmethod
+    def _validated_root_body(source):
+        return source.split(
+            "private static func validatedRoot", 1)[1].split(
+                "private static func run(", 1)[0]
+
+    def test_base_and_root_use_strict_posix_realpath(self):
+        validated = self._validated_root_body(self.source)
+        self.assertIn(
+            "guard let canonicalBase = canonicalPath(temporaryBase) else {",
+            validated)
+        self.assertIn(
+            "guard let canonicalRoot = canonicalPath(arguments.root) else {",
+            validated)
+        self.assertNotIn("resolvingSymlinksInPath", validated)
+        self.assertIn('recordRootFailure("base-realpath")', validated)
+        self.assertIn('recordRootFailure("resolved-realpath")', validated)
+        self.assertIn("if canonicalBase != temporaryBase", validated)
+        self.assertIn('let prefix = temporaryBase + "/"', validated)
+        self.assertIn("if !canonicalRoot.hasPrefix(prefix)", validated)
+        self.assertIn("if !hasSyntheticBasename(canonicalRoot)", validated)
+        self.assertIn("let root = URL(fileURLWithPath: arguments.root)", validated)
+        self.assertIn("return root", validated)
+        self.assertNotIn(
+            "return URL(fileURLWithPath: canonicalRoot)", validated)
+
+    def test_original_no_follow_and_identity_checks_are_retained(self):
+        validated = self._validated_root_body(self.source)
+        for fragment in (
+                "if lstat(arguments.root, &original) != 0",
+                "if fstat(arguments.rootFD, &inherited) != 0",
+                "if inherited.st_dev != original.st_dev",
+                "if inherited.st_ino != original.st_ino",
+                "if lstat(temporaryBase, &baseInfo) != 0",
+                "if (baseInfo.st_mode & S_IFMT) != S_IFDIR"):
+            self.assertIn(fragment, validated)
+
+    def test_canonical_path_fails_closed_without_force_unwrap(self):
+        self.assertIn(
+            "private static func canonicalPath(_ path: String) -> String? {",
+            self.source)
+        self.assertIn(
+            "var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))",
+            self.source)
+        self.assertIn(
+            "guard realpath(path, &buffer) != nil else { return nil }",
+            self.source)
+        self.assertIn(
+            "guard let canonical = String(validatingUTF8: buffer) else "
+            "{ return nil }",
+            self.source)
+        self.assertIn("return canonical", self.source)
+        self.assertNotIn("String(cString: buffer)", self.source)
+        self.assertNotIn("realpath(path, nil)!", self.source)
+
+    def test_root_url_path_must_match_validated_arguments_root(self):
+        validated = self._validated_root_body(self.source)
+        self.assertIn("guard root.path == arguments.root else {", validated)
+        self.assertIn('recordRootFailure("root-url-path")', validated)
 
 
 if __name__ == "__main__":

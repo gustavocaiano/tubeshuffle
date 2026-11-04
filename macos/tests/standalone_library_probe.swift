@@ -74,6 +74,22 @@ struct StandaloneLibraryProbe {
         return rootFailureTag
     }
 
+    // Strict POSIX canonicalization for the fixed base and the synthetic root.
+    // Foundation's resolvingSymlinksInPath previously reported a value unequal
+    // to the literal /private/tmp on macOS, so this uses the same realpath the
+    // POSIX boundary expects. A nil result fails closed at the caller.
+    private static func canonicalPath(_ path: String) -> String? {
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+        guard realpath(path, &buffer) != nil else { return nil }
+        guard let canonical = String(validatingUTF8: buffer) else { return nil }
+        return canonical
+    }
+
+    private static func hasSyntheticBasename(_ canonical: String) -> Bool {
+        let basename = canonical.split(separator: "/").last.map(String.init) ?? ""
+        return basename.hasPrefix("tubeshuffle-standalone-")
+    }
+
     static func main() {
         do {
             let arguments = try parseArguments()
@@ -121,6 +137,12 @@ struct StandaloneLibraryProbe {
             throw ProbeUsage.root
         }
         let root = URL(fileURLWithPath: arguments.root)
+        // Fail closed if Foundation normalized the input. The store must
+        // receive exactly the path the parent and identity checks validated.
+        guard root.path == arguments.root else {
+            recordRootFailure("root-url-path")
+            throw ProbeUsage.root
+        }
 
         // Original no-follow lstat before any symlink resolution.
         var original = stat()
@@ -189,8 +211,6 @@ struct StandaloneLibraryProbe {
         // checks above. Refuse a symlinked or aliased base rather than trusting
         // an environment-derived temporary directory.
         var baseInfo = stat()
-        let canonicalBase = URL(fileURLWithPath: temporaryBase)
-            .resolvingSymlinksInPath().path
         if lstat(temporaryBase, &baseInfo) != 0 {
             recordRootFailure("base-lstat")
             throw ProbeUsage.root
@@ -199,20 +219,29 @@ struct StandaloneLibraryProbe {
             recordRootFailure("base-type")
             throw ProbeUsage.root
         }
+        guard let canonicalBase = canonicalPath(temporaryBase) else {
+            recordRootFailure("base-realpath")
+            throw ProbeUsage.root
+        }
         if canonicalBase != temporaryBase {
             recordRootFailure("base-canonical")
             throw ProbeUsage.root
         }
-        let resolved = root.resolvingSymlinksInPath()
+        guard let canonicalRoot = canonicalPath(arguments.root) else {
+            recordRootFailure("resolved-realpath")
+            throw ProbeUsage.root
+        }
         let prefix = temporaryBase + "/"
-        if !resolved.path.hasPrefix(prefix) {
+        if !canonicalRoot.hasPrefix(prefix) {
             recordRootFailure("resolved-prefix")
             throw ProbeUsage.root
         }
-        if !resolved.lastPathComponent.hasPrefix("tubeshuffle-standalone-") {
+        if !hasSyntheticBasename(canonicalRoot) {
             recordRootFailure("resolved-basename")
             throw ProbeUsage.root
         }
+        // Return the original validated URL, not the canonical string, so the
+        // store receives the path the parent and identity checks validated.
         return root
     }
 
