@@ -18,6 +18,40 @@
     "appendNativeCallback": "com.tubeshuffle.playbacklab://auth/callback",
     "preserveAllExistingRedirects": true
   },
-  "mutationAttempted": false,
-  "result": "prepared_waiting_for_auth_write_access"
+  "mutationAttempted": true,
+  "result": "auth_configuration_applied_and_read_back",
+  "writeAccessPreflight": {
+    "projectHTTPStatus": 200,
+    "authHTTPStatus": 200,
+    "preparedSettingsStillMatch": true
+  },
+  "requestedFields": [
+    "site_url",
+    "uri_allow_list"
+  ],
+  "updatedAtUTC": "2026-11-05T22:41:19.013128+00:00",
+  "patchHTTPStatus": 200,
+  "verification": {
+    "authHTTPStatus": 200,
+    "siteURLMatches": true,
+    "redirectsExactlyMatchProposal": true,
+    "allPreviousRedirectsPreserved": true,
+    "nativeCallbackListed": true,
+    "redirectCount": 3,
+    "googleEnabled": true,
+    "anonymousUsersUnchanged": true,
+    "unrelatedReturnedFieldsUnchanged": true,
+    "changedFieldNames": [
+      "site_url",
+      "uri_allow_list"
+    ],
+    "unexpectedChangedFieldNames": [],
+    "loginTested": false,
+    "libraryRowsAccessed": false
+  },
+  "limits": [
+    "Read-back of Auth configuration does not prove Google/PKCE or custom-scheme delivery.",
+    "No login, playlist read/write, SQL, migration, paid resource, deployment or release.",
+    "No cross-request atomicity/CAS guarantee; no other writer was observed."
+  ]
 }

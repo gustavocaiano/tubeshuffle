@@ -147,6 +147,33 @@
         "loadedOrSignInTested": false
       },
       "scopeNote": "The base publicServices and preservation fields describe the earlier package checkpoint. This follow-up records the later read-only inspection and five Vercel additions; no deployment, Supabase mutation or library access occurred."
+    },
+    "supabaseAuthConfiguration": {
+      "evidence": "supabase-auth-config-apply.json",
+      "recordedAtUTC": "2026-11-05T22:41:19.013128+00:00",
+      "access": "Fresh private request received the required Auth Config/Project Settings write token after the owner asked to continue.",
+      "changesApplied": [
+        "Set Site URL to https://www.tubeshuffle.online",
+        "Append com.tubeshuffle.playbacklab://auth/callback, preserving both previous redirects"
+      ],
+      "patchHTTPStatus": 200,
+      "authReadBackHTTPStatus": 200,
+      "otherReturnedAuthFieldsUnchanged": true,
+      "liveLoginOrCallbackDeliveryTested": false,
+      "supersedes": "The earlier currentState entry records the timed-out request and then-pending Auth changes; that observation remains historical."
+    },
+    "deliveryReadinessSnapshot": "delivery-readiness-2026-11-05.json",
+    "nativeUIRefinement": {
+      "evidence": "../native-ui-refinement/validation.json",
+      "scope": "Later local UI implementation and a new candidate on top of 413a226; the candidate/hashes/counts above remain the earlier checkpoint.",
+      "nativeSuite": {
+        "executed": 243,
+        "passed": 241,
+        "skipped": 2,
+        "failures": 0
+      },
+      "reviewScore": 9.0,
+      "noDeployment": true
     }
   }
 }

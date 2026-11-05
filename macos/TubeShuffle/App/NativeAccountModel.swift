@@ -189,65 +189,71 @@ struct NativeAccountView: View {
     @ObservedObject var account: NativeAccountModel
     let localPlaylist: LibraryPlaylist?
     let demo: Bool
+    var width: CGFloat = 650
     @Environment(\.dismiss) private var dismiss
     @State private var removing: String?
+    private var actionLayout: AnyLayout {
+        width < 600 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout())
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack { Text("Account & cloud links").font(.title2.bold()); Spacer(); Button("Done") { dismiss() } }
-            Text("Supabase Free · only playlist IDs are stored in the cloud. Content, queue, history and preferences stay on this Mac.")
-                .foregroundStyle(.secondary)
-            if demo {
-                Label("Account access is disabled in the demo library.", systemImage: "person.crop.circle.badge.xmark")
-            } else if !account.configured {
-                Button("Load setup JSON…") { account.loadSetup() }
-                TextField("Supabase URL · https://project.supabase.co", text: $account.supabaseURL)
-                TextField("Supabase publishable key · sb_publishable_…", text: $account.publishableKey)
-                TextField("Application API origin · https://…", text: $account.apiURL)
-                Text("Use the existing configured services. This app does not provision a project or change callback settings. Configuration is kept for this run; credentials use a separate Keychain namespace for each configuration.")
-                    .font(.callout).foregroundStyle(.secondary)
-                HStack {
-                    Button("Use this configuration") { account.configure() }
-                    Button("Save public setup…") { account.saveSetup() }
-                }
-            } else {
-                HStack {
-                    if account.busy { ProgressView().controlSize(.small); Text("Working…") }
-                    else if account.state == .signedIn { Label("Signed in", systemImage: "person.crop.circle.fill") }
-                    else { Text("Session unavailable") }
-                    Spacer()
-                    Button(account.busy ? "Cancel / clear session" : "Clear local sign-in") { account.signOut() }
-                        .disabled(account.state == .invalidating)
-                }
-                HStack {
-                    Button("Sign in with Google") { account.authenticate() }
-                    Button("Resume saved session") { account.authenticate(resume: true) }
-                    Button("Refresh session") { account.authenticate(refresh: true) }
-                }.disabled(account.busy)
-                Divider()
-                HStack {
-                    Button("Read cloud links") { account.loadLinks() }.disabled(account.busy)
-                    if let localPlaylist {
-                        Button("Save selected playlist ID") { account.saveLink(localPlaylist.youtubeId) }
-                            .disabled(account.busy || account.uncertain || account.state != .signedIn)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack { Text("Account & cloud links").font(.title2.bold()); Spacer(); Button("Done") { dismiss() } }
+                Text("Supabase Free · only playlist IDs are stored in the cloud. Content, queue, history and preferences stay on this Mac.")
+                    .foregroundStyle(.secondary)
+                if demo {
+                    Label("Account access is disabled in the demo library.", systemImage: "person.crop.circle.badge.xmark")
+                } else if !account.configured {
+                    Button("Load setup JSON…") { account.loadSetup() }
+                    TextField("Supabase URL · https://project.supabase.co", text: $account.supabaseURL)
+                    TextField("Supabase publishable key · sb_publishable_…", text: $account.publishableKey)
+                    TextField("Application API origin · https://…", text: $account.apiURL)
+                    Text("Use the existing configured services. This app does not provision a project or change callback settings. Configuration is kept for this run; credentials use a separate Keychain namespace for each configuration.")
+                        .font(.callout).foregroundStyle(.secondary)
+                    actionLayout {
+                        Button("Use this configuration") { account.configure() }
+                        Button("Save public setup…") { account.saveSetup() }
                     }
-                }
-                List(account.links, id: \.youtubePlaylistId) { link in
+                } else {
                     HStack {
-                        Text(link.youtubePlaylistId).textSelection(.enabled)
+                        if account.busy { ProgressView().controlSize(.small); Text("Working…") }
+                        else if account.state == .signedIn { Label("Signed in", systemImage: "person.crop.circle.fill") }
+                        else { Text("Session unavailable") }
                         Spacer()
-                        Button("Remove link") { removing = link.youtubePlaylistId }.disabled(account.busy || account.uncertain)
+                        Button(account.busy ? "Cancel / clear session" : "Clear local sign-in") { account.signOut() }
+                            .disabled(account.state == .invalidating)
                     }
-                }.frame(minHeight: 120)
-                if account.uncertain {
-                    Text("A previous cloud change has an uncertain outcome. Reading links does not undo it.")
-                    Button("I checked the links; allow another change") { account.acknowledgeUncertainty() }.disabled(account.busy)
+                    actionLayout {
+                        Button("Sign in with Google") { account.authenticate() }
+                        Button("Resume saved session") { account.authenticate(resume: true) }
+                        Button("Refresh session") { account.authenticate(refresh: true) }
+                    }.disabled(account.busy)
+                    Divider()
+                    actionLayout {
+                        Button("Read cloud links") { account.loadLinks() }.disabled(account.busy)
+                        if let localPlaylist {
+                            Button("Save selected playlist ID") { account.saveLink(localPlaylist.youtubeId) }
+                                .disabled(account.busy || account.uncertain || account.state != .signedIn)
+                        }
+                    }
+                    List(account.links, id: \.youtubePlaylistId) { link in
+                        HStack {
+                            Text(link.youtubePlaylistId).textSelection(.enabled)
+                            Spacer()
+                            Button("Remove link") { removing = link.youtubePlaylistId }.disabled(account.busy || account.uncertain)
+                        }
+                    }.frame(height: 140)
+                    if account.uncertain {
+                        Text("A previous cloud change has an uncertain outcome. Reading links does not undo it.")
+                        Button("I checked the links; allow another change") { account.acknowledgeUncertainty() }.disabled(account.busy)
+                    }
                 }
+                if let message = account.message { Text(message).font(.callout).foregroundStyle(.secondary).textSelection(.enabled) }
+                Text("Personal prototype. Live account security and YouTube release policy still require acceptance.").font(.caption).foregroundStyle(.secondary)
             }
-            if let message = account.message { Text(message).font(.callout).foregroundStyle(.secondary).textSelection(.enabled) }
-            Text("Personal prototype. Live account security and YouTube release policy still require acceptance.").font(.caption).foregroundStyle(.secondary)
-        }
-        .padding(24).frame(width: 650, height: demo ? 260 : 590)
+            .padding(24).frame(maxWidth: .infinity, alignment: .leading)
+        }.frame(width: width, height: demo ? 260 : 590)
         .textFieldStyle(.roundedBorder)
         .confirmationDialog("Remove only this cloud link?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } })) {
             Button("Remove link", role: .destructive) { if let id = removing { account.saveLink(id, remove: true) }; removing = nil }

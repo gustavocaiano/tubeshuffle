@@ -142,9 +142,10 @@ struct TubeShuffleApp: App {
             } else if diagnostic {
                 PlaybackLabRoot().frame(minWidth: 780, minHeight: 620)
             } else {
-                NativeLibraryView().frame(minWidth: 760, minHeight: 680)
+                NativeLibraryView().frame(minWidth: 480, minHeight: 680)
             }
         }.defaultSize(width: 1280, height: 860)
+            .commands { NativeZoomCommands() }
     }
 }
 

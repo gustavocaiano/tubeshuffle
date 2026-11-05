@@ -1,0 +1,81 @@
+{
+  "recordedAtUTC": "2026-11-05T22:42:11.110824+00:00",
+  "sourceHead": "413a226a52a5f49429ea89ab43275c063bd038ad",
+  "pullRequest": {
+    "baseRefName": "main",
+    "headRefOid": "413a226a52a5f49429ea89ab43275c063bd038ad",
+    "mergeStateStatus": "UNSTABLE",
+    "mergeable": "MERGEABLE",
+    "state": "OPEN",
+    "statusCheckRollup": [
+      {
+        "__typename": "StatusContext",
+        "context": "Vercel",
+        "startedAt": "2026-11-05T22:41:10Z",
+        "state": "PENDING",
+        "targetUrl": "https://vercel.com/gustavocaianos-projects/tubeshuffle/6ixvyFm2YWP38sc7fHnaCP5MS3K5"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-05T22:41:11Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://vercel.com/github",
+        "name": "Vercel Preview Comments",
+        "startedAt": "2026-11-05T22:41:11Z",
+        "status": "COMPLETED",
+        "workflowName": ""
+      }
+    ],
+    "url": "https://github.com/gustavocaiano/tubeshuffle/pull/10"
+  },
+  "nativeCandidate": {
+    "sourceHashMatches": 85,
+    "archiveHashMatches": true,
+    "publicSetupHashMatches": true,
+    "testsRerun": false,
+    "reason": "No native source or packaging input changed since the recorded 240-pass/2-skip candidate."
+  },
+  "vercel": {
+    "project": "tubeshuffle",
+    "fiveProductionVariablesMetadataMatches": true,
+    "twoPreexistingVariablesMetadataMatches": true,
+    "variableCount": 7,
+    "productionDeploymentUnchanged": true,
+    "productionDeploymentID": "dpl_EP6ANPcdKuNL47qjcfncgLDfbZ7s",
+    "productionCommit": "e168bd58005c22a240fd9052d69fbef62ddbd2b2",
+    "productionBranch": "main",
+    "createDeployments": "enabled"
+  },
+  "supabaseAuthConfigurationEvidence": "supabase-auth-config-apply.json",
+  "limits": [
+    "Checks reported by GitHub/Vercel are not owner UI/audio/transfer acceptance.",
+    "The agent did not merge, push, deploy, sign in or access a library; a separate documentation push triggered a preview check during this continuation.",
+    "Production account API still uses the old deployment; configured project variables await deployment.",
+    "No policy or distribution approval."
+  ],
+  "finalPullRequestCheck": {
+    "recordedAtUTC": "2026-11-05T22:45:50.023693+00:00",
+    "url": "https://github.com/gustavocaiano/tubeshuffle/pull/10",
+    "head": "413a226a52a5f49429ea89ab43275c063bd038ad",
+    "state": "OPEN",
+    "mergeable": "MERGEABLE",
+    "mergeStateStatus": "CLEAN",
+    "checks": {
+      "Vercel": "SUCCESS",
+      "Vercel Preview Comments": "SUCCESS"
+    },
+    "inlineReviewCommentCount": 0,
+    "formalReviewCount": 0,
+    "earlierAutomatedReview": {
+      "head": "051bb26b48bed0e9ccbe77639b3ae6cefd9909ed",
+      "reportedFindings": false,
+      "notLatestHeadApproval": true
+    },
+    "newLocalChanges": "Configuration evidence and documentation only; no native source changes, merge or push performed by the agent."
+  },
+  "ownerRehearsal": {
+    "request": "One grouped result via async question: UI/keyboard/resize, audible player/window lifecycle, disposable GUI transfer and queue persistence.",
+    "result": "pending_owner_response",
+    "unperformedSteps": "not validated"
+  }
+}

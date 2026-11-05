@@ -1,0 +1,84 @@
+{
+  "recordedAtUTC": "2026-11-05T23:06:36.508226+00:00",
+  "sourceHeadAtBuild": "413a226a52a5f49429ea89ab43275c063bd038ad",
+  "sourceManifest": "build-info.json",
+  "nativeSourceFilesMatch": 85,
+  "fullSuite": {
+    "executed": 243,
+    "passed": 241,
+    "skipped": 2,
+    "failures": 0,
+    "testsLog": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-mglb7arz/tests.log",
+    "testsLogSHA256": "51344297344cdfed7d7726bf64f6d5398abdf979b89cd8a77df75b5c51bbec4a"
+  },
+  "targetedUI": {
+    "passed": 5,
+    "renderCases": 15,
+    "extraScrolledCases": 2,
+    "log": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-ui-refine-svj4dwxn/ui-tests-2.log",
+    "initialAttempt": "Test-only compile error: async beginSheet overload selected. Explicit completionHandler fixed it; production code did not change for this error."
+  },
+  "candidate": {
+    "app": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-mglb7arz/TubeShuffle Local/TubeShuffle.app",
+    "archive": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-mglb7arz/TubeShuffle-local-arm64.zip",
+    "archiveSHA256": "92c9d65b5517446e0988bad3d579b813f5ebdec6e7c3c88bfa89123882641606",
+    "zipIntegrity": "passed",
+    "publicSetup": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-mglb7arz/TubeShuffle-account-setup.json",
+    "publicSetupSHA256": "ac6813b24393c3628fe0134715dc03d7302aef439f115d8b71ae625788c2c472",
+    "signing": "ad-hoc hardened runtime; not Developer ID; not notarized",
+    "minimumMacOS": "14.0",
+    "architecture": "arm64"
+  },
+  "captures": {
+    "fullSuiteTemporaryDirectory": "/var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-ui-render-C9666119-18D9-4163-9345-92237802A93A",
+    "reviewedTemporaryDirectory": "/var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-ui-render-FDC5BC2A-C8C8-420D-BD74-38108F749296",
+    "retainedSHA256": {
+      "captures/paused-1280x860.png": "3d5b6f4baf5c9c7d9cb6a2e9daeb8abe07a5b17d99746c592519d046ca83f075",
+      "captures/focus-1100x720.png": "86c2c6898869ec105d127ccb0b1cbf714a82f56912a857522deac66bd339e052",
+      "captures/paused-480x680.png": "821f7fe2e69608fa7ad11864c0420b6380220f2e7f4d419d089dda7c33885da7",
+      "captures/focus-480x680.png": "919e929232aae9f82db0e0e44a4d2dde783dd0913239c2a79ab4a2128d75eea1",
+      "captures/focus-no-artwork-480x680.png": "3757f44882ccd53fb64640cdfcf3acffd1934188b9406dff2a6089031aeac125",
+      "captures/zoom80-480x680.png": "095a2e616261ad3f0eb6fdc163f58248fc01aa07303085352fb496af7f3def4a",
+      "captures/zoom125-480x800.png": "eb8e3e9539982b0ebb3b362b8317c16eefa0c9c57c232a20b840353bbdb77408",
+      "captures/focus-zoom125-480x680.png": "7a13716478198cb54fca52cd9bc5505b09d00acca0db368dabb4e8c928e9a372",
+      "captures/stage-focus-480x680.png": "9ebde609bdf214588bd24ec78a26361c67a3f3beaf238b8b8e7d2ecea892f361"
+    },
+    "reviewedImagesMatchFinalSuite": true,
+    "reviewedCaptureSHA256": {
+      "captures/focus-1100x720.png": "86c2c6898869ec105d127ccb0b1cbf714a82f56912a857522deac66bd339e052",
+      "captures/focus-480x680.png": "919e929232aae9f82db0e0e44a4d2dde783dd0913239c2a79ab4a2128d75eea1",
+      "captures/focus-no-artwork-480x680.png": "3757f44882ccd53fb64640cdfcf3acffd1934188b9406dff2a6089031aeac125",
+      "captures/focus-zoom125-480x680.png": "7a13716478198cb54fca52cd9bc5505b09d00acca0db368dabb4e8c928e9a372",
+      "captures/paused-1280x860.png": "3d5b6f4baf5c9c7d9cb6a2e9daeb8abe07a5b17d99746c592519d046ca83f075",
+      "captures/paused-480x680.png": "821f7fe2e69608fa7ad11864c0420b6380220f2e7f4d419d089dda7c33885da7",
+      "captures/stage-focus-480x680.png": "9ebde609bdf214588bd24ec78a26361c67a3f3beaf238b8b8e7d2ecea892f361",
+      "captures/zoom125-480x800.png": "eb8e3e9539982b0ebb3b362b8317c16eefa0c9c57c232a20b840353bbdb77408",
+      "captures/zoom80-480x680.png": "095a2e616261ad3f0eb6fdc163f58248fc01aa07303085352fb496af7f3def4a"
+    },
+    "storageNote": "Identical representative captures from the reviewed run and final suite are retained once in captures/. Both measurement reports are preserved."
+  },
+  "review": {
+    "model": "gpt-6.1-sol",
+    "score": 9.0,
+    "record": "review-1.json",
+    "scope": "Static visual/source review, not live interaction, playback or policy approval."
+  },
+  "observedBehavior": [
+    "Native isHidden agrees with Focus and restores in Video",
+    "Focus artwork measures 80 points times the selected zoom; artwork-off removes it",
+    "15 layouts have no measured horizontal overflow",
+    "Same WKWebView, generation and selected occurrence survive Focus/resize/zoom without load calls",
+    "Synthetic Cmd+, Cmd=, Cmd+Shift+, Cmd-, Cmd0 events change zoom with WKWebView focus; bounds and modal exclusion verified",
+    "Closing the actual hosted window tears down player callbacks and closes only its synthetic library"
+  ],
+  "limits": [
+    "Static bundled images and synthetic player events; no live YouTube audio/advancement proof",
+    "Physical keyboard, audible Focus/Video restoration and OS transfer-panel acceptance remain owner-observed",
+    "No real library, browser profile, account login, schema/migration, remote change or production deployment",
+    "Older candidate and all prior evidence preserved; new candidate is not Developer ID signed or notarized",
+    "Focus hides the official player without falsifying visibility; YouTube policy remains open"
+  ],
+  "demoLaunch": "demo-launch.json",
+  "finalSourceVerificationUTC": "2026-11-05T23:12:20.109188+00:00",
+  "applicationIconFollowUp": "app-icon.json"
+}

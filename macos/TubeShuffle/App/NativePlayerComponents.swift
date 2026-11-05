@@ -7,30 +7,44 @@ struct NativePlayerViewControls: View {
     @Binding var focus: Bool
     @Binding var stage: Bool
     var compact = false
+    var stacked = false
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
+            let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 10))
+            layout {
                 HStack(spacing: 3) {
                     viewButton("Video", symbol: "video", selected: !focus) { focus = false }
                     viewButton("Focus", symbol: "headphones", selected: focus) { focus = true }
                 }.padding(compact ? 3 : 4).background(.black.opacity(0.30), in: RoundedRectangle(cornerRadius: 12))
                     .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(NativeUIStyle.border))
-                Spacer(minLength: 4)
-                Toggle("Artwork", isOn: $showArtwork).toggleStyle(NativeSwitch()).font(.system(size: 11))
-                Button { stage.toggle() } label: { Label(stage ? "Exit Stage" : "Stage", systemImage: stage ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right") }
-                    .buttonStyle(NativeActionStyle()).help("Expand the player; Escape returns to your queue")
-            }.frame(height: compact ? 36 : 40)
+                HStack(spacing: 10) {
+                    Spacer(minLength: 4)
+                    Toggle("Artwork", isOn: $showArtwork).toggleStyle(NativeSwitch()).font(.system(size: 11))
+                    Button { stage.toggle() } label: { Label(stage ? "Exit Stage" : "Stage", systemImage: stage ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right") }
+                        .buttonStyle(NativeActionStyle()).help("Expand the player; Escape returns to your queue")
+                }
+            }.frame(height: stacked ? 74 : (compact ? 36 : 40))
             if !compact {
-                Text(focus ? "A quieter layout. The video stays visible while you listen." : "Watch the video, or choose Focus for a quieter listening view.")
+                Text(focus ? "Just the music and your queue. Switch to Video to watch." : "Watch the video, or choose Focus for a quieter listening view.")
                     .font(.system(size: 11)).foregroundStyle(NativeUIStyle.secondary).lineLimit(1)
             }
-        }
+        }.nativeBounds("viewControls")
     }
     private func viewButton(_ title: String, symbol: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) { Label(title, systemImage: symbol).font(.system(size: 12, weight: .medium)).padding(.horizontal, 12).frame(height: compact ? 28 : 32)
             .foregroundStyle(selected ? Color.black : NativeUIStyle.secondary)
             .background(selected ? Color.white : .clear, in: RoundedRectangle(cornerRadius: 9))
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+struct NativeFocusArtwork: View {
+    let item: LibraryOccurrence?
+    let demo: Bool
+    var body: some View {
+        NativeArtwork(videoID: item?.youtubeId ?? "", thumbnail: item?.thumbnail ?? "", bundledDemo: demo, radius: 12)
+            .frame(width: 80, height: 80).nativeBounds("focusArtwork")
+            .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
     }
 }
 
@@ -60,19 +74,22 @@ struct NativeIdleDeck: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: metrics.compactChrome ? 8 : 12) {
-            NativePlayerViewControls(showArtwork: $showArtwork, focus: $focus, stage: $stage, compact: metrics.compactChrome)
+            NativePlayerViewControls(showArtwork: $showArtwork, focus: $focus, stage: $stage, compact: metrics.compactChrome, stacked: metrics.stackedViewControls)
             ZStack {
-                Color.black
-                if showArtwork, let item {
+                if focus {
+                    if showArtwork { NativeFocusArtwork(item: item, demo: demo) }
+                } else if showArtwork, let item {
                     NativeArtwork(videoID: item.youtubeId, thumbnail: item.thumbnail, bundledDemo: demo, radius: 14)
                     LinearGradient(colors: [.black.opacity(0.1), .black.opacity(0.45)], startPoint: .top, endPoint: .bottom)
                 }
-                Button(action: play) {
+                if !focus { Button(action: play) {
                     Image(systemName: "play.fill").font(.system(size: 24, weight: .semibold)).offset(x: 2)
                         .foregroundStyle(.black).frame(width: 64, height: 64).background(.white, in: Circle())
                         .shadow(color: .black.opacity(0.30), radius: 16, y: 4)
-                }.buttonStyle(.plain).help("Play this playlist").accessibilityLabel("Play this playlist in its displayed order").disabled(count == 0)
-            }.frame(width: metrics.videoWidth, height: metrics.videoHeight).clipShape(RoundedRectangle(cornerRadius: 14)).accessibilityIdentifier("player.viewport").nativeBounds("video").frame(maxWidth: .infinity)
+                }.buttonStyle(.plain).help("Play this playlist").accessibilityLabel("Play this playlist in its displayed order").disabled(count == 0) }
+            }.frame(width: focus ? metrics.playerWidth - metrics.cardInset * 2 : metrics.videoWidth, height: metrics.mediaHeight)
+                .background(focus ? Color.clear : Color.black).clipShape(RoundedRectangle(cornerRadius: 14))
+                .accessibilityIdentifier("player.viewport").nativeBounds("media").frame(maxWidth: .infinity)
             NativeNowPlaying(caption: "Ready to listen · \(count) videos", title: item?.title ?? "Your next listen starts here", channel: item?.channelTitle ?? "Choose a playlist from your library", compact: metrics.compactChrome)
             VStack(spacing: metrics.compactChrome ? 6 : 8) {
                 Rectangle().fill(NativeUIStyle.border).frame(height: 1)
@@ -101,26 +118,32 @@ struct NativeLiveDeck: View {
     @Binding var focus: Bool
     @Binding var stage: Bool
     let metrics: NativePlayerLayout
-    let close: () -> Void
+    let demo: Bool
+    let restart: () -> Void
 
     private var current: PlayerCoordinator.Item { coordinator.queue[coordinator.index] }
     var body: some View {
         VStack(alignment: .leading, spacing: metrics.compactChrome ? 8 : 12) {
-            NativePlayerViewControls(showArtwork: $showArtwork, focus: $focus, stage: $stage, compact: metrics.compactChrome)
+            NativePlayerViewControls(showArtwork: $showArtwork, focus: $focus, stage: $stage, compact: metrics.compactChrome, stacked: metrics.stackedViewControls)
             // Same NSViewRepresentable identity in Video, Focus, Stage and resize.
-            NativePlayerWebView(player: coordinator.player)
-                .frame(width: metrics.videoWidth, height: metrics.videoHeight)
-                .background(.black).clipShape(RoundedRectangle(cornerRadius: 14))
-                .accessibilityIdentifier("player.viewport")
-                .nativeBounds("video").frame(maxWidth: .infinity)
+            // Focus uses real native hiding; no page visibility override or playback command.
+            ZStack {
+                NativePlayerWebView(player: coordinator.player, hidden: focus)
+                    .frame(width: metrics.videoWidth, height: metrics.videoHeight)
+                    .background(focus ? Color.clear : Color.black).clipShape(RoundedRectangle(cornerRadius: 14))
+                    .accessibilityIdentifier("player.viewport").accessibilityHidden(focus).nativeBounds("video")
+                if focus && showArtwork {
+                    NativeFocusArtwork(item: current.localOccurrenceID.flatMap { session.occurrencesByID[$0] }, demo: demo)
+                }
+            }.frame(height: metrics.mediaHeight).frame(maxWidth: .infinity).clipped().nativeBounds("media")
             NativeNowPlaying(caption: "Now playing · Track \(coordinator.index + 1) of \(coordinator.queue.count)",
                 title: current.title ?? current.videoID, channel: current.channel ?? session.playlist.title, compact: metrics.compactChrome)
-            NativeTransport(coordinator: coordinator, close: close, compact: metrics.compactChrome).frame(height: metrics.transportHeight).nativeBounds("transport")
+            NativeTransport(coordinator: coordinator, compact: metrics.compactChrome, stackedVolume: metrics.stackedVolume).frame(height: metrics.transportHeight).nativeBounds("transport")
             if coordinator.recoveryRequired {
                 HStack {
                     Text("Playback needs a fresh start. Your library and queue are safe.").font(.system(size: 12))
                     Spacer()
-                    Button("Stop & close", action: close).buttonStyle(NativeActionStyle())
+                    Button("Restart player", action: restart).buttonStyle(NativeActionStyle())
                 }.foregroundStyle(.yellow)
             }
         }.padding(metrics.cardInset).modifier(NativeCard())
@@ -130,8 +153,8 @@ struct NativeLiveDeck: View {
 
 struct NativeTransport: View {
     @ObservedObject var coordinator: PlayerCoordinator
-    let close: () -> Void
     var compact = false
+    var stackedVolume = false
     @State private var seeking = false
     @State private var seekValue: Double = 0
     @State private var seekOccurrence: Int?
@@ -166,21 +189,25 @@ struct NativeTransport: View {
                         .disabled(!coordinator.canNext).keyboardShortcut(.rightArrow, modifiers: [.command, .option])
                 }
                 HStack {
-                    Button(action: close) { Label("Stop & close", systemImage: "stop").font(.system(size: 11)).foregroundStyle(NativeUIStyle.secondary).frame(minHeight: 36) }.buttonStyle(.plain).help("Stop playback and close the player")
                     Spacer()
-                    HStack(spacing: 6) {
-                        Image(systemName: "speaker.wave.2").font(.system(size: 11)).foregroundStyle(NativeUIStyle.secondary)
-                        Slider(value: Binding(get: { changingVolume ? volumeValue : coordinator.volume }, set: { value in
-                            volumeValue = value
-                            if !changingVolume { coordinator.setVolume(value) }
-                        }), in: 0...1, onEditingChanged: { editing in
-                            if editing { volumeValue = coordinator.volume; changingVolume = true }
-                            else { changingVolume = false; coordinator.setVolume(volumeValue) }
-                        }).frame(width: 70).disabled(!coordinator.canTransport).accessibilityLabel("Volume")
-                    }
+                    if !stackedVolume { volume }
                 }
             }.frame(height: compact ? 36 : 42)
+            if stackedVolume { volume.frame(maxWidth: .infinity, alignment: .trailing).frame(height: 20) }
         }.onChange(of: coordinator.occurrence) { seekOccurrence = nil; seeking = false }
+    }
+
+    private var volume: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "speaker.wave.2").font(.system(size: 11)).foregroundStyle(NativeUIStyle.secondary)
+            Slider(value: Binding(get: { changingVolume ? volumeValue : coordinator.volume }, set: { value in
+                volumeValue = value
+                if !changingVolume { coordinator.setVolume(value) }
+            }), in: 0...1, onEditingChanged: { editing in
+                if editing { volumeValue = coordinator.volume; changingVolume = true }
+                else { changingVolume = false; coordinator.setVolume(volumeValue) }
+            }).frame(width: 70).disabled(!coordinator.canTransport).accessibilityLabel("Volume")
+        }.fixedSize()
     }
 }
 
@@ -274,8 +301,9 @@ struct NativeQueueCard: View {
 
 struct NativePlayerWebView: NSViewRepresentable {
     let player: DirectPlayer
-    func makeNSView(context: Context) -> WKWebView { player.webView }
-    func updateNSView(_ view: WKWebView, context: Context) {}
+    var hidden = false
+    func makeNSView(context: Context) -> WKWebView { player.webView.isHidden = hidden; return player.webView }
+    func updateNSView(_ view: WKWebView, context: Context) { view.isHidden = hidden }
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: WKWebView, context: Context) -> CGSize? {
         CGSize(width: proposal.width ?? 480, height: proposal.height ?? 270)
     }

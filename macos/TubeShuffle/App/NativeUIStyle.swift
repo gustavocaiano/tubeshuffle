@@ -117,32 +117,122 @@ struct NativePlayerLayout {
     let contentWidth: CGFloat
     let playerWidth: CGFloat
     let queueWidth: CGFloat
-    let videoHeight: CGFloat
+    private(set) var videoHeight: CGFloat = 0
     let horizontal: Bool
     let inset: CGFloat
     let compactChrome: Bool
+    let narrow: Bool
+    let focus: Bool
+    let showArtwork: Bool
+    var stackedViewControls: Bool { playerWidth - cardInset * 2 < 390 }
+    var stackedVolume: Bool { playerWidth - cardInset * 2 < 360 }
     var cardInset: CGFloat { compactChrome ? 12 : 16 }
-    var pageTopInset: CGFloat { compactChrome ? 12 : 24 }
+    var pageTopInset: CGFloat { if narrow { return 8 }; return compactChrome ? 12 : 24 }
     var sectionSpacing: CGFloat { compactChrome ? 12 : 20 }
-    var navigationHeight: CGFloat { compactChrome ? 44 : 54 }
-    var headingHeight: CGFloat { compactChrome ? 44 : 60 }
-    var transportHeight: CGFloat { compactChrome ? 68 : 80 }
-    var deckHeight: CGFloat { videoHeight + (compactChrome ? 200 : 276) }
+    var navigationHeight: CGFloat { if narrow { return 40 }; return compactChrome ? 44 : 54 }
+    var headingHeight: CGFloat { if narrow { return 80 }; return compactChrome ? 44 : 60 }
+    var viewControlsHeight: CGFloat { if stackedViewControls { return 74 }; return compactChrome ? 36 : 64 }
+    var transportHeight: CGFloat { (compactChrome ? 68 : 80) + (stackedVolume ? 26 : 0) }
+    var mediaHeight: CGFloat { if !focus { return videoHeight }; return showArtwork ? 128 : 0 }
+    var deckOverhead: CGFloat {
+        viewControlsHeight + (compactChrome ? 48 : 64) + transportHeight
+            + (compactChrome ? 24 : 36) + cardInset * 2
+    }
+    var deckHeight: CGFloat { mediaHeight + deckOverhead }
     var videoWidth: CGFloat { min(playerWidth - cardInset * 2, videoHeight * 16 / 9) }
-    init(width: CGFloat, height: CGFloat, stage: Bool = false, focus: Bool = false) {
-        compactChrome = height < 800 || stage
-        inset = width < 900 ? 20 : 28
+    init(width: CGFloat, height: CGFloat, stage: Bool = false, focus: Bool = false, showArtwork: Bool = true, scale: CGFloat = 1) {
+        self.focus = focus
+        self.showArtwork = showArtwork
+        narrow = width < 660
+        compactChrome = height < 800 || stage || narrow
+        if narrow { inset = 12 } else { inset = width < 900 ? 20 : 28 }
         contentWidth = max(280, min(1240, width - inset * 2))
         horizontal = contentWidth >= 940 && !stage
         queueWidth = horizontal ? min(328, contentWidth * 0.28) : contentWidth
         playerWidth = horizontal ? contentWidth - queueWidth - 20 : contentWidth
-        let padding: CGFloat = compactChrome ? 24 : 32
-        let overhead: CGFloat = compactChrome ? 200 : 276
-        let top: CGFloat = stage ? 12 : (compactChrome ? 112 : 158)
-        let ideal = (playerWidth - padding) * 9 / 16
-        let viewportLimit = max(200, height - top - overhead - 20)
-        videoHeight = min(ideal, focus ? min(240, viewportLimit) : viewportLimit)
+        var top = pageTopInset
+        if !stage { top += navigationHeight + headingHeight + sectionSpacing }
+        let ideal = (playerWidth - cardInset * 2) * 9 / 16
+        let viewportLimit = max(200 / scale, height - top - deckOverhead - 8 / scale)
+        videoHeight = min(ideal, viewportLimit)
     }
+}
+
+enum NativeInterfaceZoom {
+    static let levels: [Double] = [0.8, 0.9, 1, 1.1, 1.25]
+    static func clamped(_ value: Double) -> Double {
+        guard value.isFinite else { return 1 }
+        return min(levels.last!, max(levels.first!, value))
+    }
+    static func increased(_ value: Double) -> Double { levels.first { $0 > clamped(value) + 0.001 } ?? levels.last! }
+    static func decreased(_ value: Double) -> Double { levels.last { $0 < clamped(value) - 0.001 } ?? levels.first! }
+}
+
+private struct NativeZoomKey: FocusedValueKey { typealias Value = Binding<Double> }
+extension FocusedValues {
+    var nativeInterfaceZoom: Binding<Double>? {
+        get { self[NativeZoomKey.self] }
+        set { self[NativeZoomKey.self] = newValue }
+    }
+}
+
+struct NativeZoomCommands: Commands {
+    @FocusedBinding(\.nativeInterfaceZoom) private var zoom
+    var body: some Commands {
+        CommandGroup(after: .toolbar) {
+            Button("Zoom In") { if let zoom { self.zoom = NativeInterfaceZoom.increased(zoom) } }
+                .keyboardShortcut("+", modifiers: .command).disabled(zoom == nil || (zoom ?? 1) >= 1.25)
+            Button("Zoom Out") { if let zoom { self.zoom = NativeInterfaceZoom.decreased(zoom) } }
+                .keyboardShortcut("-", modifiers: .command).disabled(zoom == nil || (zoom ?? 1) <= 0.8)
+            Button("Actual Size") { zoom = 1 }.keyboardShortcut("0", modifiers: .command).disabled(zoom == nil)
+        }
+    }
+}
+
+/// Handles both keyboard layouts with a dedicated + key and Cmd+= / Cmd+Shift+=.
+/// The local monitor belongs to this native window; sheets and other windows pass through.
+struct NativeZoomKeyboard: NSViewRepresentable {
+    @Binding var zoom: Double
+    func makeNSView(context: Context) -> NativeZoomKeyView { NativeZoomKeyView() }
+    func updateNSView(_ view: NativeZoomKeyView, context: Context) {
+        view.changeZoom = { action in
+            switch action {
+            case .increase: zoom = NativeInterfaceZoom.increased(zoom)
+            case .decrease: zoom = NativeInterfaceZoom.decreased(zoom)
+            case .reset: zoom = 1
+            }
+        }
+    }
+    static func dismantleNSView(_ view: NativeZoomKeyView, coordinator: ()) { view.removeMonitor() }
+}
+
+final class NativeZoomKeyView: NSView {
+    enum Action { case increase, decrease, reset }
+    var changeZoom: ((Action) -> Void)?
+    private var monitor: Any?
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        removeMonitor()
+        guard window != nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, let window = self.window, event.window === window,
+                  window.attachedSheet == nil, let action = Self.action(for: event) else { return event }
+            self.changeZoom?(action)
+            return nil
+        }
+    }
+    static func action(for event: NSEvent) -> Action? {
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        guard modifiers == .command || modifiers == [.command, .shift] else { return nil }
+        switch event.charactersIgnoringModifiers {
+        case "+", "=": return .increase
+        case "-": return .decrease
+        case "0" where modifiers == .command: return .reset
+        default: return nil
+        }
+    }
+    func removeMonitor() { if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil }
+    deinit { if let monitor { NSEvent.removeMonitor(monitor) } }
 }
 
 func nativeTimeLabel(_ seconds: Double) -> String {

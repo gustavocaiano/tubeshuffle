@@ -12,19 +12,29 @@ final class NativeUIRenderingTests: XCTestCase {
         var measurements: [[String: Any]] = []
         // These render real SwiftUI views. The media region in live cases uses a
         // static bundled fixture instead of YouTube; no audio/network claim.
-        for (name, size, live, focus, stage) in [
-            ("ready-1280x860", NSSize(width: 1280, height: 860), false, false, false),
-            ("paused-1280x860", NSSize(width: 1280, height: 860), true, false, false),
-            ("paused-1100x720", NSSize(width: 1100, height: 720), true, false, false),
-            ("paused-760x680", NSSize(width: 760, height: 680), true, false, false),
-            ("focus-1100x720", NSSize(width: 1100, height: 720), true, true, false),
-            ("stage-1100x720", NSSize(width: 1100, height: 720), true, false, true),
-            ("paused-1600x1000", NSSize(width: 1600, height: 1000), true, false, false)
+        for (name, size, live, focus, stage, artwork, zoom) in [
+            ("ready-1280x860", NSSize(width: 1280, height: 860), false, false, false, true, 1.0),
+            ("paused-1280x860", NSSize(width: 1280, height: 860), true, false, false, true, 1.0),
+            ("paused-1100x720", NSSize(width: 1100, height: 720), true, false, false, true, 1.0),
+            ("paused-760x680", NSSize(width: 760, height: 680), true, false, false, true, 1.0),
+            ("focus-1100x720", NSSize(width: 1100, height: 720), true, true, false, true, 1.0),
+            ("stage-1100x720", NSSize(width: 1100, height: 720), true, false, true, true, 1.0),
+            ("paused-1600x1000", NSSize(width: 1600, height: 1000), true, false, false, true, 1.0),
+            ("paused-480x680", NSSize(width: 480, height: 680), true, false, false, true, 1.0),
+            ("focus-480x680", NSSize(width: 480, height: 680), true, true, false, true, 1.0),
+            ("focus-no-artwork-480x680", NSSize(width: 480, height: 680), true, true, false, false, 1.0),
+            ("ready-focus-480x680", NSSize(width: 480, height: 680), false, true, false, true, 1.0),
+            ("zoom80-480x680", NSSize(width: 480, height: 680), true, false, false, true, 0.8),
+            ("zoom125-480x800", NSSize(width: 480, height: 800), true, false, false, true, 1.25),
+            ("focus-zoom125-480x680", NSSize(width: 480, height: 680), true, true, false, true, 1.25),
+            ("stage-focus-480x680", NSSize(width: 480, height: 680), true, true, true, true, 1.0)
         ] {
             let library = NativeLibraryModel()
             library.openDemo()
             let preferences = try XCTUnwrap(UserDefaults(suiteName: "tubeshuffle-ui-render-\(UUID().uuidString)"))
             preferences.set(focus, forKey: "native.focus")
+            preferences.set(artwork, forKey: "native.showArtwork")
+            preferences.set(zoom, forKey: "native.interfaceZoom")
             let fixture = NativeLibraryFixture.snapshot
             let session: NativeListeningSession? = live ? NativeListeningSession(items: fixture.occurrences, playlist: fixture.playlists[0], library: library,
                 testHooks: .init(load: { _, _ in }, progress: { _ in (0, 100) }, draw: { 0.5 })) : nil
@@ -54,19 +64,31 @@ final class NativeUIRenderingTests: XCTestCase {
             try await Task.sleep(nanoseconds: 350_000_000)
             host.layoutSubtreeIfNeeded()
             window.displayIfNeeded()
-            let video = try XCTUnwrap(bounds["video"], name)
+            let media = try XCTUnwrap(bounds["media"], name)
+            let video = try XCTUnwrap(bounds["video"] ?? bounds["media"], name)
             let transport = try XCTUnwrap(bounds["transport"], name)
             let deck = try XCTUnwrap(bounds["deck"], name)
             for (key, rect) in bounds {
+                if focus && key == "video" { continue } // Retained native view is actually hidden.
                 XCTAssertGreaterThanOrEqual(rect.minX, -1, "\(name) \(key) overflow left")
                 XCTAssertLessThanOrEqual(rect.maxX, size.width + 1, "\(name) \(key) overflow right")
             }
-            XCTAssertGreaterThanOrEqual(video.minY, 0, name)
-            XCTAssertGreaterThanOrEqual(video.height, 200, name)
-            XCTAssertEqual(video.width / video.height, 16 / 9, accuracy: 0.01, name)
+            XCTAssertGreaterThanOrEqual(media.minY, 0, name)
+            if focus {
+                if let session { XCTAssertTrue(session.coordinator.player.webView.isHiddenOrHasHiddenAncestor, name) }
+                if artwork {
+                    let thumbnail = try XCTUnwrap(bounds["focusArtwork"], name)
+                    XCTAssertEqual(thumbnail.width, 80 * zoom, accuracy: 1, name)
+                    XCTAssertEqual(thumbnail.height, thumbnail.width, accuracy: 1, name)
+                } else { XCTAssertNil(bounds["focusArtwork"], name) }
+            } else {
+                if let session { XCTAssertFalse(session.coordinator.player.webView.isHiddenOrHasHiddenAncestor, name) }
+                XCTAssertGreaterThanOrEqual(video.height, 199, name)
+                XCTAssertEqual(video.width / video.height, 16 / 9, accuracy: 0.01, name)
+            }
             XCTAssertLessThanOrEqual(transport.maxY, size.height, "\(name): transport below viewport")
             XCTAssertLessThanOrEqual(deck.maxY, size.height, "\(name): deck below viewport")
-            XCTAssertGreaterThan(transport.minY, video.maxY, name)
+            XCTAssertGreaterThan(transport.minY, media.maxY, name)
             // Keep the exact geometry asserted above; scrolling for an additional
             // capture updates the live preference dictionary asynchronously.
             let initialBounds = bounds
@@ -88,7 +110,7 @@ final class NativeUIRenderingTests: XCTestCase {
                     "initialViewportAssertionsPassed": false,
                     "bounds": bounds.mapValues { ["x": $0.minX, "y": $0.minY, "width": $0.width, "height": $0.height] }])
             }
-            measurements.append(["case": name, "width": size.width, "height": size.height,
+            measurements.append(["case": name, "width": size.width, "height": size.height, "zoom": zoom, "focus": focus, "artwork": artwork,
                 "media": live ? "Static bundled image in the real WKWebView; synthetic paused event" : "Real idle view, bundled demo artwork", "boundsCoordinateSpace": "Initial unscrolled content viewport",
                 "initialViewportAssertionsPassed": true,
                 "bounds": initialBounds.mapValues { ["x": $0.minX, "y": $0.minY, "width": $0.width, "height": $0.height] }])
@@ -115,7 +137,7 @@ final class NativeUIRenderingTests: XCTestCase {
         XCTAssertNil(NativeArtwork.url(thumbnail: "https://name:secret@i.ytimg.com/image", videoID: "invalid"))
     }
 
-    func testResizeAndFocusKeepTheExistingPlayerAndOccurrence() async throws {
+    func testResizeFocusAndZoomKeepTheExistingPlayerAndOccurrence() async throws {
         let library = NativeLibraryModel()
         library.openDemo()
         let fixture = NativeLibraryFixture.snapshot
@@ -129,8 +151,9 @@ final class NativeUIRenderingTests: XCTestCase {
         window.contentView = host
         window.orderBack(nil)
         defer { session.coordinator.stop(); window.close(); library.closeLibrary() }
-        for (width, height, focus) in [(1280, 860, false), (760, 680, false), (1100, 720, true), (1600, 1000, false)] {
+        for (width, height, focus, zoom) in [(1280, 860, false, 1.0), (480, 680, false, 0.8), (480, 800, false, 1.25), (480, 680, true, 1.25), (1100, 720, true, 1.0), (1600, 1000, false, 1.0)] {
             preferences.set(focus, forKey: "native.focus")
+            preferences.set(zoom, forKey: "native.interfaceZoom")
             window.setContentSize(NSSize(width: width, height: height))
             try await Task.sleep(nanoseconds: 150_000_000)
             host.layoutSubtreeIfNeeded()
@@ -138,11 +161,58 @@ final class NativeUIRenderingTests: XCTestCase {
             XCTAssertEqual(players.count, 1)
             XCTAssertTrue(players.first === session.coordinator.player.webView)
             XCTAssertTrue(session.coordinator.player.webView.window === window)
+            XCTAssertEqual(session.coordinator.player.webView.isHiddenOrHasHiddenAncestor, focus)
             XCTAssertEqual(session.coordinator.queueState.expectedGeneration, 1)
             XCTAssertEqual(session.coordinator.index, 0)
             XCTAssertFalse(session.coordinator.recoveryRequired)
         }
-        XCTAssertEqual(loads, 0, "Layout and Focus changes must not request a media reload")
+        XCTAssertEqual(loads, 0, "Layout, Focus and zoom must not request a media reload")
+    }
+
+    func testCommandZoomWithWebViewFocusedAndWindowCloseStopsThePlayer() async throws {
+        let library = NativeLibraryModel()
+        library.openDemo()
+        let fixture = NativeLibraryFixture.snapshot
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: "tubeshuffle-ui-zoom-\(UUID().uuidString)"))
+        let session = NativeListeningSession(items: fixture.occurrences, playlist: fixture.playlists[0], library: library,
+            testHooks: .init(load: { _, _ in XCTFail("Zoom must not reload media") }, progress: { _ in (0, 100) }, draw: { 0.5 }))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 800), styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let host = NSHostingView(rootView: NativeLibraryView(library: library, preferences: preferences, session: session))
+        window.contentView = host
+        window.orderBack(nil)
+        defer { session.coordinator.stop(); window.close(); library.closeLibrary() }
+        host.layoutSubtreeIfNeeded()
+        try await Task.sleep(nanoseconds: 150_000_000)
+        window.makeFirstResponder(session.coordinator.player.webView)
+        for (characters, modifiers, expected) in [
+            ("-", NSEvent.ModifierFlags.command, 0.9),
+            ("-", .command, 0.8), ("-", .command, 0.8),
+            ("=", .command, 0.9), ("+", [.command, .shift], 1.0),
+            ("+", .command, 1.1), ("+", .command, 1.25), ("+", .command, 1.25),
+            ("0", .command, 1.0), ("-", [], 1.0), ("-", [.command, .option], 1.0)
+        ] {
+            let event = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
+                windowNumber: window.windowNumber, context: nil, characters: characters, charactersIgnoringModifiers: characters,
+                isARepeat: false, keyCode: 0))
+            NSApp.sendEvent(event)
+            try await Task.sleep(nanoseconds: 80_000_000)
+            XCTAssertEqual(preferences.double(forKey: "native.interfaceZoom"), expected, accuracy: 0.001, characters)
+        }
+        let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 200), styleMask: [.titled], backing: .buffered, defer: false)
+        sheet.isReleasedWhenClosed = false
+        window.beginSheet(sheet, completionHandler: { _ in })
+        let event = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, characters: "-", charactersIgnoringModifiers: "-", isARepeat: false, keyCode: 0))
+        NSApp.sendEvent(event)
+        XCTAssertEqual(preferences.double(forKey: "native.interfaceZoom"), 1)
+        window.endSheet(sheet); sheet.close()
+        window.close()
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertNil(session.coordinator.player.onEvent, "Closing the native window must tear down the media bridge")
+        XCTAssertNil(session.coordinator.onNaturalCompletion)
+        XCTAssertFalse(session.coordinator.canTransport)
+        XCTAssertFalse(library.isOpen)
     }
 
     private func webViews(in view: NSView) -> [WKWebView] {

@@ -26,9 +26,10 @@ def sha256(path: Path) -> str:
 
 
 def source_hashes() -> dict[str, str]:
-    suffixes = {".swift", ".plist", ".entitlements", ".pbxproj", ".resolved", ".jpg", ".py", ".sh"}
+    suffixes = {".swift", ".plist", ".entitlements", ".pbxproj", ".resolved", ".jpg", ".icns", ".mjs", ".py", ".sh"}
     sources = sorted(p for p in MACOS.rglob("*")
                      if p.is_file() and p.suffix in suffixes and "__pycache__" not in p.parts)
+    sources.append(ROOT / "public/favicon.svg")
     return {str(p.relative_to(ROOT)): sha256(p) for p in sources}
 
 
@@ -61,6 +62,8 @@ def main() -> None:
     with (app / "Contents/Info.plist").open("rb") as handle:
         info = plistlib.load(handle)
     assert info["CFBundleIdentifier"] == "com.tubeshuffle.playbacklab"
+    assert info["CFBundleIconFile"] == "AppIcon"
+    assert sha256(app / "Contents/Resources/AppIcon.icns") == sha256(MACOS / "TubeShuffle/Resources/AppIcon.icns")
     assert info["CFBundleURLTypes"][0]["CFBundleURLSchemes"] == ["com.tubeshuffle.playbacklab"]
     entitlement_result = subprocess.run(["codesign", "-d", "--entitlements", ":-", str(app)], capture_output=True, check=True)
     entitlements = plistlib.loads(entitlement_result.stdout)

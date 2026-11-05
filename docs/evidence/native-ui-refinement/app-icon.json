@@ -1,0 +1,115 @@
+{
+  "recordedAtUTC": "2026-11-05T23:18:32.177623+00:00",
+  "scope": "Owner-requested reuse of the web favicon as the native application icon; no Swift application/player changes since the UI refinement.",
+  "asset": {
+    "source": "public/favicon.svg",
+    "sourceSHA256": "e42204d72baea15cd6d3a39430490094a35c02ea002e25937febc6d55caa2bae",
+    "icon": "macos/TubeShuffle/Resources/AppIcon.icns",
+    "iconSHA256": "6fcc43703b6fcca7546dbf29f846631e3a9ed2d87b1b0b65e1078c3ca5c855ba",
+    "representations": [
+      {
+        "filename": "icon_128x128.png",
+        "pixels": 128,
+        "alpha": true
+      },
+      {
+        "filename": "icon_128x128@2x.png",
+        "pixels": 256,
+        "alpha": true
+      },
+      {
+        "filename": "icon_16x16.png",
+        "pixels": 16,
+        "alpha": true
+      },
+      {
+        "filename": "icon_16x16@2x.png",
+        "pixels": 32,
+        "alpha": true
+      },
+      {
+        "filename": "icon_256x256.png",
+        "pixels": 256,
+        "alpha": true
+      },
+      {
+        "filename": "icon_256x256@2x.png",
+        "pixels": 512,
+        "alpha": true
+      },
+      {
+        "filename": "icon_32x32.png",
+        "pixels": 32,
+        "alpha": true
+      },
+      {
+        "filename": "icon_32x32@2x.png",
+        "pixels": 64,
+        "alpha": true
+      },
+      {
+        "filename": "icon_512x512.png",
+        "pixels": 512,
+        "alpha": true
+      },
+      {
+        "filename": "icon_512x512@2x.png",
+        "pixels": 1024,
+        "alpha": true
+      }
+    ]
+  },
+  "wiring": {
+    "CFBundleIconFile": "AppIcon",
+    "bundledPath": "Contents/Resources/AppIcon.icns",
+    "bundledBytesMatchSource": true,
+    "resourcesPhaseIncludesIcon": true
+  },
+  "macOSObservation": {
+    "bundle": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-szvj8h5e/TubeShuffle Local/TubeShuffle.app",
+    "finderIcon": "finder-icon.png",
+    "finishedLaunching": true,
+    "pid": 69218,
+    "runningIcon": "running-icon.png"
+  },
+  "systemAppearance": {
+    "retainedImage": "app-icon-system.png",
+    "sha256": "75266f8b99c2022b029c2ecc7179cc1fe03cf9e1d7e47a49f9328f41121d063c",
+    "finderAndRunningApplicationImagesIdentical": true,
+    "visuallyInspected": true
+  },
+  "verification": {
+    "sourceFilesMatched": 88,
+    "manifest": "app-icon-build-info.json",
+    "executed": 243,
+    "passed": 241,
+    "skipped": 2,
+    "failures": 0,
+    "testsLog": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-szvj8h5e/tests.log",
+    "testsLogSHA256": "2dbe2b829aef3495e9e8fc65391ad96169ff4b725fd09575a75ca3324e555913",
+    "releaseBuild": "passed",
+    "adHocSignatureAndEntitlements": "passed",
+    "zipIntegrity": "passed",
+    "sourcePlistsAndGeneratorSyntax": "passed"
+  },
+  "candidate": {
+    "archive": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-szvj8h5e/TubeShuffle-local-arm64.zip",
+    "archiveSHA256": "d1d55d760058285e11f15c0dcc61c616fe67f665d33016992b6fba4f96f8bbd0",
+    "publicSetup": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-szvj8h5e/TubeShuffle-account-setup.json",
+    "publicSetupSHA256": "ac6813b24393c3628fe0134715dc03d7302aef439f115d8b71ae625788c2c472"
+  },
+  "preservation": {
+    "previousCandidatesKept": true,
+    "existingAppInstancesLeftAlone": true,
+    "newDemoLeftOpen": true,
+    "agentStartedPlayback": false,
+    "realLibraryAccess": false,
+    "accountLogin": false,
+    "remoteChangesOrDeployment": false
+  },
+  "limits": [
+    "The icon is verified; it does not close pending manual audio, transfer, account or YouTube policy gates.",
+    "The earlier visual review covers the unchanged listening UI, not a new review of the application icon.",
+    "The new candidate remains ad-hoc signed and not notarized."
+  ]
+}
