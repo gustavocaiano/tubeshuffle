@@ -36,6 +36,43 @@ final class NativeAccountModel: ObservableObject {
 
     deinit { if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) } }
 
+    func applySetup(_ data: Data) throws {
+        guard !configured, !busy else { return }
+        let value = try NativeAccountSetupDocument.decode(data)
+        supabaseURL = value.supabaseOrigin.absoluteString
+        publishableKey = value.publishableKey
+        apiURL = value.applicationAPIOrigin.absoluteString
+        message = "Setup loaded. Review the origins and choose Use this configuration. Sign-in remains a separate action."
+    }
+
+    func loadSetup() {
+        guard !configured, !busy else { return }
+        let panel = NSOpenPanel()
+        panel.title = "Load account setup"
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do { try applySetup(NativeTransferFiles.read(url)) }
+        catch { message = "Setup was not loaded. Use a valid TubeShuffle setup JSON with HTTPS origins and a publishable key, up to 8 KB." }
+    }
+
+    func saveSetup() {
+        guard !busy else { return }
+        do {
+            guard let auth = URL(string: supabaseURL), let api = URL(string: apiURL) else { throw NativeAccountSetupDocument.Failure.invalidDocument }
+            let value = try NativeAccountConfiguration(supabaseOrigin: auth, publishableKey: publishableKey, applicationAPIOrigin: api)
+            let data = try NativeAccountSetupDocument.encode(value)
+            let panel = NSSavePanel()
+            panel.title = "Save public account setup"
+            panel.nameFieldStringValue = "tubeshuffle-account-setup.json"
+            panel.allowedContentTypes = [.json]
+            panel.message = "Only service origins and the public publishable key are included. No login tokens or library data. Choose a new filename."
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            try NativeTransferFiles.writeNew(data, at: url)
+            message = "Public setup saved. Load it explicitly on your next run; sign-in remains separate."
+        } catch { message = "Setup could not be saved. Check the public configuration and choose a new filename; existing files are kept." }
+    }
+
     func configure() {
         guard !configured, !busy, let window else { return }
         do {
@@ -163,12 +200,16 @@ struct NativeAccountView: View {
             if demo {
                 Label("Account access is disabled in the demo library.", systemImage: "person.crop.circle.badge.xmark")
             } else if !account.configured {
+                Button("Load setup JSON…") { account.loadSetup() }
                 TextField("Supabase URL · https://project.supabase.co", text: $account.supabaseURL)
                 TextField("Supabase publishable key · sb_publishable_…", text: $account.publishableKey)
                 TextField("Application API origin · https://…", text: $account.apiURL)
                 Text("Use the existing configured services. This app does not provision a project or change callback settings. Configuration is kept for this run; credentials use a separate Keychain namespace for each configuration.")
                     .font(.callout).foregroundStyle(.secondary)
-                Button("Use this configuration") { account.configure() }
+                HStack {
+                    Button("Use this configuration") { account.configure() }
+                    Button("Save public setup…") { account.saveSetup() }
+                }
             } else {
                 HStack {
                     if account.busy { ProgressView().controlSize(.small); Text("Working…") }

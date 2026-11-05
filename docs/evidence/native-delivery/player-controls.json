@@ -1,0 +1,27 @@
+[
+  {
+    "step": "resize1280x900",
+    "states": [
+      "Now playing \u00b7 Track 1 of 6",
+      "Player status: Playback: Playing"
+    ]
+  },
+  {
+    "step": "minimizeRestore",
+    "states": [
+      "Now playing \u00b7 Track 1 of 6",
+      "Player status: Playback: Playing"
+    ]
+  },
+  {
+    "step": "hideRestore",
+    "states": [
+      "Now playing \u00b7 Track 1 of 6",
+      "Player status: Playback: Playing"
+    ]
+  },
+  {
+    "step": "stopAndClose",
+    "states": []
+  }
+]

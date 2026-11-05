@@ -24,6 +24,8 @@ Send one results block after these checks, marking anything not tried as **not t
 
 The queue and preferences are **not transferred** by JSON: create the queue after importing to test its persistence. Natural observed ends are recorded once for the exact local occurrence; seeks/manual skips do not fabricate completions. Listening seconds are recorded as zero (not measured), not inferred from track duration. Suggestions opened on YouTube have no local listening events and are excluded from export/history.
 
+In a macOS file panel, use **Cmd+Shift+G** to navigate to the printed rehearsal directory, then enter only a filename in **Save As**. Pasting a full path into the filename field can create a filename containing colon characters instead of navigating there. Confirm the selected directory before saving or creating a library.
+
 Use only these synthetic files, without account login or a real library. Keep the rehearsal files until the results are reviewed. Automated SwiftUI rendering checks cover geometry, demo artwork and retained-player identity across resize/Focus. They render static media fixtures, not live audio; OS keyboard/file-panel behavior and subjective UI acceptance remain owner-observed. A successful build is not a UI/audio pass.
 
 ## Current local behavior and limits
@@ -31,12 +33,44 @@ Use only these synthetic files, without account login or a real library. Keep th
 - Content/history use SwiftData with CloudKit disabled. Creation requires a new private folder; existing open requires the runtime marker, compatible structure and a cooperative exclusive lock. No library discovery, missing-store creation, repair, merge or destructive refresh runs automatically. SwiftData has no public general no-migration open guarantee; arbitrary or old real stores are not approved by the synthetic checks.
 - Queue is a versioned local JSON sidecar containing only exact occurrence IDs/order/selection. Opening a library never starts audio. A missing sidecar is distinct from an invalid one; malformed/unknown queue files are kept and reported. Queue/history commits are separate; the app does not claim an atomic transaction across them.
 - Transfer v1 preserves IDs and valid history; orphan history is counted and omitted. Nonempty destinations are blocked. Input is capped at 10 MB, 500,000 JSON values and depth 8. A nominally valid but more complex file may be rejected by the resource cap. Files are unencrypted; export never replaces an existing filename. Old overwritten duplicate occurrences cannot be reconstructed.
-- Account setup uses explicitly entered HTTPS origins and a Supabase **publishable** key, for Supabase Free only. Configuration is per run. Google PKCE uses the system authentication browser; credentials are isolated in Keychain by configuration. Sign-in does not upload or fetch playlist content. Cloud save/remove changes only IDs and is explicit. Resume/refresh are explicit; a failed mutation may already have committed and is not retried automatically.
-- Account callback/provider/owner/RLS configuration and real Keychain behavior are still external/manual gates. The exact native callback is `com.tubeshuffle.playbacklab://auth/callback`; no callback allowlist, SQL migration or service setting was changed by this work. The previous diagnostic callback entry was reported removed. Do not assume a live login will work until it is separately configured and tested.
+- Account setup uses explicitly entered HTTPS origins and a Supabase **publishable** key, for Supabase Free only. Configuration is per run; **Load setup JSON…** and **Save public setup…** let you carry that public configuration between runs. Loading only fills the form: review it, choose **Use this configuration**, then explicitly sign in or resume. No configuration file is discovered automatically. Google PKCE uses the system authentication browser; credentials are isolated in Keychain by configuration. Sign-in does not upload or fetch playlist content. Cloud save/remove changes only IDs and is explicit. Resume/refresh are explicit; a failed mutation may already have committed and is not retried automatically.
+- Account callback activation, live provider/owner/RLS behavior and real Keychain behavior remain external/manual gates. Read-only inspection confirmed Google enabled, the existing owner pin and expected catalog settings; it did not test live login or policy execution. The exact native callback `com.tubeshuffle.playbacklab://auth/callback` is currently absent from the allowlist. No Supabase setting or SQL migration was changed. The Vercel configuration additions below await a separate deployment.
 - Suggestions cache at most five results per playlist/UTC day and 20 entries in memory, scoped to the active account run. They open on YouTube; they are not silently inserted into a local playlist/history. Quota/network/service-paused failures preserve local contents.
 - Normal/Smart shuffle, a visible embedded player, native queue/transport/seeking/volume, local filtering and preferences are implemented. Rendering checks cover seven desktop/compact/Focus/Stage layouts and bundled artwork. Accessibility, live artwork requests, OS interaction and playback through this UI still need owner observation. There are no transcripts, stream downloads, hidden keepalives or visibility/identity overrides.
 
 Run the historical lab explicitly with `--playback-lab`; `--local-oauth-diagnostic` and `--local-two-account-diagnostic` remain separate diagnostic paths. The sections below retain earlier evidence and procedures, not current product acceptance.
+
+## Local delivery and browser coexistence
+
+The website remains available at **https://www.tubeshuffle.online/**. The native app does not replace it or open its browser profile. Web IndexedDB/localStorage and native SwiftData/queue files are separate. There is no automatic content, queue, history or preference sync. Account links are shared only when the account service is configured and working; the cloud stores IDs, not local library contents.
+
+The 2026-11-05 anonymous public check observed **200** on the homepage and **503** on `/api/playlist-links`. That is not a full web acceptance result. The initial [Vercel audit](../docs/evidence/native-delivery/vercel-readonly-audit.json) found five missing account variables. They have since been [added to production configuration](../docs/evidence/native-delivery/configuration-apply.json), preserving existing variables and leaving preview/development unchanged. The running deployment remains at `e168bd5`; it does not acquire those values until a new deployment, and the checkout's newer storage protection has not been rolled out there. Supabase reads verified the project/key/pin and catalog settings, but the native callback and canonical Site URL still need Auth configuration access. No Supabase mutation, SQL migration or deployment occurred. Live-account acceptance remains pending.
+
+Build a fresh, isolated Apple Silicon candidate from the repository root:
+
+```sh
+python3 -B macos/scripts/prepare-local-delivery.py
+```
+
+This runs the hosted suite and a Release build with pinned package versions, verifies unchanged native source hashes, signs only its new app copy ad hoc, verifies the signature/entitlements/arm64 architecture, and produces a ZIP, `SHA256SUMS`, logs and `build-info.json` in a unique ignored `build/tubeshuffle-delivery-*` directory. It does not install, overwrite an earlier candidate, deploy or notarize. It is a repeatable preparation procedure, not a claim of bit-for-bit deterministic Xcode output.
+
+Keep the extracted **TubeShuffle Local** folder together. **Open Demo.command** starts the isolated in-memory demo; **Open TubeShuffle.command** starts the ordinary empty entry screen. Requires macOS 14+ and Apple Silicon. The package is **not Developer ID signed or notarized**, and it is not an approved public release. No valid local Developer ID identity was found. Do not disable Gatekeeper globally.
+
+Public setup JSON has exactly these fields (replace the placeholders before loading):
+
+```json
+{
+  "format": "tubeshuffle-account-setup",
+  "version": 1,
+  "supabaseOrigin": "https://YOUR_PROJECT.supabase.co",
+  "publishableKey": "<verified project publishable key>",
+  "applicationAPIOrigin": "https://www.tubeshuffle.online"
+}
+```
+
+The parser rejects unknown/duplicate fields, invalid origins, non-publishable keys and files larger than 8 KB. Export has the same size bound and never overwrites an existing file. Access/refresh tokens, owner pins, Vercel tokens and server API keys do not belong in this file. A public key's syntax does not prove its project provenance. A [setup JSON from the verified project](../build/tubeshuffle-delivery-_fcy8y2w/TubeShuffle-account-setup.json) is prepared beside the candidate ZIP. Load it in the ordinary app's Account form; the demo disables Account. Loading is not live acceptance: the native callback, deployment and owner sign-in test remain pending.
+
+See the [delivery evidence and remaining gates](../docs/evidence/native-delivery/README.md) for the prepared candidate, exact counts and the limited UI observations. The grouped rehearsal above remains the single place to report unverified keyboard, audio and file-panel behavior. Passing it does not resolve YouTube policy.
 
 # Playback Lab — historical P0 instructions
 

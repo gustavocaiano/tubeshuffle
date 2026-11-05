@@ -1,0 +1,16 @@
+{
+  "origin": "https://www.tubeshuffle.online",
+  "results": [
+    {
+      "contentType": "text/html; charset=utf-8",
+      "path": "/",
+      "status": 200
+    },
+    {
+      "contentType": "application/json",
+      "path": "/api/playlist-links",
+      "status": 503
+    }
+  ],
+  "title": "TubeShuffle — A Better YouTube Playlist Shuffle"
+}

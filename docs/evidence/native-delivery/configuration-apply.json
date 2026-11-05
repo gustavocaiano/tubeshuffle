@@ -1,0 +1,88 @@
+{
+  "recordedAtUTC": "2026-11-05T21:59:08.495149+00:00",
+  "scope": "Add five previously absent Vercel production environment variables under the owner configuration request. No deploy or Supabase configuration mutation.",
+  "created": [
+    {
+      "httpStatus": 201,
+      "id": "Jm7rRcTgLYXZMbrY",
+      "key": "NEXT_PUBLIC_SUPABASE_URL",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "httpStatus": 201,
+      "id": "JK2BoojpeGY0x4uZ",
+      "key": "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "httpStatus": 201,
+      "id": "bBgR3OpIzGZ7wvcj",
+      "key": "OWNER_USER_ID",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    },
+    {
+      "httpStatus": 201,
+      "id": "77NnWe25y74NeoKF",
+      "key": "APP_ORIGIN",
+      "target": [
+        "production"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "httpStatus": 201,
+      "id": "o6ZUUhBocyrdJFXF",
+      "key": "CSRF_HMAC_SECRET",
+      "target": [
+        "production"
+      ],
+      "type": "sensitive"
+    }
+  ],
+  "supabaseAuthWriteRequest": "timed_out; no mutation attempted",
+  "supabasePreflight": {
+    "existingOwnerPinMatched": true,
+    "publishableKeyMatched": true,
+    "playlistRowsRead": false
+  },
+  "preexistingVariables": [
+    {
+      "id": "zghk9RPpPFaVVUIK",
+      "key": "NEXT_PUBLIC_YOUTUBE_API_MODE",
+      "target": [
+        "production",
+        "preview",
+        "development"
+      ],
+      "type": "encrypted"
+    },
+    {
+      "id": "wRFvIz8tDdWpMF9G",
+      "key": "YOUTUBE_API_KEY",
+      "target": [
+        "production",
+        "preview",
+        "development"
+      ],
+      "type": "encrypted"
+    }
+  ],
+  "verification": {
+    "newVariableMetadataVerified": true,
+    "preexistingVariableMetadataPreserved": true,
+    "productionDeploymentUnchanged": true,
+    "productionCommit": "e168bd58005c22a240fd9052d69fbef62ddbd2b2",
+    "currentDeploymentUsesNewValues": false,
+    "runtimeAccountAcceptance": false
+  },
+  "result": "configuration_saved_pending_deploy"
+}

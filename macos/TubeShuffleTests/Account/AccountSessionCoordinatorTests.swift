@@ -26,6 +26,43 @@ private struct SyntheticAPIAccountLinkService: AccountLinkService {
 
 @MainActor
 final class AccountSessionCoordinatorTests: XCTestCase {
+    func testPublicSetupRoundTripDoesNotConfigureOrStartAccount() throws {
+        let configuration = try NativeAccountConfiguration(supabaseOrigin: URL(string: "https://example.supabase.co")!,
+            publishableKey: "sb_publishable_abcdefghijklmnopqrstuv", applicationAPIOrigin: URL(string: "https://example.test")!)
+        let data = try NativeAccountSetupDocument.encode(configuration)
+        XCTAssertEqual(try NativeAccountSetupDocument.decode(data), configuration)
+        let model = NativeAccountModel()
+        try model.applySetup(data)
+        XCTAssertEqual(model.apiURL, "https://example.test")
+        XCTAssertFalse(model.configured)
+        XCTAssertFalse(model.busy)
+        XCTAssertEqual(model.state, .signedOut)
+    }
+
+    func testPublicSetupRejectsUnknownFieldsDuplicatesAndOversizedInput() throws {
+        let valid = "{\"format\":\"tubeshuffle-account-setup\",\"version\":1,\"supabaseOrigin\":\"https://example.supabase.co\",\"publishableKey\":\"sb_publishable_abcdefghijklmnopqrstuv\",\"applicationAPIOrigin\":\"https://example.test\"}"
+        for invalid in [valid.replacingOccurrences(of: "\"version\":1", with: "\"version\":1,\"token\":\"do-not-import\""),
+                        valid.replacingOccurrences(of: "\"version\":1", with: "\"version\":1,\"version\":1"),
+                        valid.replacingOccurrences(of: "\"version\":1", with: "\"version\":1.00000000000000001"),
+                        valid.replacingOccurrences(of: "sb_publishable_abcdefghijklmnopqrstuv", with: "sb_secret_abcdefghijklmnopqrstuv"),
+                        valid.replacingOccurrences(of: "https://example.test", with: "http://example.test"),
+                        valid + String(repeating: " ", count: 8_192)] {
+            XCTAssertThrowsError(try NativeAccountSetupDocument.decode(Data(invalid.utf8)))
+        }
+        let oversized = try NativeAccountConfiguration(supabaseOrigin: URL(string: "https://example.supabase.co")!,
+            publishableKey: "sb_publishable_" + String(repeating: "a", count: 8_192),
+            applicationAPIOrigin: URL(string: "https://example.test")!)
+        XCTAssertThrowsError(try NativeAccountSetupDocument.encode(oversized))
+    }
+
+    func testInvalidPublicSetupKeepsCurrentFormValues() {
+        let model = NativeAccountModel()
+        model.apiURL = "https://previous.test"
+        XCTAssertThrowsError(try model.applySetup(Data("{}".utf8)))
+        XCTAssertEqual(model.apiURL, "https://previous.test")
+        XCTAssertFalse(model.configured)
+    }
+
     enum Failure: Error { case secretBearingError }
 
     final class Auth: AccountAuthenticationService {

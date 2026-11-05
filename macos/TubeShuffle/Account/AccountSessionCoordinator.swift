@@ -343,8 +343,9 @@ final class AccountSessionCoordinator {
 // MARK: - Normal native account service
 
 /// Explicit, non-secret configuration supplied by the person using the app.
-/// It is never discovered from a plist, file, environment variable, or remote
-/// endpoint. Service-role keys and OAuth client secrets are not accepted here.
+/// It is never discovered automatically. A setup document can be selected
+/// explicitly and reviewed in the account form before use. Service-role keys
+/// and OAuth client secrets are not accepted here.
 struct NativeAccountConfiguration: Equatable {
     enum Failure: Error, Equatable { case invalidSupabaseOrigin, invalidPublishableKey, invalidAPIOrigin, invalidRedirect }
     static let requiredRedirect = URL(string: "com.tubeshuffle.playbacklab://auth/callback")!
@@ -378,6 +379,44 @@ struct NativeAccountConfiguration: Equatable {
               parts.path.isEmpty || parts.path == "/",
               parts.port == nil || (1...65535).contains(parts.port!) else { return false }
         return true
+    }
+}
+
+/// Portable public setup only. Tokens, passwords and owner pins have no fields.
+enum NativeAccountSetupDocument {
+    enum Failure: Error { case invalidDocument }
+    static let maximumBytes = 8_192
+    private struct Payload: Codable {
+        let format: String
+        let version: Int
+        let supabaseOrigin: String
+        let publishableKey: String
+        let applicationAPIOrigin: String
+    }
+
+    static func decode(_ data: Data) throws -> NativeAccountConfiguration {
+        guard data.count <= maximumBytes else { throw Failure.invalidDocument }
+        let document = try RawJSONScanner.scan(data, maximumNodes: 6, maximumDepth: 2)
+        guard document.nodes.count == 6,
+              case .object = document.nodes[0].value,
+              Set(document.nodes.dropFirst().compactMap(\.key)) == Set(["format", "version", "supabaseOrigin", "publishableKey", "applicationAPIOrigin"]),
+              let version = document.nodes.first(where: { $0.key == "version" }),
+              case .number("1") = version.value else { throw Failure.invalidDocument }
+        let payload = try JSONDecoder().decode(Payload.self, from: data)
+        guard payload.format == "tubeshuffle-account-setup",
+              let auth = URL(string: payload.supabaseOrigin),
+              let api = URL(string: payload.applicationAPIOrigin) else { throw Failure.invalidDocument }
+        return try NativeAccountConfiguration(supabaseOrigin: auth, publishableKey: payload.publishableKey, applicationAPIOrigin: api)
+    }
+
+    static func encode(_ configuration: NativeAccountConfiguration) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(Payload(format: "tubeshuffle-account-setup", version: 1,
+            supabaseOrigin: configuration.supabaseOrigin.absoluteString, publishableKey: configuration.publishableKey,
+            applicationAPIOrigin: configuration.applicationAPIOrigin.absoluteString))
+        guard data.count <= maximumBytes else { throw Failure.invalidDocument }
+        return data
     }
 }
 

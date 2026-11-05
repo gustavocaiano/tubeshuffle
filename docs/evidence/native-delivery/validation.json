@@ -1,0 +1,152 @@
+{
+  "recordedAtUTC": "2026-11-05T17:43:30.484702+00:00",
+  "scope": "Local uncommitted delivery preparation at 051bb26. Synthetic data only; no production deployment or release approval.",
+  "baseline": {
+    "head": "051bb26b48bed0e9ccbe77639b3ae6cefd9909ed",
+    "branch": "t3/native-macos-app"
+  },
+  "candidate": {
+    "directory": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-_fcy8y2w",
+    "archive": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-_fcy8y2w/TubeShuffle-local-arm64.zip",
+    "archiveSHA256": "5ed4db807b059e46e13bfc134a09c9b8c57b816f25db9ca894fcabaa74c2d16d",
+    "app": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-_fcy8y2w/TubeShuffle Local/TubeShuffle.app",
+    "minimumMacOS": "14.0",
+    "architecture": "arm64",
+    "signature": "ad hoc; verified; not Developer ID; not notarized",
+    "sourceFilesMatch": 85,
+    "zipIntegrity": "passed",
+    "entitlementsMatch": "passed",
+    "sourceManifest": "build-info.json"
+  },
+  "nativeSuite": {
+    "executed": 242,
+    "passed": 240,
+    "skipped": 2,
+    "failures": 0,
+    "testsLog": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-_fcy8y2w/tests.log",
+    "testsLogSHA256": "caf3a897e9ed455d690f0855bda0e3915381534765e4121daaa02ae36109e878",
+    "buildLog": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-_fcy8y2w/build.log",
+    "buildLogSHA256": "f50679c1e9724c304b880a3b80780443ad232d093aa465e14b172e3649aa736b",
+    "skips": [
+      "CooperativeFileLockTests.testProcessDeathReleasesLock",
+      "LocalLibraryStoreTests.testSuccessfulExistingStoreReopenRequiresSeparateProcess"
+    ]
+  },
+  "otherChecks": {
+    "accountBuildConfig": {
+      "command": "python3 -B macos/tests/test_account_build_config.py",
+      "passed": 6
+    },
+    "nativeLibrarySeparateProcesses": {
+      "command": "python3 -B macos/tests/run_standalone_native_local_library_probe.py",
+      "result": "ok",
+      "rawLogRetained": false
+    },
+    "browserStorage": {
+      "raw": "browser-storage.json",
+      "outcomes": 13,
+      "ok": true,
+      "contexts": "Disposable Incognito iframe realms; prior two-tab result is separate evidence"
+    },
+    "webRegression": "No web code changed for this delivery; prior 461-pass/2-skip and 6 synthetic HTTP results remain source-bound historical evidence, not rerun counts."
+  },
+  "publicServices": {
+    "raw": "public-web-probe.json",
+    "anonymous": true,
+    "homepage": 200,
+    "playlistLinks": 503,
+    "vercelAccess": "Existing CLI token invalid; private replacement request declined. No remote settings inspected or changed.",
+    "callback": "Not assumed to be allowlisted",
+    "signingIdentityCount": 0
+  },
+  "firstCandidateGUI": {
+    "binarySHA256": "79f0313a73b898b22acde52e45beb4f115647ab789b014bc43344ffbd78ca336",
+    "fixturePID": 28196,
+    "actions": [
+      "Library/Done",
+      "Focus/Stage/Exit Stage",
+      "AX resize 760x680 and 1280x900",
+      "Shuffle & listen",
+      "Minimize/unminimize requests accepted",
+      "Stop & close removed the player"
+    ],
+    "displayedPlayback": "Playing with advancing position; audible audio and natural transitions not observed",
+    "hideRequest": false,
+    "keyboard": "Escape/shortcuts not established by the automation. Manual verification required.",
+    "export": {
+      "playlists": 1,
+      "occurrences": 6,
+      "history": 0,
+      "retainedFile": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-xxhy5j9l/rehearsal/automation-initial-export.json",
+      "automationIssue": "Absolute path was placed in Save As; macOS normalized separators into filename characters under Documents. Only that newly created fixture file was copied into rehearsal, byte-checked, then its accidental original removed. No existing files replaced."
+    },
+    "uiCreateImportReopen": "not completed; separate model/process tests are not a GUI pass",
+    "raw": [
+      "player-ax.json",
+      "player-controls.json"
+    ]
+  },
+  "finalCandidateLaunch": {
+    "fixturePID": 31713,
+    "launch": "open -n app --args --ui-fixture",
+    "demoRows": 6,
+    "accountDisabledObserved": true,
+    "playbackStarted": false,
+    "terminationRequested": true,
+    "accountCheck": "AXEnabled=0 on Account button; sheet is unavailable in fixture mode. Initial probe incorrectly expected a disabled-account label inside an unavailable sheet.",
+    "accountControl": {
+      "description": "Account",
+      "enabled": "0",
+      "index": "6",
+      "role": "AXButton",
+      "title": "",
+      "value": ""
+    }
+  },
+  "openGates": [
+    "Owner integrated UI/audio/keyboard/file-panel results",
+    "Live callback/provider/owner/API/RLS and signed Keychain validation",
+    "YouTube policy",
+    "Developer ID/notarization and separate release/rollout authorization"
+  ],
+  "preservation": "No real library/profile opened; no production schema, repair, migration, account change, deploy or rollout. User files and prior candidates preserved.",
+  "followUp": {
+    "vercelReadOnlyAudit": "vercel-readonly-audit.json",
+    "access": "User supplied working token in a second private request; earlier declined-request observation above remains historical.",
+    "changesApplied": [
+      {
+        "service": "Vercel",
+        "target": "production",
+        "createdVariables": [
+          "NEXT_PUBLIC_SUPABASE_URL",
+          "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+          "OWNER_USER_ID",
+          "APP_ORIGIN",
+          "CSRF_HMAC_SECRET"
+        ],
+        "existingVariablesPreserved": true,
+        "deployed": false
+      }
+    ],
+    "supabaseReadOnlyAudit": "supabase-readonly-audit.json",
+    "configurationApply": "configuration-apply.json",
+    "currentState": {
+      "recordedAtUTC": "2026-11-05T21:59:08.495149+00:00",
+      "supabaseReadToken": "Received and validated through the private request; no token value retained in repository evidence.",
+      "supabaseAuthWriteRequest": "Timed out without a response; no Supabase mutation attempted.",
+      "supabaseChangesPending": [
+        "Set Site URL to https://www.tubeshuffle.online",
+        "Append com.tubeshuffle.playbacklab://auth/callback while preserving both current redirects"
+      ],
+      "productionDeploymentUnchanged": true,
+      "productionCommit": "e168bd58005c22a240fd9052d69fbef62ddbd2b2",
+      "accountRuntimeAccepted": false,
+      "publicSetup": {
+        "path": "build/tubeshuffle-delivery-_fcy8y2w/TubeShuffle-account-setup.json",
+        "sha256": "ac6813b24393c3628fe0134715dc03d7302aef439f115d8b71ae625788c2c472",
+        "loadedOrSignInTested": false
+      },
+      "scopeNote": "The base publicServices and preservation fields describe the earlier package checkpoint. This follow-up records the later read-only inspection and five Vercel additions; no deployment, Supabase mutation or library access occurred."
+    }
+  }
+}
