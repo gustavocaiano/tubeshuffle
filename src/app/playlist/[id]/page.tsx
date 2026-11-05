@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink, Music } from "lucide-react";
@@ -21,9 +21,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { shuffleVideos } from "@/lib/shuffle/shuffle-service";
 import { usePlayerStore, type VideoItem } from "@/stores/player-store";
-import { playlistRepository } from "@/stores/playlist-store";
+import { playlistRepository, type LocalPlaylistBundle } from "@/stores/playlist-store";
 import { useUiPreferencesStore } from "@/stores/ui-preferences-store";
 import type { ShufflePreset } from "@/types/playlist";
+import { QueryReadError } from "@/components/QueryReadError";
+
+interface ShuffleInvocation {
+  requestId: number;
+  routePlaylistId: string;
+  bundle: LocalPlaylistBundle;
+  preset: ShufflePreset;
+  shouldExcludeWatched: boolean;
+}
 
 function ListeningView({
   currentVideo,
@@ -65,35 +74,83 @@ function ListeningView({
 export default function PlaylistPage() {
   const params = useParams();
   const playlistId = params.id as string;
+  return <PlaylistView key={playlistId} playlistId={playlistId} />;
+}
 
+function PlaylistView({ playlistId }: { playlistId: string }) {
   const [shufflePreset, setShufflePreset] = useState<ShufflePreset>("RANDOM");
   const [excludeWatched, setExcludeWatched] = useState(false);
 
-  const { setQueue, currentVideo, queue, currentIndex } = usePlayerStore();
+  const { setQueue, currentVideo, queue, currentIndex, playlistId: queuePlaylistId } = usePlayerStore();
   const { focusMode, hideThumbnails } = useUiPreferencesStore();
+
+  // Hook-level mutation callbacks can run after unmount or a route change.
+  // Track the mounted instance, active playlist, and newest invocation so
+  // superseded requests cannot touch the shared player store or toasts.
+  const shuffleRequestIdRef = useRef(0);
+  const mountedRef = useRef(false);
+  const routePlaylistIdRef = useRef(playlistId);
+  const autoShuffleKeyRef = useRef<string | null>(null);
+  const canUsePlaylistRef = useRef(false);
+
+  useLayoutEffect(() => {
+    mountedRef.current = true;
+
+    if (routePlaylistIdRef.current !== playlistId) {
+      routePlaylistIdRef.current = playlistId;
+      // Any request from the previous route is stale even if navigation
+      // returns to the same playlist before the request settles.
+      shuffleRequestIdRef.current += 1;
+      autoShuffleKeyRef.current = null;
+    }
+
+    return () => {
+      mountedRef.current = false;
+      canUsePlaylistRef.current = false;
+    };
+  }, [playlistId]);
+
+  const isCurrentShuffle = useCallback(
+    (request: ShuffleInvocation) =>
+      mountedRef.current &&
+      canUsePlaylistRef.current &&
+      routePlaylistIdRef.current === request.routePlaylistId &&
+      request.bundle.playlist.id === routePlaylistIdRef.current &&
+      request.requestId === shuffleRequestIdRef.current,
+    [],
+  );
 
   const playlistQuery = useQuery({
     queryKey: ["playlist", playlistId],
     queryFn: () => playlistRepository.getPlaylist(playlistId),
+    networkMode: "always",
     enabled: Boolean(playlistId),
+    refetchOnMount: "always",
   });
+  const showReadError = playlistQuery.isError || (playlistQuery.isPending && playlistQuery.errorUpdatedAt > 0);
+
+  const canUsePlaylist = playlistQuery.isSuccess && playlistQuery.isFetchedAfterMount && playlistQuery.data?.playlist.id === playlistId;
+  useLayoutEffect(() => {
+    canUsePlaylistRef.current = canUsePlaylist;
+    if (!canUsePlaylist) {
+      shuffleRequestIdRef.current += 1;
+      autoShuffleKeyRef.current = null;
+    }
+  }, [canUsePlaylist, playlistId]);
 
   const shuffleMutation = useMutation({
+    networkMode: "always",
     mutationFn: async ({
+      bundle,
       preset,
       shouldExcludeWatched,
-    }: {
-      preset: ShufflePreset;
-      shouldExcludeWatched: boolean;
-    }) => {
-      const data = playlistQuery.data;
-      if (!data) return [];
-
-      let videosToShuffle = data.videos;
+    }: ShuffleInvocation) => {
+      let videosToShuffle = bundle.videos;
 
       if (shouldExcludeWatched) {
-        const watchedIds =
-          await playlistRepository.getCompletedVideoIds(playlistId);
+        const watchedIds = await playlistRepository.getCompletedVideoIds(
+          bundle.playlist.id,
+        );
         videosToShuffle = videosToShuffle.filter(
           (video) => !watchedIds.has(video.id),
         );
@@ -101,9 +158,12 @@ export default function PlaylistPage() {
 
       return shuffleVideos(videosToShuffle, preset);
     },
-    onSuccess: (shuffledVideos) => {
-      const bundle = playlistQuery.data;
-      if (bundle && shuffledVideos.length > 0) {
+    onSuccess: (shuffledVideos, request) => {
+      if (!isCurrentShuffle(request)) return;
+
+      const { bundle } = request;
+
+      if (shuffledVideos.length > 0) {
         const queueVideos = shuffledVideos.map((v) => ({
           id: v.id,
           youtubeId: v.youtubeId,
@@ -114,11 +174,12 @@ export default function PlaylistPage() {
         }));
         setQueue(queueVideos, bundle.playlist.id, bundle.playlist.title);
         toast.success(`Shuffled ${shuffledVideos.length} videos`);
-      } else if (bundle && shuffledVideos.length === 0) {
+      } else {
         toast.error("No videos available with the current filters.");
       }
     },
-    onError: (error: Error) => {
+    onError: (error: Error, request) => {
+      if (!isCurrentShuffle(request)) return;
       toast.error(error.message);
     },
   });
@@ -134,14 +195,24 @@ export default function PlaylistPage() {
   const handleShuffle = useCallback(
     (preset: ShufflePreset) => {
       setShufflePreset(preset);
-      shuffleMutation.mutate({ preset, shouldExcludeWatched: excludeWatched });
+
+      const bundle = playlistQuery.data;
+      if (!bundle || !canUsePlaylistRef.current || bundle.playlist.id !== playlistId || routePlaylistIdRef.current !== playlistId) return;
+
+      shuffleMutation.mutate({
+        requestId: ++shuffleRequestIdRef.current,
+        routePlaylistId: playlistId,
+        bundle,
+        preset,
+        shouldExcludeWatched: excludeWatched,
+      });
     },
-    [excludeWatched, shuffleMutation],
+    [excludeWatched, playlistId, playlistQuery.data, shuffleMutation],
   );
 
   const handleVideoEnd = useCallback(
     (video: VideoItem) => {
-      if (playlistId) {
+      if (mountedRef.current && canUsePlaylistRef.current && routePlaylistIdRef.current === playlistId && usePlayerStore.getState().playlistId === playlistId) {
         recordPlayMutation.mutate({
           playlistId,
           videoId: video.id,
@@ -154,19 +225,21 @@ export default function PlaylistPage() {
 
   // Auto-shuffle on first load
   useEffect(() => {
-    if (playlistQuery.data && playlistQuery.data.videos.length > 0) {
+    if (canUsePlaylist && playlistQuery.data && playlistQuery.data.videos.length > 0) {
       const playlist = playlistQuery.data.playlist;
-      const { playlistId: currentPlaylistId, queue } =
+      const { playlistId: currentPlaylistId } =
         usePlayerStore.getState();
 
-      if (currentPlaylistId === playlist.id && queue.length > 0) {
+      if (currentPlaylistId === playlist.id) {
         return;
       }
 
+      if (autoShuffleKeyRef.current === playlist.id) return;
+      autoShuffleKeyRef.current = playlist.id;
       handleShuffle("RANDOM");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playlistQuery.data?.playlist.id]);
+  }, [playlistQuery.data?.playlist.id, canUsePlaylist]);
 
   const playlist = playlistQuery.data?.playlist;
   const listeningView = focusMode || hideThumbnails;
@@ -175,8 +248,9 @@ export default function PlaylistPage() {
     listeningView && "aspect-auto min-h-64",
     listeningView && !hideThumbnails && "min-h-[336px]",
   );
+  const playerReady = canUsePlaylist && queuePlaylistId === playlistId;
   const showAmbientThumbnail = Boolean(
-    currentVideo?.thumbnail && !hideThumbnails,
+    playerReady && currentVideo?.thumbnail && !hideThumbnails,
   );
 
   return (
@@ -208,7 +282,7 @@ export default function PlaylistPage() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            {playlistQuery.isLoading ? (
+            {playlistQuery.isPending || (!playlistQuery.isError && !playlistQuery.isFetchedAfterMount) ? (
               <div>
                 <Skeleton className="h-7 w-48 max-w-full bg-white/10 sm:w-64" />
                 <Skeleton className="mt-1 h-4 w-40 bg-white/10" />
@@ -222,8 +296,9 @@ export default function PlaylistPage() {
                   {playlist.channelTitle && (
                     <span>{playlist.channelTitle}</span>
                   )}
-                  <span>·</span>
-                  <span>{playlistQuery.data?.videos.length ?? 0} videos</span>
+                  {(!playlistQuery.isError || (playlistQuery.data?.videos.length ?? 0) > 0) && (
+                    <><span>·</span><span>{playlistQuery.data?.videos.length ?? 0} videos</span></>
+                  )}
                   <a
                     href={`https://youtube.com/playlist?list=${playlist.youtubeId}`}
                     target="_blank"
@@ -235,6 +310,8 @@ export default function PlaylistPage() {
                   </a>
                 </div>
               </div>
+            ) : playlistQuery.isError ? (
+              <h1 className="text-2xl font-bold">Playlist unavailable</h1>
             ) : (
               <div>
                 <h1 className="text-2xl font-bold">Playlist not found</h1>
@@ -242,8 +319,12 @@ export default function PlaylistPage() {
             )}
           </div>
 
-          {playlistQuery.isLoading ? (
-            <div className="grid gap-6 lg:grid-cols-3">
+          {showReadError && (
+            <QueryReadError subject="playlist" stale={Boolean(playlist)} />
+          )}
+
+          {playlistQuery.isPending || (!playlistQuery.isError && !playlistQuery.isFetchedAfterMount) ? (
+            <div role="status" aria-label={playlistQuery.isPaused ? "Waiting to load your playlist" : "Loading your playlist"} className="grid gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2">
                 <Skeleton className="aspect-video w-full rounded-3xl bg-white/10" />
               </div>
@@ -251,7 +332,7 @@ export default function PlaylistPage() {
                 <Skeleton className="h-[500px] rounded-3xl bg-white/10" />
               </div>
             </div>
-          ) : playlist && (playlistQuery.data?.videos.length ?? 0) > 0 ? (
+          ) : canUsePlaylist && playlist && (playlistQuery.data?.videos.length ?? 0) > 0 && playerReady ? (
             <>
               <div
                 className={cn(
@@ -333,7 +414,12 @@ export default function PlaylistPage() {
                 videos={playlistQuery.data?.videos ?? []}
               />
             </>
-          ) : playlist ? (
+          ) : canUsePlaylist && playlist && (playlistQuery.data?.videos.length ?? 0) > 0 ? (
+            <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-6">
+              <p role="status" className="mb-4 text-white/70">Preparing this playlist for playback.</p>
+              <ShuffleControls currentPreset={shufflePreset} excludeWatched={excludeWatched} onShuffle={handleShuffle} onExcludeWatchedChange={setExcludeWatched} isShuffling={shuffleMutation.isPending} />
+            </div>
+          ) : canUsePlaylist && playlist ? (
             <div className="flex flex-col items-center justify-center rounded-[2rem] border border-white/10 bg-white/[0.045] py-20 text-center shadow-2xl shadow-black/30 backdrop-blur">
               <Music className="mb-4 h-12 w-12 text-white/45" />
               <h2 className="text-xl font-semibold">
@@ -351,6 +437,10 @@ export default function PlaylistPage() {
                 </Button>
               </Link>
             </div>
+          ) : !showReadError && playlistQuery.isSuccess && playlist ? (
+            <p role="status" className="rounded-3xl border border-white/10 bg-white/[0.045] p-6 text-white/70">
+              {playlistQuery.isPaused ? "Waiting to read this playlist." : "Checking this playlist…"}
+            </p>
           ) : null}
         </div>
       </main>

@@ -10,12 +10,13 @@ export interface LocalPlaylistBundle {
 }
 
 async function upsertPlaylistFromYouTubeId(playlistYoutubeId: string): Promise<LocalPlaylistBundle> {
+  const playlists = await browserStorage.listPlaylists();
+  if (playlists.some((playlist) => playlist.youtubeId === playlistYoutubeId)) {
+    throw new Error("Syncing or reimporting an existing playlist is temporarily blocked to protect your watch history. Keep your library unchanged and retry when safe sync is available.");
+  }
   const data = await fetchPlaylistData(playlistYoutubeId);
   const now = new Date().toISOString();
-  const playlists = await browserStorage.listPlaylists();
-  const existing = playlists.find((playlist) => playlist.youtubeId === playlistYoutubeId);
-
-  const playlistId = existing?.id ?? crypto.randomUUID();
+  const playlistId = crypto.randomUUID();
 
   const playlist: LocalPlaylist = {
     id: playlistId,
@@ -25,12 +26,12 @@ async function upsertPlaylistFromYouTubeId(playlistYoutubeId: string): Promise<L
     thumbnail: data.thumbnail,
     channelTitle: data.channelTitle,
     videoCount: data.videos.length,
-    createdAt: existing?.createdAt ?? now,
+    createdAt: now,
     updatedAt: now,
   };
 
   const videos: LocalVideo[] = data.videos.map((video, index) => ({
-    id: `${playlistId}:${video.id}`,
+    id: crypto.randomUUID(),
     playlistId,
     youtubeId: video.id,
     title: video.title,
@@ -71,13 +72,8 @@ export const playlistRepository = {
     return upsertPlaylistFromYouTubeId(playlistId);
   },
 
-  async syncPlaylist(id: string): Promise<LocalPlaylistBundle> {
-    const bundle = await browserStorage.getPlaylist(id);
-    if (!bundle) {
-      throw new Error("Playlist not found.");
-    }
-
-    return upsertPlaylistFromYouTubeId(bundle.playlist.youtubeId);
+  async syncPlaylist(_id: string): Promise<LocalPlaylistBundle> {
+    throw new Error("Syncing or reimporting an existing playlist is temporarily blocked to protect your watch history. Keep your library unchanged and retry when safe sync is available.");
   },
 
   async deletePlaylist(id: string): Promise<void> {

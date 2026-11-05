@@ -1,0 +1,4122 @@
+{
+  "format": "tubeshuffle-transfer",
+  "version": 1,
+  "exportedAt": "2026-10-28T00:00:00.000Z",
+  "playlists": [
+    {
+      "id": "local-playlist",
+      "youtubeId": "PL123456789",
+      "title": "Sample",
+      "description": null,
+      "thumbnail": null,
+      "channelTitle": null,
+      "videoCount": 1,
+      "createdAt": "2026-10-28T00:00:00.000Z",
+      "updatedAt": "2026-10-28T00:00:00.000Z"
+    }
+  ],
+  "videos": [
+    {
+      "id": "local-playlist:abcdefghijk",
+      "playlistId": "local-playlist",
+      "youtubeId": "abcdefghijk",
+      "title": "Track",
+      "channelTitle": "Artist",
+      "thumbnail": "",
+      "duration": 180,
+      "position": 0
+    }
+  ],
+  "history": [
+    {
+      "id": "event-1",
+      "playlistId": "deleted-playlist",
+      "videoId": "deleted-playlist:abcdefghijk",
+      "watchedAt": "2026-10-28T00:00:00.000Z",
+      "watchedSeconds": 180,
+      "completed": true
+    }
+  ],
+  "vectors": {
+    "boundedDiagnostics": {
+      "limit": 100,
+      "order": ["kind", "id", "reason"],
+      "examples": [
+        { "name": "duplicate plus unknown", "records": [{ "id": "p", "youtubeId": "PL123456789" }, { "id": "p", "youtubeId": "PL123456789", "extra": true }], "expectedReasons": ["duplicate:id", "duplicate:youtubeId", "unknown_field:extra"] },
+        { "name": "many unknown fields", "generator": "5000 history records, distinct IDs e0000 through e4999, each with unknown00 through unknown39", "diagnostics": 100, "omittedDiagnostics": 199900, "first": ["history", "e0000", "unknown_field:unknown00"], "last": ["history", "e0002", "unknown_field:unknown19"] }
+      ]
+    },
+    "merge": [
+      {
+        "name": "create repeated occurrences",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "v2",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "v1",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [],
+          "videos": [],
+          "history": []
+        },
+        "expected": {
+          "status": "committed",
+          "report": {
+            "created": {
+              "playlists": 1,
+              "videos": 2,
+              "history": 1
+            },
+            "identical": {
+              "playlists": 0,
+              "videos": 0,
+              "history": 0
+            },
+            "conflicts": [],
+            "omittedOrphans": []
+          },
+          "destination": {
+            "playlists": [
+              {
+                "id": "p",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "v1",
+                "playlistId": "p",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "v2",
+                "playlistId": "p",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "p",
+                "videoId": "v1",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "repeat identical import",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "v2",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "v1",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "v2",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "v1",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "expected": {
+          "status": "committed",
+          "report": {
+            "created": {
+              "playlists": 0,
+              "videos": 0,
+              "history": 0
+            },
+            "identical": {
+              "playlists": 1,
+              "videos": 2,
+              "history": 1
+            },
+            "conflicts": [],
+            "omittedOrphans": []
+          },
+          "destination": {
+            "playlists": [
+              {
+                "id": "p",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "v1",
+                "playlistId": "p",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "v2",
+                "playlistId": "p",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "p",
+                "videoId": "v1",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          }
+        },
+        "confirmedPairs": [
+          {
+            "sourceVideoId": "v1",
+            "destinationVideoId": "v1",
+            "externalEvidence": "user inspected independent occurrence evidence; explicit per-pair confirmation"
+          },
+          {
+            "sourceVideoId": "v2",
+            "destinationVideoId": "v2",
+            "externalEvidence": "user inspected independent occurrence evidence; explicit per-pair confirmation"
+          }
+        ]
+      },
+      {
+        "name": "matched playlist maps IDs and adds occurrence and history",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "v2",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "v2",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "dst",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "dst",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": []
+        },
+        "expected": {
+          "status": "committed",
+          "report": {
+            "created": {
+              "playlists": 0,
+              "videos": 1,
+              "history": 1
+            },
+            "identical": {
+              "playlists": 1,
+              "videos": 1,
+              "history": 0
+            },
+            "conflicts": [],
+            "omittedOrphans": []
+          },
+          "destination": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "v1",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "v2",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "dst",
+                "videoId": "v2",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          }
+        },
+        "confirmedPairs": [
+          {
+            "sourceVideoId": "v1",
+            "destinationVideoId": "v1",
+            "externalEvidence": "user inspected independent occurrence evidence; explicit per-pair confirmation"
+          }
+        ]
+      },
+      {
+        "name": "repeat mapped import",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "v2",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "v2",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "dst",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "dst",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "v2",
+              "playlistId": "dst",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "dst",
+              "videoId": "v2",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "expected": {
+          "status": "committed",
+          "report": {
+            "created": {
+              "playlists": 0,
+              "videos": 0,
+              "history": 0
+            },
+            "identical": {
+              "playlists": 1,
+              "videos": 2,
+              "history": 1
+            },
+            "conflicts": [],
+            "omittedOrphans": []
+          },
+          "destination": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "v1",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "v2",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "dst",
+                "videoId": "v2",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          }
+        },
+        "confirmedPairs": [
+          {
+            "sourceVideoId": "v1",
+            "destinationVideoId": "v1",
+            "externalEvidence": "user inspected independent occurrence evidence; explicit per-pair confirmation"
+          },
+          {
+            "sourceVideoId": "v2",
+            "destinationVideoId": "v2",
+            "externalEvidence": "user inspected independent occurrence evidence; explicit per-pair confirmation"
+          }
+        ]
+      },
+      {
+        "name": "metadata conflict retained and reported",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Changed",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Changed",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": []
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": []
+        },
+        "expected": {
+          "status": "committed",
+          "report": {
+            "created": {
+              "playlists": 0,
+              "videos": 0,
+              "history": 0
+            },
+            "identical": {
+              "playlists": 0,
+              "videos": 0,
+              "history": 0
+            },
+            "conflicts": [
+              {
+                "kind": "playlist",
+                "id": "p",
+                "reason": "fields"
+              },
+              {
+                "kind": "video",
+                "id": "v1",
+                "reason": "fields"
+              }
+            ],
+            "omittedOrphans": []
+          },
+          "destination": {
+            "playlists": [
+              {
+                "id": "p",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "v1",
+                "playlistId": "p",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              }
+            ],
+            "history": []
+          }
+        },
+        "confirmedPairs": [
+          {
+            "sourceVideoId": "v1",
+            "destinationVideoId": "v1",
+            "externalEvidence": "user inspected independent occurrence evidence; explicit per-pair confirmation"
+          }
+        ]
+      },
+      {
+        "name": "source orphans cannot attach to destination",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "missing-playlist",
+              "playlistId": "other",
+              "videoId": "foreign",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            },
+            {
+              "id": "missing-video",
+              "playlistId": "p",
+              "videoId": "foreign",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            },
+            {
+              "id": "cross",
+              "playlistId": "p",
+              "videoId": "foreign2",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            },
+            {
+              "id": "other",
+              "youtubeId": "PL987654321",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "foreign",
+              "playlistId": "other",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "foreign2",
+              "playlistId": "other",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": []
+        },
+        "expected": {
+          "status": "committed",
+          "report": {
+            "created": {
+              "playlists": 0,
+              "videos": 0,
+              "history": 0
+            },
+            "identical": {
+              "playlists": 1,
+              "videos": 1,
+              "history": 0
+            },
+            "conflicts": [],
+            "omittedOrphans": [
+              {
+                "id": "missing-playlist",
+                "reason": "missing_playlist"
+              },
+              {
+                "id": "missing-video",
+                "reason": "missing_video"
+              },
+              {
+                "id": "cross",
+                "reason": "missing_video"
+              }
+            ]
+          },
+          "destination": {
+            "playlists": [
+              {
+                "id": "p",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              },
+              {
+                "id": "other",
+                "youtubeId": "PL987654321",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "v1",
+                "playlistId": "p",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "foreign",
+                "playlistId": "other",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "foreign2",
+                "playlistId": "other",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": []
+          }
+        },
+        "confirmedPairs": [
+          {
+            "sourceVideoId": "v1",
+            "destinationVideoId": "v1",
+            "externalEvidence": "user inspected independent occurrence evidence; explicit per-pair confirmation"
+          }
+        ]
+      },
+      {
+        "name": "cross playlist source history omitted",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            },
+            {
+              "id": "q",
+              "youtubeId": "PL987654321",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "v2",
+              "playlistId": "q",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "cross",
+              "playlistId": "p",
+              "videoId": "v2",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [],
+          "videos": [],
+          "history": []
+        },
+        "expected": {
+          "status": "committed",
+          "report": {
+            "created": {
+              "playlists": 2,
+              "videos": 2,
+              "history": 0
+            },
+            "identical": {
+              "playlists": 0,
+              "videos": 0,
+              "history": 0
+            },
+            "conflicts": [],
+            "omittedOrphans": [
+              {
+                "id": "cross",
+                "reason": "cross_playlist"
+              }
+            ]
+          },
+          "destination": {
+            "playlists": [
+              {
+                "id": "p",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              },
+              {
+                "id": "q",
+                "youtubeId": "PL987654321",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "v1",
+                "playlistId": "p",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "v2",
+                "playlistId": "q",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              }
+            ],
+            "history": []
+          }
+        }
+      },
+      {
+        "name": "playlist ID collision with other destination despite youtube match",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "occupied",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [],
+          "history": []
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "dst",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            },
+            {
+              "id": "occupied",
+              "youtubeId": "PL987654321",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [],
+          "history": []
+        },
+        "expected": {
+          "status": "rejected",
+          "code": "playlist_id_collision",
+          "destination": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              },
+              {
+                "id": "occupied",
+                "youtubeId": "PL987654321",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [],
+            "history": []
+          }
+        }
+      },
+      {
+        "name": "video ID collision prevents unsafe history attachment",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "v1",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            },
+            {
+              "id": "q",
+              "youtubeId": "PL987654321",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "q",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": []
+        },
+        "expected": {
+          "status": "committed",
+          "report": {
+            "created": {
+              "playlists": 0,
+              "videos": 0,
+              "history": 0
+            },
+            "identical": {
+              "playlists": 1,
+              "videos": 0,
+              "history": 0
+            },
+            "conflicts": [
+              {
+                "kind": "video",
+                "id": "v1",
+                "reason": "identity"
+              },
+              {
+                "kind": "history",
+                "id": "e1",
+                "reason": "unmapped_video"
+              }
+            ],
+            "omittedOrphans": []
+          },
+          "destination": {
+            "playlists": [
+              {
+                "id": "p",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              },
+              {
+                "id": "q",
+                "youtubeId": "PL987654321",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "v1",
+                "playlistId": "q",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              }
+            ],
+            "history": []
+          }
+        }
+      },
+      {
+        "name": "position collision retains destination",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v2",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "e2",
+              "playlistId": "p",
+              "videoId": "v2",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": []
+        },
+        "expected": {
+          "status": "committed",
+          "report": {
+            "created": {
+              "playlists": 0,
+              "videos": 0,
+              "history": 0
+            },
+            "identical": {
+              "playlists": 1,
+              "videos": 0,
+              "history": 0
+            },
+            "conflicts": [
+              {
+                "kind": "video",
+                "id": "v2",
+                "reason": "position"
+              },
+              {
+                "kind": "history",
+                "id": "e2",
+                "reason": "unmapped_video"
+              }
+            ],
+            "omittedOrphans": []
+          },
+          "destination": {
+            "playlists": [
+              {
+                "id": "p",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "v1",
+                "playlistId": "p",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              }
+            ],
+            "history": []
+          }
+        }
+      },
+      {
+        "name": "transaction failure rolls back",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "v2",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "v1",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [],
+          "videos": [],
+          "history": []
+        },
+        "injection": "fail_after_first_write",
+        "expected": {
+          "status": "rejected",
+          "code": "storage_failure",
+          "destination": {
+            "playlists": [],
+            "videos": [],
+            "history": []
+          }
+        }
+      },
+      {
+        "name": "concurrent change invalidates preview",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "v2",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "v1",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [],
+          "videos": [],
+          "history": []
+        },
+        "injection": "destination_changed_after_preview",
+        "expected": {
+          "status": "rejected",
+          "code": "stale_preview",
+          "destination": {
+            "playlists": [
+              {
+                "id": "external",
+                "youtubeId": "PL987654321",
+                "title": "External",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 0,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [],
+            "history": []
+          }
+        },
+        "transactionStartDestination": {
+          "playlists": [
+            {
+              "id": "external",
+              "youtubeId": "PL987654321",
+              "title": "External",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 0,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [],
+          "history": []
+        }
+      }
+    ],
+    "validation": [
+      {
+        "name": "escaped duplicate keys",
+        "raw": "{\"format\":\"tubeshuffle-transfer\",\"\\u0066ormat\":\"tubeshuffle-transfer\",\"version\":1,\"exportedAt\":\"2026-10-28T00:00:00.000Z\",\"playlists\":[],\"videos\":[],\"history\":[]}",
+        "expected": "duplicate_key"
+      },
+      {
+        "name": "unsupported version",
+        "document": {
+          "format": "tubeshuffle-transfer",
+          "version": 2,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [],
+          "videos": [],
+          "history": []
+        },
+        "expected": "unsupported_version"
+      },
+      {
+        "name": "duplicate youtube playlists",
+        "document": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            },
+            {
+              "id": "q",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [],
+          "history": []
+        },
+        "expected": "duplicate_playlist_youtube_id"
+      },
+      {
+        "name": "unsafe integer",
+        "document": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 9007199254740992,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [],
+          "history": []
+        },
+        "expected": "invalid_field"
+      },
+      {
+        "name": "bad calendar date",
+        "document": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-02-29T00:00:00.000Z",
+          "playlists": [],
+          "videos": [],
+          "history": []
+        },
+        "expected": "invalid_field"
+      },
+      {
+        "name": "unresolved video playlist",
+        "document": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [],
+          "videos": [
+            {
+              "id": "v1",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": []
+        },
+        "expected": "invalid_video_reference"
+      },
+      {
+        "name": "safe integer exponent",
+        "raw": "{\"format\":\"tubeshuffle-transfer\",\"version\":1e0,\"exportedAt\":\"2026-10-28T00:00:00.000Z\",\"playlists\":[],\"videos\":[],\"history\":[]}",
+        "expected": "valid"
+      },
+      {
+        "name": "byte boundary",
+        "generator": {
+          "utf8Bytes": 10485760,
+          "otherwise": "valid document with whitespace"
+        },
+        "expected": "valid"
+      },
+      {
+        "name": "over byte boundary",
+        "generator": {
+          "utf8Bytes": 10485761,
+          "otherwise": "valid document with whitespace"
+        },
+        "expected": "file_too_large"
+      }
+    ],
+    "legacyExport": [
+      {
+        "name": "large view count and fractional normalization",
+        "input": {
+          "viewCount": 12500000000,
+          "publishedAt": "2020-02-29T12:34:56Z"
+        },
+        "expected": {
+          "viewCount": 12500000000,
+          "publishedAt": "2020-02-29T12:34:56.000Z"
+        }
+      },
+      {
+        "name": "offset canonicalization",
+        "input": {
+          "publishedAt": "2020-02-29T13:34:56.12+01:00"
+        },
+        "expected": {
+          "publishedAt": "2020-02-29T12:34:56.120Z"
+        }
+      },
+      {
+        "name": "unrepresentable precision",
+        "input": {
+          "publishedAt": "2020-02-29T12:34:56.1234Z"
+        },
+        "error": "unrepresentable_timestamp"
+      },
+      {
+        "name": "duplicate youtube IDs in snapshot",
+        "input": {
+          "playlistYoutubeIds": [
+            "PL123456789",
+            "PL123456789"
+          ]
+        },
+        "error": "duplicate_playlist_youtube_id"
+      },
+      {
+        "name": "overwritten occurrence",
+        "input": {
+          "knownOverwrittenOccurrences": true
+        },
+        "warning": "occurrences_unrecoverable"
+      }
+    ],
+    "independentOccurrences": [
+      {
+        "name": "browser to browser identical position requires evidence",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p:abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "p:abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "dst",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "dst:abcdefghijk",
+              "playlistId": "dst",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": []
+        },
+        "confirmedPairs": [],
+        "expected": {
+          "destination": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 1,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "dst:abcdefghijk",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              }
+            ],
+            "history": []
+          },
+          "videoMapping": {},
+          "conflicts": [
+            {
+              "kind": "video",
+              "id": "p:abcdefghijk",
+              "reason": "position"
+            },
+            {
+              "kind": "history",
+              "id": "e1",
+              "reason": "unmapped_video"
+            }
+          ]
+        }
+      },
+      {
+        "name": "browser to browser confirmed independent IDs",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p:abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "p:abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "dst",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "dst:abcdefghijk",
+              "playlistId": "dst",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": []
+        },
+        "confirmedPairs": [
+          {
+            "sourceVideoId": "p:abcdefghijk",
+            "destinationVideoId": "dst:abcdefghijk",
+            "evidence": "user verified upstream playlist-item identity"
+          }
+        ],
+        "expected": {
+          "destination": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 1,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "dst:abcdefghijk",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "dst",
+                "videoId": "dst:abcdefghijk",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          },
+          "videoMapping": {
+            "p:abcdefghijk": "dst:abcdefghijk"
+          },
+          "conflicts": []
+        }
+      },
+      {
+        "name": "browser to native confirmed independent IDs",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p:abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "p:abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "native",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "native-occ-1",
+              "playlistId": "native",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": []
+        },
+        "confirmedPairs": [
+          {
+            "sourceVideoId": "p:abcdefghijk",
+            "destinationVideoId": "native-occ-1",
+            "evidence": "user verified upstream playlist-item identity"
+          }
+        ],
+        "expected": {
+          "destination": {
+            "playlists": [
+              {
+                "id": "native",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 1,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "native-occ-1",
+                "playlistId": "native",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "native",
+                "videoId": "native-occ-1",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          },
+          "videoMapping": {
+            "p:abcdefghijk": "native-occ-1"
+          },
+          "conflicts": []
+        }
+      },
+      {
+        "name": "confirmed mapping repeat import",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p:abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "p:abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "dst",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "dst:abcdefghijk",
+              "playlistId": "dst",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "dst",
+              "videoId": "dst:abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "confirmedPairs": [
+          {
+            "sourceVideoId": "p:abcdefghijk",
+            "destinationVideoId": "dst:abcdefghijk",
+            "evidence": "user verified upstream playlist-item identity"
+          }
+        ],
+        "expected": {
+          "destination": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 1,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "dst:abcdefghijk",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "dst",
+                "videoId": "dst:abcdefghijk",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          },
+          "videoMapping": {
+            "p:abcdefghijk": "dst:abcdefghijk"
+          },
+          "conflicts": [],
+          "repeatNoWrites": true
+        }
+      },
+      {
+        "name": "moved occurrence remains ambiguous",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p:abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "p:abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "dst",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "dst:abcdefghijk",
+              "playlistId": "dst",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 2
+            }
+          ],
+          "history": []
+        },
+        "confirmedPairs": [],
+        "expected": {
+          "destination": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 1,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "dst:abcdefghijk",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 2
+              }
+            ],
+            "history": []
+          },
+          "videoMapping": {},
+          "conflicts": [
+            {
+              "kind": "video",
+              "id": "p:abcdefghijk",
+              "reason": "ambiguous_occurrence"
+            },
+            {
+              "kind": "history",
+              "id": "e1",
+              "reason": "unmapped_video"
+            }
+          ]
+        }
+      },
+      {
+        "name": "repeated occurrence cannot be guessed",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p:abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "p:abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "native",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "native-occ-1",
+              "playlistId": "native",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "native-occ-2",
+              "playlistId": "native",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": []
+        },
+        "confirmedPairs": [],
+        "expected": {
+          "destination": {
+            "playlists": [
+              {
+                "id": "native",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "native-occ-1",
+                "playlistId": "native",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "native-occ-2",
+                "playlistId": "native",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": []
+          },
+          "videoMapping": {},
+          "conflicts": [
+            {
+              "kind": "video",
+              "id": "p:abcdefghijk",
+              "reason": "position"
+            },
+            {
+              "kind": "history",
+              "id": "e1",
+              "reason": "unmapped_video"
+            }
+          ]
+        }
+      }
+    ],
+    "syncIntegration": [
+      {
+        "name": "import refresh export preserves distinct history references",
+        "afterImport": {
+          "playlists": [
+            {
+              "id": "dst",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p:abcdefghijk",
+              "playlistId": "dst",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "p:abcdefghijk:second",
+              "playlistId": "dst",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "dst",
+              "videoId": "p:abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            },
+            {
+              "id": "e2",
+              "playlistId": "dst",
+              "videoId": "p:abcdefghijk:second",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "refreshInput": {
+          "youtubeIds": [
+            "abcdefghijk",
+            "abcdefghijk"
+          ],
+          "provenSameOccurrences": true
+        },
+        "expected": {
+          "status": "committed",
+          "afterRefresh": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "p:abcdefghijk",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "p:abcdefghijk:second",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              },
+              {
+                "id": "e2",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk:second",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          },
+          "export": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "p:abcdefghijk",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "p:abcdefghijk:second",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              },
+              {
+                "id": "e2",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk:second",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          },
+          "watchedOccurrenceIds": [
+            "p:abcdefghijk",
+            "p:abcdefghijk:second"
+          ]
+        },
+        "importSource": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p:abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "p:abcdefghijk:second",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "p:abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            },
+            {
+              "id": "e2",
+              "playlistId": "p",
+              "videoId": "p:abcdefghijk:second",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "beforeImport": {
+          "playlists": [
+            {
+              "id": "dst",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [],
+          "history": []
+        },
+        "importExpected": {
+          "playlistMapping": {
+            "p": "dst"
+          },
+          "videoMapping": {
+            "p:abcdefghijk": "p:abcdefghijk",
+            "p:abcdefghijk:second": "p:abcdefghijk:second"
+          },
+          "destination": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "p:abcdefghijk",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "p:abcdefghijk:second",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              },
+              {
+                "id": "e2",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk:second",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "refresh transaction failure rolls back",
+        "afterImport": {
+          "playlists": [
+            {
+              "id": "dst",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p:abcdefghijk",
+              "playlistId": "dst",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "p:abcdefghijk:second",
+              "playlistId": "dst",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "dst",
+              "videoId": "p:abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            },
+            {
+              "id": "e2",
+              "playlistId": "dst",
+              "videoId": "p:abcdefghijk:second",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "refreshInput": {
+          "youtubeIds": [
+            "abcdefghijk",
+            "abcdefghijk"
+          ],
+          "provenSameOccurrences": true,
+          "injection": "fail_after_first_write"
+        },
+        "expected": {
+          "status": "rejected",
+          "code": "storage_failure",
+          "afterRefresh": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "p:abcdefghijk",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "p:abcdefghijk:second",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              },
+              {
+                "id": "e2",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk:second",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          },
+          "export": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "p:abcdefghijk",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "p:abcdefghijk:second",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              },
+              {
+                "id": "e2",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk:second",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          },
+          "watchedOccurrenceIds": [
+            "p:abcdefghijk",
+            "p:abcdefghijk:second"
+          ]
+        },
+        "importSource": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p:abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "p:abcdefghijk:second",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "p:abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            },
+            {
+              "id": "e2",
+              "playlistId": "p",
+              "videoId": "p:abcdefghijk:second",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "beforeImport": {
+          "playlists": [
+            {
+              "id": "dst",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [],
+          "history": []
+        },
+        "importExpected": {
+          "playlistMapping": {
+            "p": "dst"
+          },
+          "videoMapping": {
+            "p:abcdefghijk": "p:abcdefghijk",
+            "p:abcdefghijk:second": "p:abcdefghijk:second"
+          },
+          "destination": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "p:abcdefghijk",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "p:abcdefghijk:second",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              },
+              {
+                "id": "e2",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk:second",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "unsupported refresh blocked before writes",
+        "afterImport": {
+          "playlists": [
+            {
+              "id": "dst",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p:abcdefghijk",
+              "playlistId": "dst",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "p:abcdefghijk:second",
+              "playlistId": "dst",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "dst",
+              "videoId": "p:abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            },
+            {
+              "id": "e2",
+              "playlistId": "dst",
+              "videoId": "p:abcdefghijk:second",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "refreshInput": {
+          "youtubeIds": [
+            "abcdefghijk",
+            "abcdefghijk"
+          ],
+          "implementation": "legacy destructive sync"
+        },
+        "expected": {
+          "status": "rejected",
+          "code": "sync_unsupported",
+          "afterRefresh": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "p:abcdefghijk",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "p:abcdefghijk:second",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              },
+              {
+                "id": "e2",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk:second",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          },
+          "export": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "p:abcdefghijk",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "p:abcdefghijk:second",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              },
+              {
+                "id": "e2",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk:second",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          },
+          "watchedOccurrenceIds": [
+            "p:abcdefghijk",
+            "p:abcdefghijk:second"
+          ]
+        },
+        "importSource": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p:abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            },
+            {
+              "id": "p:abcdefghijk:second",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 1
+            }
+          ],
+          "history": [
+            {
+              "id": "e1",
+              "playlistId": "p",
+              "videoId": "p:abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            },
+            {
+              "id": "e2",
+              "playlistId": "p",
+              "videoId": "p:abcdefghijk:second",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "beforeImport": {
+          "playlists": [
+            {
+              "id": "dst",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 2,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [],
+          "history": []
+        },
+        "importExpected": {
+          "playlistMapping": {
+            "p": "dst"
+          },
+          "videoMapping": {
+            "p:abcdefghijk": "p:abcdefghijk",
+            "p:abcdefghijk:second": "p:abcdefghijk:second"
+          },
+          "destination": {
+            "playlists": [
+              {
+                "id": "dst",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 2,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "p:abcdefghijk",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              },
+              {
+                "id": "p:abcdefghijk:second",
+                "playlistId": "dst",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 1
+              }
+            ],
+            "history": [
+              {
+                "id": "e1",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              },
+              {
+                "id": "e2",
+                "playlistId": "dst",
+                "videoId": "p:abcdefghijk:second",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "equalLegacyOccurrences": [
+      {
+        "name": "old snapshot versus removed and readded equal composite ID",
+        "lineage": "Destination removed and re-added the same video before transfer support; same generated ID does not identify the old occurrence.",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p_abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "old-event",
+              "playlistId": "p",
+              "videoId": "p_abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p_abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "new-event",
+              "playlistId": "p",
+              "videoId": "p_abcdefghijk",
+              "watchedAt": "2026-10-29T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "trustedProvenance": null,
+        "confirmedPairs": [],
+        "expected": {
+          "videoMapping": {},
+          "conflicts": [
+            {
+              "kind": "video",
+              "id": "p_abcdefghijk",
+              "reason": "ambiguous_occurrence"
+            },
+            {
+              "kind": "history",
+              "id": "old-event",
+              "reason": "unmapped_video"
+            }
+          ],
+          "destination": {
+            "playlists": [
+              {
+                "id": "p",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 1,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "p_abcdefghijk",
+                "playlistId": "p",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              }
+            ],
+            "history": [
+              {
+                "id": "new-event",
+                "playlistId": "p",
+                "videoId": "p_abcdefghijk",
+                "watchedAt": "2026-10-29T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "repeat unresolved equal ID import",
+        "lineage": "Same source retried after prior conflict; no mapping or writes were made.",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p_abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "old-event",
+              "playlistId": "p",
+              "videoId": "p_abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p_abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "new-event",
+              "playlistId": "p",
+              "videoId": "p_abcdefghijk",
+              "watchedAt": "2026-10-29T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "trustedProvenance": null,
+        "confirmedPairs": [],
+        "expected": {
+          "videoMapping": {},
+          "conflicts": [
+            {
+              "kind": "video",
+              "id": "p_abcdefghijk",
+              "reason": "ambiguous_occurrence"
+            },
+            {
+              "kind": "history",
+              "id": "old-event",
+              "reason": "unmapped_video"
+            }
+          ],
+          "destination": {
+            "playlists": [
+              {
+                "id": "p",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 1,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "p_abcdefghijk",
+                "playlistId": "p",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              }
+            ],
+            "history": [
+              {
+                "id": "new-event",
+                "playlistId": "p",
+                "videoId": "p_abcdefghijk",
+                "watchedAt": "2026-10-29T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "cross-device copied ID diverged after readd",
+        "lineage": "An earlier transfer copied the ID to another device; destination later removed and re-added the video. Copied lineage is not continuity evidence.",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p_abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "old-event",
+              "playlistId": "p",
+              "videoId": "p_abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p_abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "new-event",
+              "playlistId": "p",
+              "videoId": "p_abcdefghijk",
+              "watchedAt": "2026-10-29T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "trustedProvenance": null,
+        "confirmedPairs": [],
+        "expected": {
+          "videoMapping": {},
+          "conflicts": [
+            {
+              "kind": "video",
+              "id": "p_abcdefghijk",
+              "reason": "ambiguous_occurrence"
+            },
+            {
+              "kind": "history",
+              "id": "old-event",
+              "reason": "unmapped_video"
+            }
+          ],
+          "destination": {
+            "playlists": [
+              {
+                "id": "p",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 1,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "p_abcdefghijk",
+                "playlistId": "p",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              }
+            ],
+            "history": [
+              {
+                "id": "new-event",
+                "playlistId": "p",
+                "videoId": "p_abcdefghijk",
+                "watchedAt": "2026-10-29T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "equal ID user-confirmed same occurrence",
+        "lineage": "User independently establishes continuity of this particular occurrence; confirmation is an assertion with misattachment risk.",
+        "source": {
+          "format": "tubeshuffle-transfer",
+          "version": 1,
+          "exportedAt": "2026-10-28T00:00:00.000Z",
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p_abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "old-event",
+              "playlistId": "p",
+              "videoId": "p_abcdefghijk",
+              "watchedAt": "2026-10-28T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "destination": {
+          "playlists": [
+            {
+              "id": "p",
+              "youtubeId": "PL123456789",
+              "title": "Sample",
+              "description": null,
+              "thumbnail": null,
+              "channelTitle": null,
+              "videoCount": 1,
+              "createdAt": "2026-10-28T00:00:00.000Z",
+              "updatedAt": "2026-10-28T00:00:00.000Z"
+            }
+          ],
+          "videos": [
+            {
+              "id": "p_abcdefghijk",
+              "playlistId": "p",
+              "youtubeId": "abcdefghijk",
+              "title": "Track",
+              "channelTitle": "Artist",
+              "thumbnail": "",
+              "duration": 180,
+              "position": 0
+            }
+          ],
+          "history": [
+            {
+              "id": "new-event",
+              "playlistId": "p",
+              "videoId": "p_abcdefghijk",
+              "watchedAt": "2026-10-29T00:00:00.000Z",
+              "watchedSeconds": 180,
+              "completed": true
+            }
+          ]
+        },
+        "trustedProvenance": null,
+        "confirmedPairs": [
+          {
+            "sourceVideoId": "p_abcdefghijk",
+            "destinationVideoId": "p_abcdefghijk",
+            "externalEvidence": "user inspected independent upstream item evidence and confirmed pair"
+          }
+        ],
+        "expected": {
+          "videoMapping": {
+            "p_abcdefghijk": "p_abcdefghijk"
+          },
+          "conflicts": [],
+          "destination": {
+            "playlists": [
+              {
+                "id": "p",
+                "youtubeId": "PL123456789",
+                "title": "Sample",
+                "description": null,
+                "thumbnail": null,
+                "channelTitle": null,
+                "videoCount": 1,
+                "createdAt": "2026-10-28T00:00:00.000Z",
+                "updatedAt": "2026-10-28T00:00:00.000Z"
+              }
+            ],
+            "videos": [
+              {
+                "id": "p_abcdefghijk",
+                "playlistId": "p",
+                "youtubeId": "abcdefghijk",
+                "title": "Track",
+                "channelTitle": "Artist",
+                "thumbnail": "",
+                "duration": 180,
+                "position": 0
+              }
+            ],
+            "history": [
+              {
+                "id": "new-event",
+                "playlistId": "p",
+                "videoId": "p_abcdefghijk",
+                "watchedAt": "2026-10-29T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              },
+              {
+                "id": "old-event",
+                "playlistId": "p",
+                "videoId": "p_abcdefghijk",
+                "watchedAt": "2026-10-28T00:00:00.000Z",
+                "watchedSeconds": 180,
+                "completed": true
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "refreshGateRoutes": [
+      "syncPlaylist",
+      "import existing YouTube playlist",
+      "re-import existing YouTube playlist",
+      "shared destructive upsert"
+    ]
+  }
+}

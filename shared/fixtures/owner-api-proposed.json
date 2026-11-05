@@ -1,0 +1,34 @@
+{
+  "normalization": [
+    { "input": "  PL123456789\t", "expected": "PL123456789" },
+    { "input": "https://www.youtube.com/playlist?list=PL123456789&x=1", "expected": "PL123456789" },
+    { "input": "https://m.youtube.com/watch?v=abc&list=PL123456789#x", "expected": "PL123456789" },
+    { "input": "https://youtube.com/playlist?list=PL12345678%39", "expected": "PL123456789" },
+    { "input": "https://youtube.com/playlist?list=PL123456789&list=PL987654321", "expected": null },
+    { "input": "https://youtube.com.evil.test/playlist?list=PL123456789", "expected": null },
+    { "input": "http://youtube.com/playlist?list=PL123456789", "expected": null },
+    { "input": "https://youtube.com/playlist?list=short", "expected": null },
+    { "input": "https://youtube.com/playlist?list=PL12345678%2539", "expected": null },
+    { "input": "https://youtube.com/other?list=PL123456789", "expected": null }
+  ],
+  "cases": [
+    { "name": "create", "request": { "method": "POST", "path": "/api/playlist-links", "body": { "playlistId": "PL123456789" } }, "response": { "status": 201, "body": { "link": { "youtubePlaylistId": "PL123456789", "createdAt": "2026-10-28T00:00:00.000Z" } } } },
+    { "name": "repeat at cap", "request": { "method": "POST", "path": "/api/playlist-links", "body": { "playlistId": "https://youtube.com/playlist?list=PL123456789" } }, "state": "existing-at-cap", "response": { "status": 200, "body": { "link": { "youtubePlaylistId": "PL123456789", "createdAt": "2026-10-28T00:00:00.000Z" } } } },
+    { "name": "new at cap", "request": { "method": "POST", "path": "/api/playlist-links", "body": { "playlistId": "PL987654321" } }, "state": "at-cap", "response": { "status": 409, "body": { "error": { "code": "link_limit", "message": "Link limit reached" } } } },
+    { "name": "list", "request": { "method": "GET", "path": "/api/playlist-links" }, "response": { "status": 200, "body": { "links": [{ "youtubePlaylistId": "PL123456789", "createdAt": "2026-10-28T00:00:00.000Z" }] } } },
+    { "name": "unlink absent", "request": { "method": "DELETE", "path": "/api/playlist-links/PL123456789" }, "response": { "status": 204, "body": null } },
+    { "name": "method before auth", "request": { "method": "PUT", "path": "/api/playlist-links", "auth": "missing" }, "response": { "status": 405, "allow": "GET, POST" } },
+    { "name": "auth before invalid body", "request": { "method": "POST", "path": "/api/playlist-links", "auth": "missing", "rawBody": "{" }, "response": { "status": 401, "body": { "error": { "code": "unauthenticated", "message": "Authentication required" } } } },
+    { "name": "invalid bearer never falls back", "request": { "method": "GET", "path": "/api/playlist-links", "auth": "malformed-bearer-with-cookie" }, "response": { "status": 401, "body": { "error": { "code": "unauthenticated", "message": "Authentication required" } } } },
+    { "name": "provider unavailable", "request": { "method": "GET", "path": "/api/playlist-links", "auth": "provider-down" }, "response": { "status": 503, "body": { "error": { "code": "auth_unavailable", "message": "Authentication unavailable" } } } },
+    { "name": "non-owner", "request": { "method": "GET", "path": "/api/playlist-links", "auth": "non-owner" }, "response": { "status": 403, "body": { "error": { "code": "forbidden", "message": "Forbidden" } } } },
+    { "name": "invalid input", "request": { "method": "POST", "path": "/api/playlist-links", "body": { "playlistId": "short" } }, "response": { "status": 400, "body": { "error": { "code": "invalid_request", "message": "Invalid request" } } } },
+    { "name": "oversize", "request": { "method": "POST", "path": "/api/playlist-links", "bodyBytes": 4097 }, "response": { "status": 413, "body": { "error": { "code": "payload_too_large", "message": "Payload too large" } } } },
+    { "name": "media type", "request": { "method": "POST", "path": "/api/playlist-links", "contentType": "text/plain" }, "response": { "status": 415, "body": { "error": { "code": "unsupported_media_type", "message": "Unsupported media type" } } } },
+    { "name": "rate limit", "request": { "method": "GET", "path": "/api/playlist-links", "throttled": true }, "response": { "status": 429, "retryAfter": "3", "body": { "error": { "code": "rate_limited", "message": "Rate limited" } } } }
+  ],
+  "concurrency": [
+    { "name": "same ID final slot", "initialCount": 4999, "ids": ["PL123456789", "PL123456789"], "statusesSorted": [200, 201], "finalCount": 5000 },
+    { "name": "distinct IDs final slot", "initialCount": 4999, "ids": ["PL123456789", "PL987654321"], "statusesSorted": [201, 409], "finalCount": 5000 }
+  ]
+}

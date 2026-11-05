@@ -23,6 +23,7 @@ import {
 import { cn, formatDuration } from "@/lib/utils";
 import { usePlayerStore, type VideoItem } from "@/stores/player-store";
 import type { DailySuggestionsResult, LocalVideo, SuggestedVideo } from "@/types/playlist";
+import { getCsrf, responseError, safeAccountMessage } from "@/lib/services/account-client";
 
 interface DailySuggestionsProps {
   playlistId: string;
@@ -119,11 +120,13 @@ async function fetchDailySuggestions(
 
   const excludedSuggestionIds = options.previousSuggestions?.map((suggestion) => suggestion.youtubeId) ?? [];
 
+  const csrfToken = await getCsrf();
   const response = await fetch("/api/youtube/suggestions", {
     method: "POST",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
+      "x-csrf-token": csrfToken,
     },
     body: JSON.stringify({
       playlistId,
@@ -135,14 +138,8 @@ async function fetchDailySuggestions(
     }),
   });
 
-  const payload = (await response.json()) as DailySuggestionsResult | { error?: string };
-  if (!response.ok) {
-    throw new Error(
-      "error" in payload && payload.error
-        ? payload.error
-        : `Suggestions request failed: ${response.status}`
-    );
-  }
+  if (!response.ok) throw await responseError(response);
+  const payload = (await response.json()) as DailySuggestionsResult;
 
   const result = payload as DailySuggestionsResult;
   await setDailySuggestionsCache(result);
@@ -273,7 +270,7 @@ export function DailySuggestions({
 
       {resuggestMutation.isError ? (
         <p className="relative mt-4 rounded-2xl border border-amber-200/15 bg-amber-200/[0.06] px-4 py-3 text-sm text-amber-100">
-          Couldn&apos;t refresh suggestions.
+          {safeAccountMessage(resuggestMutation.error, "Suggestions are unavailable. Please try again.")}
         </p>
       ) : null}
 
@@ -289,7 +286,7 @@ export function DailySuggestions({
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-200" />
               <div>
                 <p className="font-semibold text-amber-100">Suggestions unavailable.</p>
-                <p className="mt-1 text-sm text-white/55">Try a YouTube search instead.</p>
+                <p className="mt-1 text-sm text-white/55">{safeAccountMessage(suggestionsQuery.error, "Suggestions are unavailable.")} Try a YouTube search instead.</p>
               </div>
             </div>
             <a href={fallbackUrl} target="_blank" rel="noopener noreferrer">

@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,13 +20,19 @@ import type { LocalPlaylist } from "@/types/playlist";
 interface PlaylistCardProps {
   playlist: LocalPlaylist;
   onDelete: (id: string) => void;
-  onSync: (id: string) => void;
+  readOnly?: boolean;
 }
 
-export function PlaylistCard({ playlist, onDelete, onSync }: PlaylistCardProps) {
+export function PlaylistCard({ playlist, onDelete, readOnly = false }: PlaylistCardProps) {
+  return <PlaylistCardContent key={readOnly ? "read-only" : "editable"} playlist={playlist} onDelete={onDelete} readOnly={readOnly} />;
+}
+
+function PlaylistCardContent({ playlist, onDelete, readOnly = false }: PlaylistCardProps) {
   const hideThumbnails = useUiPreferencesStore((state) => state.hideThumbnails);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
+    <>
     <Card className="group overflow-hidden rounded-[1.75rem] border-white/10 bg-white/[0.055] text-white shadow-2xl shadow-black/20 transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.08] hover:shadow-black/40">
       <div className="relative aspect-video overflow-hidden bg-white/10">
         {playlist.thumbnail && !hideThumbnails ? (
@@ -56,23 +64,24 @@ export function PlaylistCard({ playlist, onDelete, onSync }: PlaylistCardProps) 
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <Link
+            {readOnly ? <span className="line-clamp-2 font-semibold tracking-tight text-white/75">{playlist.title}</span> : <Link
               href={`/playlist/${playlist.id}`}
               className="line-clamp-2 font-semibold tracking-tight text-white hover:text-white/80"
             >
               {playlist.title}
-            </Link>
+            </Link>}
             {playlist.channelTitle && (
               <p className="mt-1 text-sm text-white/50">
                 {playlist.channelTitle}
               </p>
             )}
           </div>
-          <DropdownMenu>
+          {!readOnly && <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
+                aria-label={`Actions for ${playlist.title}`}
                 className="h-8 w-8 shrink-0 text-white/70 hover:bg-white/10 hover:text-white"
               >
                 <MoreVertical className="h-4 w-4" />
@@ -85,22 +94,22 @@ export function PlaylistCard({ playlist, onDelete, onSync }: PlaylistCardProps) 
                   Shuffle & Play
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onSync(playlist.id)}>
+              <DropdownMenuItem disabled>
                 <RefreshCw className="mr-2 h-4 w-4" />
-                Sync with YouTube
+                Sync with YouTube (unavailable)
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-red-300 focus:text-red-200"
-                onClick={() => onDelete(playlist.id)}
+                onSelect={() => setConfirmDelete(true)}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+          </DropdownMenu>}
         </div>
 
-        <div className="mt-3 flex items-center gap-2">
+        {!readOnly && <div className="mt-3 flex items-center gap-2">
           <Link href={`/playlist/${playlist.id}`} className="flex-1">
             <Button
               size="sm"
@@ -110,8 +119,23 @@ export function PlaylistCard({ playlist, onDelete, onSync }: PlaylistCardProps) 
               Shuffle & Play
             </Button>
           </Link>
-        </div>
+        </div>}
       </CardContent>
     </Card>
+    <Dialog open={confirmDelete && !readOnly} onOpenChange={setConfirmDelete}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete this playlist?</DialogTitle>
+          <DialogDescription>
+            Deleting “{playlist.title}” makes its associated watch history unusable and omits it from exports. Reimporting the playlist cannot recover that history.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+          <Button className="bg-red-700 text-white hover:bg-red-600" onClick={() => { setConfirmDelete(false); if (!readOnly) onDelete(playlist.id); }}>Delete playlist</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

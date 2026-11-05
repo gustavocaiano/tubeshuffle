@@ -87,6 +87,25 @@ npm run dev
 
 Open [localhost:3000](http://localhost:3000).
 
+### Owner-link concurrency regression
+
+The optional PostgreSQL regression creates a uniquely named disposable container
+from an already available `postgres:16` image, with networking disabled and
+temporary database storage. It never targets an existing database. It explicitly
+uses `unix:///var/run/docker.sock`, ignoring Docker context and host settings.
+**A Unix socket does not prove daemon locality:** run this only if you trust that
+the standard socket is controlled by your local Docker daemon, not a proxy to a
+remote daemon. Opt in to that assumption before running:
+
+```bash
+TUBESHUFFLE_TRUST_LOCAL_DOCKER=1 python3 supabase/tests/owner_links_concurrency.py
+```
+
+Cleanup checks the generated name, unique label, and image before removing the
+container by ID. If Docker is unavailable or a create completes after the bounded
+cleanup window, manual inspection for the reported unique name may be needed.
+Docker-free safety checks: `python3 -m unittest discover -s supabase/tests -p 'test_owner_links_concurrency_safety.py'`.
+
 ### Deploying your own copy
 
 For Vercel or another hosted deployment, set:

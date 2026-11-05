@@ -1,16 +1,9 @@
-import {
-  DB_VERSION,
-  STORE_META,
-  STORE_PLAYLISTS,
-  STORE_PLAY_HISTORY,
-  STORE_VIDEOS,
-} from "@/lib/storage/browser-db";
+import { DB_VERSION, STORE_META } from "@/lib/storage/browser-db";
 
 const META_KEY_SCHEMA_VERSION = "schemaVersion";
 const META_KEY_MIGRATED_FROM_LEGACY = "migratedFromLegacy";
 const LEGACY_MIGRATION_MARKER = "tubeshuffle:legacy-migrated";
 const LEGACY_APP_KEY_PREFIX = "tube" + "shuffler";
-const LEGACY_INDEXED_DB_NAME = `${LEGACY_APP_KEY_PREFIX}_local`;
 
 const LEGACY_STORAGE_KEYS = [
   "playlist-store",
@@ -19,12 +12,6 @@ const LEGACY_STORAGE_KEYS = [
   `${LEGACY_APP_KEY_PREFIX}:playlists`,
   "tubeshuffle:playlists",
 ];
-
-const MIGRATABLE_STORE_NAMES = [
-  STORE_PLAYLISTS,
-  STORE_VIDEOS,
-  STORE_PLAY_HISTORY,
-] as const;
 
 interface MetaRecord<T = unknown> {
   key: string;
@@ -46,7 +33,6 @@ function completeRequest<T>(request: IDBRequest<T>): Promise<T> {
 function completeTransaction(transaction: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB transaction failed."));
     transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB transaction aborted."));
   });
 }
@@ -72,92 +58,6 @@ function persistLegacyMigrationSignal(): void {
   }
 
   window.localStorage.setItem(LEGACY_MIGRATION_MARKER, "1");
-}
-
-async function legacyIndexedDbExists(): Promise<boolean> {
-  if (typeof window === "undefined" || typeof window.indexedDB === "undefined") {
-    return false;
-  }
-
-  const indexedDb = window.indexedDB as IDBFactory & {
-    databases?: () => Promise<Array<{ name?: string }>>;
-  };
-
-  if (!indexedDb.databases) {
-    return false;
-  }
-
-  const databases = await indexedDb.databases();
-  return databases.some((database) => database.name === LEGACY_INDEXED_DB_NAME);
-}
-
-function openLegacyIndexedDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = window.indexedDB.open(LEGACY_INDEXED_DB_NAME);
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("Failed to open legacy IndexedDB database."));
-    request.onblocked = () => reject(new Error("Legacy database open request blocked by another connection."));
-  });
-}
-
-async function targetDatabaseHasPlaylists(db: IDBDatabase): Promise<boolean> {
-  const transaction = db.transaction(STORE_PLAYLISTS, "readonly");
-  const count = await completeRequest(transaction.objectStore(STORE_PLAYLISTS).count());
-  await completeTransaction(transaction);
-  return count > 0;
-}
-
-export async function migrateLegacyIndexedDb(db: IDBDatabase): Promise<void> {
-  if (!(await legacyIndexedDbExists())) {
-    return;
-  }
-
-  if (await targetDatabaseHasPlaylists(db)) {
-    return;
-  }
-
-  const legacyDb = await openLegacyIndexedDb();
-
-  try {
-    const storeNames = MIGRATABLE_STORE_NAMES.filter(
-      (storeName) =>
-        db.objectStoreNames.contains(storeName) &&
-        legacyDb.objectStoreNames.contains(storeName)
-    );
-
-    if (storeNames.length === 0) {
-      return;
-    }
-
-    const readTransaction = legacyDb.transaction(storeNames, "readonly");
-    const recordsByStore = await Promise.all(
-      storeNames.map(async (storeName) => ({
-        storeName,
-        records: await completeRequest<unknown[]>(
-          readTransaction.objectStore(storeName).getAll()
-        ),
-      }))
-    );
-    await completeTransaction(readTransaction);
-
-    if (recordsByStore.every(({ records }) => records.length === 0)) {
-      return;
-    }
-
-    const writeTransaction = db.transaction(storeNames, "readwrite");
-    for (const { storeName, records } of recordsByStore) {
-      const store = writeTransaction.objectStore(storeName);
-      for (const record of records) {
-        store.put(record);
-      }
-    }
-    await completeTransaction(writeTransaction);
-
-    persistLegacyMigrationSignal();
-  } finally {
-    legacyDb.close();
-  }
 }
 
 export async function getStorageMigrationMeta(db: IDBDatabase): Promise<StorageMigrationMeta> {
