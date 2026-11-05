@@ -3,9 +3,10 @@
 //
 // JOURNAL_GUARD_MODE=upgrade selects the separate test-only schema-upgrade
 // rehearsal. JOURNAL_GUARD_MODE=lifecycle selects the separate test-only
-// browser DB lifecycle guard. JOURNAL_GUARD_TEST_CLEANUP_FAULT=1 runs a
-// focused, inert-by-default self-check of the fail-closed fixture-removal
-// decision.
+// browser DB lifecycle guard. JOURNAL_GUARD_MODE=provisioning selects the
+// separate test-only explicit-provisioning coordinator guard and its own exact
+// allowlist. JOURNAL_GUARD_TEST_CLEANUP_FAULT=1 runs a focused,
+// inert-by-default self-check of the fail-closed fixture-removal decision.
 //
 // Isolation is deliberately layered but not absolute: Chrome runs in a fresh
 // profile with HOME/XDG/TMPDIR redirected under one exclusive fixture directory,
@@ -35,11 +36,18 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 // The default journal mode is unchanged. `JOURNAL_GUARD_MODE=upgrade` selects
 // the separate test-only schema-upgrade rehearsal and its own exact allowlist.
 // `JOURNAL_GUARD_MODE=lifecycle` selects the separate test-only lifecycle
-// guard and its own exact allowlist.
+// guard and its own exact allowlist. `JOURNAL_GUARD_MODE=provisioning` selects
+// the separate test-only explicit-provisioning coordinator guard and its own
+// exact allowlist.
 const mode = process.env.JOURNAL_GUARD_MODE ?? "journal";
-if (mode !== "journal" && mode !== "upgrade" && mode !== "lifecycle") {
+if (
+  mode !== "journal" &&
+  mode !== "upgrade" &&
+  mode !== "lifecycle" &&
+  mode !== "provisioning"
+) {
   throw new Error(
-    `JOURNAL_GUARD_MODE must be "journal", "upgrade", or "lifecycle", got ${JSON.stringify(mode)}.`,
+    `JOURNAL_GUARD_MODE must be "journal", "upgrade", "lifecycle", or "provisioning", got ${JSON.stringify(mode)}.`,
   );
 }
 const tempPrefix = "completion-journal-guard-";
@@ -522,6 +530,17 @@ const lifecycleDbNames = Array.from(
 if (new Set(lifecycleDbNames).size !== 28) {
   throw new Error("Runner generated colliding lifecycle fixture database names.");
 }
+// The provisioning coordinator gets its own forty-five runtime-unique names
+// and exact per-mode allowlist. These are never used by another guard mode.
+const provisioningDbNames = Array.from(
+  { length: 45 },
+  () => `tubeshuffle-provisioning-test-${randomUUID()}`,
+);
+if (new Set(provisioningDbNames).size !== 45) {
+  throw new Error(
+    "Runner generated colliding provisioning fixture database names.",
+  );
+}
 const journalBootstrap = `(() => {
   const allowed = new Set(${JSON.stringify([journalDbName, wrongDbName, iframeDbName])});
   const production = "tubeshuffle_local";
@@ -726,18 +745,90 @@ const lifecycleBootstrap = `(() => {
   }
 })();`;
 
+// Provisioning mode uses the same isolation layers but allows only its
+// forty-five runtime-unique fixture names. It blocks every deleteDatabase
+// call, including fixture names: only removal of the whole ephemeral profile is
+// permitted.
+const provisioningBootstrap = `(() => {
+  const names = ${JSON.stringify(provisioningDbNames)};
+  const allowed = new Set(names);
+  const production = "tubeshuffle_local";
+  const nativeOpen = indexedDB.open.bind(indexedDB);
+  const nativeFetch = window.fetch.bind(window);
+  const guard = {
+    mode: "provisioning",
+    dbNames: names,
+    allowed,
+    openedNames: [],
+    deleteNames: [],
+    unexpectedOpenAttempts: [],
+    productionOpenAttempts: 0,
+    networkAttempts: 0,
+    nativeFetch,
+  };
+  Object.defineProperty(window, "__journalGuard", {
+    value: guard,
+    enumerable: false,
+    writable: false,
+    configurable: false,
+  });
+  indexedDB.open = function (name, version) {
+    const text = String(name);
+    guard.openedNames.push(text);
+    if (!allowed.has(text)) {
+      if (text === production) guard.productionOpenAttempts++;
+      guard.unexpectedOpenAttempts.push(text);
+      throw new Error("Unexpected IndexedDB open blocked: " + text);
+    }
+    return nativeOpen(name, version);
+  };
+  indexedDB.deleteDatabase = function (name) {
+    const text = String(name);
+    guard.deleteNames.push(text);
+    throw new Error("deleteDatabase is not allowed in provisioning mode: " + text);
+  };
+  window.fetch = function (input) {
+    guard.networkAttempts++;
+    return Promise.reject(new Error("Network access is not allowed: " + String(input)));
+  };
+  if (window.XMLHttpRequest) {
+    XMLHttpRequest.prototype.open = function () {
+      guard.networkAttempts++;
+      throw new Error("Network access is not allowed: XMLHttpRequest");
+    };
+  }
+  for (const name of ["WebSocket", "EventSource"]) {
+    if (name in window) {
+      window[name] = function () {
+        guard.networkAttempts++;
+        throw new Error("Network access is not allowed: " + name);
+      };
+    }
+  }
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon = function () {
+      guard.networkAttempts++;
+      return false;
+    };
+  }
+})();`;
+
 const bootstrap =
   mode === "upgrade"
     ? upgradeBootstrap
     : mode === "lifecycle"
       ? lifecycleBootstrap
-      : journalBootstrap;
+      : mode === "provisioning"
+        ? provisioningBootstrap
+        : journalBootstrap;
 const entryFile =
   mode === "upgrade"
     ? "tests/browser/journal-upgrade-guard.ts"
     : mode === "lifecycle"
       ? "tests/browser/db-lifecycle-guard.ts"
-      : "tests/browser/completion-journal-guard.ts";
+      : mode === "provisioning"
+        ? "tests/browser/browser-provisioning-guard.ts"
+        : "tests/browser/completion-journal-guard.ts";
 
 let finish;
 const result = new Promise((resolveResult) => {

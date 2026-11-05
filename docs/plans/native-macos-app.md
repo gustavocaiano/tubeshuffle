@@ -27,6 +27,7 @@ User decisions recorded:
 - Playlist contents, queue, playback history, and preferences remain local.
 - Explicit browser export/native import; no automatic full-library synchronization.
 - Online-only playback is acceptable; no downloads or offline media.
+- Browser local database: an absent database must **not** be auto-created. Offer a separate, explicit one-shot confirmation before creation; absence is not user consent and does not prove first use. This decision is not yet integrated: the current production opener still auto-creates when the database is absent.
 - Supabase Auth + Postgres is approved on the Free plan. No paid upgrade without approval.
 - The first implementation milestone should be a dedicated prototype PR, followed by a pull-and-test handoff to a new chat on the Mac.
 
@@ -157,6 +158,19 @@ Use a separate versioned JSON exchange format, shared by browser and Mac:
 - **Export disclosure unresolved.** The agreed temporary omission of suggestion/unknown completion events from export has not been implemented or verified in user-facing disclosure.
 - **Local failure unresolved.** Journal writes may reject, including an indeterminate completion after a queued add commits. App-level retry, reconciliation, and history projection behavior are absent.
 - **Old history unresolved.** This experiment does not delete, rewrite, backfill, or reconcile existing history. The journal guard checks that a synthetic pre-existing row stays unchanged, and the upgrade rehearsal preserves a synthetic orphan row; old-history continuity and real-data behavior remain open.
+
+### Browser storage provisioning — Phase 1 status, 2026-11-05
+
+- **Owner decision (recorded 2026-11-04).** An absent local database must **not** be auto-created. The app must offer a separate, explicit one-shot confirmation before creation. A missing observation is not user consent and does not prove first use. This is an owner decision, not an implemented integration: the **current production opener still auto-creates on absence** until an approved integration replaces it.
+- **Inert target-bound coordinator.** `src/lib/storage/browser-provisioning.ts` binds an immutable target `{ name, version }` at construction. Existing-only opens abort unexpected upgrades; only a confirmed missing observation makes the caller `eligibleForConfirmation`; `confirmCreateOnce` consumes that eligibility once. Target mismatches, unreadable results, failed closes, unsupervised/uncertain outcomes, and unexpected terminal errors after schema code latch `indeterminate`. A blocked drain or `existing-found` requires an explicit `checkExistingAgain` before another ordinary request. A committed creation is validated before `created` is reported. The module has no application import or production wiring and writes no metadata.
+- **Synthetic evidence.** The test lane reports 42 local native-Chromium synthetic scenarios across 45 runtime-unique fixture names passing against this coordinator. The run uses native IndexedDB in a disposable Chromium profile, a loopback server, an exact fixture-name allowlist, runtime-unique fixture names, and no `deleteDatabase`; it does not open `tubeshuffle_local` or touch real user data. A focused, owner-authorized review of the schema-rollback evidence found no remaining blocker. The rollback claim is limited to the synthetic schema transaction; it does not prove callback side effects outside that transaction. These are local Linux Chromium results, not owner-Mac evidence.
+- **Explicit non-claims.** No real database was tested. No production wiring exists. There is no actual first-use detection, backup, cross-tab coordination or data preservation, production migration, crash recovery, or durability guarantee. The inert coordinator is not release-ready storage.
+- **Next gates (not implemented).**
+  - Integrate existing-only startup and the explicit one-shot confirmation; remove the production opener's automatic-create path only in that approved integration.
+  - Review and approve the metadata-initializer policy; any metadata write must be explicit, guarded, and transactional, with the same uncertainty and validation rules.
+  - Design the versionchange UI/generation contract and the paused/blocked/uncertain UX, including user disclosure. Pull-only `getStatus()` is insufficient for production.
+  - Resolve production migration and old-tab behavior: schema versioning, stale/blocked tabs, rollback uncertainty, and preservation of existing history.
+  - Add exact tests against the production shared code with unique isolated databases. The synthetic test-only guard and local Chromium runner are not production coverage.
 
 ### Native player and design boundary
 
