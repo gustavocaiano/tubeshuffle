@@ -19,6 +19,8 @@ import { toast } from "sonner";
 import { useUiPreferencesStore } from "@/stores/ui-preferences-store";
 import { AccountPanel } from "@/components/playlist/AccountPanel";
 import { ExportLibrary } from "./ExportLibrary";
+import { BrowserStorageNotice } from "@/components/BrowserStorageNotice";
+import { useBrowserStorage, isStorageGenerationCurrent } from "@/hooks/use-browser-storage";
 import { QueryReadError } from "@/components/QueryReadError";
 
 const Navbar = dynamic(
@@ -27,25 +29,31 @@ const Navbar = dynamic(
 );
 
 export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
+  const storage = useBrowserStorage();
   const [importModalOpen, setImportModalOpen] = useState(false);
   const queryClient = useQueryClient();
   const { hideThumbnails, toggleHideThumbnails } = useUiPreferencesStore();
 
   const playlistsQuery = useQuery({
-    queryKey: ["playlists"],
+    queryKey: ["playlists", storage.generation],
+    retry: false,
+    enabled: storage.phase === "unknown" || storage.phase === "ready",
     queryFn: () => playlistRepository.listPlaylists(),
     networkMode: "always",
     refetchOnMount: "always",
   });
   const showReadError = playlistsQuery.isError || (playlistsQuery.isPending && playlistsQuery.errorUpdatedAt > 0);
-  const readOnly = showReadError || !playlistsQuery.isFetchedAfterMount || playlistsQuery.isPaused;
+  const readOnly = storage.phase !== "ready" || showReadError || !playlistsQuery.isFetchedAfterMount || playlistsQuery.isPaused;
 
   const deleteMutation = useMutation({
     networkMode: "always",
-    mutationFn: (id: string) => playlistRepository.deletePlaylist(id),
+    mutationFn: (id: string) => {
+      if (!isStorageGenerationCurrent(storage.generation)) throw new Error("Check the library again before deleting.");
+      return playlistRepository.deletePlaylist(id);
+    },
     onSuccess: (_result, id) => {
       toast.success("Playlist deleted");
-      queryClient.removeQueries({ queryKey: ["playlist", id], exact: true });
+      queryClient.removeQueries({ queryKey: ["playlist", id] });
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -82,7 +90,7 @@ export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
               </div>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <ExportLibrary />
+              <ExportLibrary readOnly={readOnly} />
               <Button
                 variant="outline"
                 onClick={toggleHideThumbnails}
@@ -103,7 +111,8 @@ export default function DashboardPage({ appOrigin }: { appOrigin: string }) {
 
           <AccountPanel appOrigin={appOrigin} readOnly={readOnly} />
 
-          {showReadError && (
+          <BrowserStorageNotice />
+          {showReadError && storage.phase === "ready" && (
             <QueryReadError subject="library" stale={playlists.length > 0} />
           )}
 

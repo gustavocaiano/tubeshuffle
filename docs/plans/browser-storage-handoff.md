@@ -1,6 +1,24 @@
 # Handoff — Provisão de armazenamento do browser
 
-Documento de continuação para outro chat. Não implementa nem ativa as alterações propostas.
+Documento de continuação com checkpoints históricos. O estado atual abaixo prevalece sobre instruções antigas de investigação sem wiring.
+
+## Continuação integrada — 2026-11-05
+
+O checkout começou limpo em `e168bd5`, branch `t3/native-macos-app`. A pasta `.slim/deepwork/browser-storage-provisioning/` não existe neste worktree; as suas pesquisas/revisões não foram assumidas como verificadas. A divergência do alvo foi resolvida com **substituição virtual apenas do módulo-folha**, guards por realm e gates de build.
+
+A auditoria inicial observou os defeitos previstos. Depois, o pedido explícito do owner para continuar toda a implementação autorizou corrigir e integrar localmente a facade, o coordenador e a UI. A restrição antiga de não fazer wiring sem nova autorização está satisfeita para este trabalho local; não autoriza qualquer acesso real, migração ou rollout.
+
+**Implementado:** arranque existing-only; schema v1 validado antes dos metadados; criação por confirmação separada de uso único; sessão/geração e transações detidas pela facade; invalidação em versionchange; queries/export/player ligados à geração; estados separados para missing, base vazia, incompatível, blocked/draining e efeitos IDB/localStorage parciais. O repositório já não obtém o handle cru. Nome/versão/schema e histórico de produção não foram migrados ou reparados.
+
+**Testado:** 13 cenários com módulos reais em fixtures Incognito descartáveis, mais confirmação concorrente e blocked/draining em dois separadores reais. Regressão web: 461 aprovados/2 ignorados, TypeScript/lint/build aprovados (um warning preexistente). [Fase 2 atual](browser-storage-phase2.md), [evidência final](../evidence/browser-storage-integrated-final-2026-11-05.json). Os resultados anteriores ficam preservados como checkpoints, não como evidência do código final.
+
+**Ainda aberto:** aceitação visual e playback da nova UI nativa, conta/API/Keychain reais e segurança de produção, política do YouTube, acesso a dados reais e rollout. A app nativa já integra biblioteca local/transferência/conta/player em código, com testes sintéticos; ver o [plano principal](native-macos-app.md#current-continuation--2026-11-05-local-work-no-rollout) e o [ensaio Mac agrupado](../../macos/README.md#one-grouped-ui-rehearsal).
+
+A confirmação anterior do owner (“sim funciona sempre”) é evidência qualitativa de reprodução, sem contagens/logs inventados. Não se repete o teste antigo; o ensaio atual cobre as alterações posteriores de UI/player. A UI web de export/divulgação já existia antes desta continuação — a afirmação antiga de que não existia estava errada. O export continua a omitir e divulgar órfãos sem alterar o histórico de origem; não prova proveniência nem continuidade entre ocorrências.
+
+## Registo histórico do handoff original
+
+As secções 1–8 abaixo são preservadas com o estado e restrições daquele checkpoint. Onde dizem “atual”, “inerte” ou “próximo passo”, consultar a continuação acima. A pasta `.slim` listada é uma referência histórica de artefactos ausentes, não evidência disponível. Não houve biblioteca real, migração de produção ou deploy nesta continuação.
 
 ## 1. Objetivo maior
 

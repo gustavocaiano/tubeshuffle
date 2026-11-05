@@ -18,6 +18,13 @@ interface MetaRecord<T = unknown> {
   value: T;
 }
 
+export class StorageMetadataError extends Error {
+  constructor(readonly stage: "legacy-read" | "database" | "marker") {
+    super("Local metadata initialization could not be completed.");
+    this.name = "StorageMetadataError";
+  }
+}
+
 export interface StorageMigrationMeta {
   schemaVersion: number;
   migratedFromLegacy: boolean;
@@ -52,7 +59,7 @@ function readLegacyMigrationSignal(): boolean {
   return LEGACY_STORAGE_KEYS.some((key) => window.localStorage.getItem(key) !== null);
 }
 
-function persistLegacyMigrationSignal(): void {
+export function persistLegacyMigrationSignal(): void {
   if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
     return;
   }
@@ -62,6 +69,8 @@ function persistLegacyMigrationSignal(): void {
 
 export async function getStorageMigrationMeta(db: IDBDatabase): Promise<StorageMigrationMeta> {
   const transaction = db.transaction(STORE_META, "readonly");
+  const done = completeTransaction(transaction);
+  void done.catch(() => {});
   const store = transaction.objectStore(STORE_META);
 
   const schemaRecord = (await completeRequest(
@@ -71,7 +80,7 @@ export async function getStorageMigrationMeta(db: IDBDatabase): Promise<StorageM
     store.get(META_KEY_MIGRATED_FROM_LEGACY),
   )) as MetaRecord<boolean> | undefined;
 
-  await completeTransaction(transaction);
+  await done;
 
   return {
     schemaVersion: schemaRecord?.value ?? DB_VERSION,
@@ -79,10 +88,18 @@ export async function getStorageMigrationMeta(db: IDBDatabase): Promise<StorageM
   };
 }
 
-export async function ensureStorageMigrationMeta(db: IDBDatabase): Promise<StorageMigrationMeta> {
-  const legacyDetected = readLegacyMigrationSignal();
+export async function ensureStorageMigrationMeta(
+  db: IDBDatabase,
+  lifecycle?: { transaction: (tx: IDBTransaction) => void; beforeMarker: () => void },
+): Promise<StorageMigrationMeta> {
+  let legacyDetected: boolean;
+  try { legacyDetected = readLegacyMigrationSignal(); }
+  catch { throw new StorageMetadataError("legacy-read"); }
 
   const transaction = db.transaction(STORE_META, "readwrite");
+  lifecycle?.transaction(transaction);
+  const done = completeTransaction(transaction);
+  void done.catch(() => {});
   const store = transaction.objectStore(STORE_META);
 
   const schemaRecord = (await completeRequest(
@@ -103,10 +120,11 @@ export async function ensureStorageMigrationMeta(db: IDBDatabase): Promise<Stora
     store.put({ key: META_KEY_MIGRATED_FROM_LEGACY, value: migratedFromLegacy });
   }
 
-  await completeTransaction(transaction);
+  await done;
 
   if (migratedFromLegacy) {
-    persistLegacyMigrationSignal();
+    try { lifecycle?.beforeMarker(); persistLegacyMigrationSignal(); }
+    catch { throw new StorageMetadataError("marker"); }
   }
 
   return { schemaVersion, migratedFromLegacy };
@@ -114,9 +132,11 @@ export async function ensureStorageMigrationMeta(db: IDBDatabase): Promise<Stora
 
 export async function markMigratedFromLegacy(db: IDBDatabase): Promise<void> {
   const transaction = db.transaction(STORE_META, "readwrite");
+  const done = completeTransaction(transaction);
+  void done.catch(() => {});
   const store = transaction.objectStore(STORE_META);
 
   store.put({ key: META_KEY_MIGRATED_FROM_LEGACY, value: true });
-  await completeTransaction(transaction);
+  await done;
   persistLegacyMigrationSignal();
 }

@@ -11,29 +11,35 @@ private final class NativeMemoryBackend: NativeCredentialBackend {
     var addStatus: OSStatus?
     var updateStatus: OSStatus?
     var deleteStatus: OSStatus?
-    func add(key: String, value: Data) -> OSStatus {
-        calls.append("add:\(key)")
+    private func namespaced(_ service: String, _ key: String) -> String { service + "\u{0}" + key }
+    func add(service: String, key: String, value: Data) -> OSStatus {
+        calls.append("add:\(service):\(key)")
         if let status = addStatus { return status }
-        guard values[key] == nil else { return errSecDuplicateItem }
-        values[key] = value; return errSecSuccess
+        let namespaced = namespaced(service, key)
+        guard values[namespaced] == nil else { return errSecDuplicateItem }
+        values[namespaced] = value; return errSecSuccess
     }
-    func update(key: String, value: Data) -> OSStatus {
-        calls.append("update:\(key)")
+    func update(service: String, key: String, value: Data) -> OSStatus {
+        calls.append("update:\(service):\(key)")
         if let status = updateStatus { return status }
-        guard values[key] != nil else { return errSecItemNotFound }
-        values[key] = value; return errSecSuccess
+        let namespaced = namespaced(service, key)
+        guard values[namespaced] != nil else { return errSecItemNotFound }
+        values[namespaced] = value; return errSecSuccess
     }
-    func read(key: String) -> (OSStatus, Data?) {
-        calls.append("read:\(key)")
+    func read(service: String, key: String) -> (OSStatus, Data?) {
+        calls.append("read:\(service):\(key)")
         if let status = readStatus { return (status, nil) }
-        guard let value = values[key] else { return (errSecItemNotFound, nil) }
+        guard let value = values[namespaced(service, key)] else { return (errSecItemNotFound, nil) }
         return (errSecSuccess, value)
     }
-    func delete(key: String) -> OSStatus {
-        calls.append("delete:\(key)")
+    func delete(service: String, key: String) -> OSStatus {
+        calls.append("delete:\(service):\(key)")
         if let status = deleteStatus { return status }
-        return values.removeValue(forKey: key) == nil ? errSecItemNotFound : errSecSuccess
+        return values.removeValue(forKey: namespaced(service, key)) == nil ? errSecItemNotFound : errSecSuccess
     }
+
+    func value(service: String, key: String) -> Data? { values[namespaced(service, key)] }
+    func set(_ value: Data, service: String, key: String) { values[namespaced(service, key)] = value }
 }
 
 final class NativeCredentialStorageTests: XCTestCase {
@@ -48,7 +54,7 @@ final class NativeCredentialStorageTests: XCTestCase {
     }
     func testOnlyReservedKeysReachBackend() throws {
         let backend = NativeMemoryBackend(), storage = NativeCredentialStorage(backend: backend)
-        XCTAssertEqual(NativeCredentialStorage.service, "com.tubeshuffle.native.auth.v1")
+        XCTAssertEqual(storage.service, "com.tubeshuffle.native.auth.v2.synthetic")
         XCTAssertNil(try storage.retrieve(key: "supabase.session"))
         for key in ["supabase.session", "other", "session.v1-other"] {
             XCTAssertThrowsError(try storage.store(key: key, value: Data()))
@@ -78,17 +84,17 @@ final class NativeCredentialStorageTests: XCTestCase {
     func testUnknownCollisionNeverMutatesAndDuplicateNeverRetries() throws {
         let backend = NativeMemoryBackend(), storage = NativeCredentialStorage(backend: backend)
         let unknown = Data([0, 1, 2])
-        backend.values[session] = unknown
+        backend.set(unknown, service: storage.service, key: session)
         XCTAssertThrowsError(try storage.retrieve(key: session)) { XCTAssertEqual($0 as? NativeCredentialStorage.Failure, .collision) }
         XCTAssertThrowsError(try storage.store(key: session, value: Data()))
         XCTAssertThrowsError(try storage.remove(key: session))
-        XCTAssertEqual(backend.values[session], unknown)
+        XCTAssertEqual(backend.value(service: storage.service, key: session), unknown)
         XCTAssertFalse(backend.calls.contains { $0.hasPrefix("update:") || $0.hasPrefix("delete:") })
-        backend.values.removeValue(forKey: session)
+        backend.values.removeAll()
         backend.calls.removeAll()
         backend.addStatus = errSecDuplicateItem
         XCTAssertThrowsError(try storage.store(key: session, value: Data())) { XCTAssertEqual($0 as? NativeCredentialStorage.Failure, .collision) }
-        XCTAssertEqual(backend.calls, ["read:\(session)", "add:\(session)"])
+        XCTAssertEqual(backend.calls, ["read:\(storage.service):\(session)", "add:\(storage.service):\(session)"])
     }
     func testBackendFailuresAreSanitizedAndRecorded() throws {
         let backend = NativeMemoryBackend(), storage = NativeCredentialStorage(backend: backend)
@@ -107,8 +113,29 @@ final class NativeCredentialStorageTests: XCTestCase {
         let object = try JSONSerialization.jsonObject(with: sessionData())
         let legacy = try JSONSerialization.data(withJSONObject: ["session": object, "expiration_date": 0])
         try storage.store(key: session, value: legacy)
-        let before = backend.values[session]
+        let before = backend.value(service: storage.service, key: session)
         XCTAssertThrowsError(try storage.retrieve(key: session)) { XCTAssertEqual($0 as? NativeCredentialStorage.Failure, .corrupt) }
-        XCTAssertEqual(backend.values[session], before)
+        XCTAssertEqual(backend.value(service: storage.service, key: session), before)
+    }
+
+    func testConfigurationNamespacesKeepSameKeysInSeparateStores() throws {
+        let first = try NativeAccountConfiguration(supabaseOrigin: try XCTUnwrap(URL(string: "https://one.supabase.co")),
+                                                   publishableKey: "sb_publishable_synthetic", applicationAPIOrigin: try XCTUnwrap(URL(string: "https://api.one.test")))
+        let second = try NativeAccountConfiguration(supabaseOrigin: try XCTUnwrap(URL(string: "https://two.supabase.co")),
+                                                    publishableKey: "sb_publishable_synthetic", applicationAPIOrigin: try XCTUnwrap(URL(string: "https://api.two.test")))
+        let backend = NativeMemoryBackend()
+        let one = NativeCredentialStorage(configuration: first, backend: backend)
+        let two = NativeCredentialStorage(configuration: second, backend: backend)
+        XCTAssertNotEqual(one.service, two.service)
+        XCTAssertTrue(one.service.hasPrefix(NativeCredentialStorage.servicePrefix + "."))
+        let data = try sessionData()
+        try one.store(key: session, value: data)
+        XCTAssertEqual(try one.retrieve(key: session), data)
+        XCTAssertNil(try two.retrieve(key: session))
+        let storedBefore = backend.value(service: one.service, key: session)
+        XCTAssertNotNil(storedBefore) // Backend retains the ownership envelope.
+        try two.remove(key: session)
+        XCTAssertEqual(backend.value(service: one.service, key: session), storedBefore)
+        XCTAssertNil(backend.value(service: two.service, key: session))
     }
 }

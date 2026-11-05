@@ -133,7 +133,6 @@ final class TransientOAuthTransport: NSObject, URLSessionDataDelegate, @unchecke
         finish(.success((body, response)))
     }
 }
-
 #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
 /// Private, opt-in diagnostic configuration. The file contains only the modern
 /// publishable key, never a URL or a privileged credential.
@@ -173,7 +172,6 @@ enum LocalOAuthDiagnosticConfiguration {
         return key
     }
 }
-
 @MainActor
 final class LocalOAuthDiagnosticService: TemporaryAccountService {
     private let account: TransientSupabaseAccount

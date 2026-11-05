@@ -9,14 +9,10 @@ import {
   STORE_PLAY_HISTORY,
   STORE_META,
   STORE_VIDEOS,
-  openBrowserDb,
 } from "@/lib/storage/browser-db";
-import {
-  ensureStorageMigrationMeta,
-  getStorageMigrationMeta,
-  markMigratedFromLegacy,
-  type StorageMigrationMeta,
-} from "@/lib/storage/storage-migrations";
+import { type StorageMigrationMeta } from "@/lib/storage/storage-migrations";
+import { acquireBrowserStorage, beginStorageTransaction, getBrowserStorageState, finishLegacyMigrationMarker } from "./browser-session";
+export { getBrowserStorageState, subscribeBrowserStorage, getServerStorageState, recheckBrowserStorage, confirmBrowserStorageCreation } from "./browser-session";
 
 export interface LocalPlaylistBundle {
   playlist: LocalPlaylist;
@@ -27,8 +23,6 @@ interface MetaRecord<T = unknown> {
   key: string;
   value: T;
 }
-
-let dbPromise: Promise<IDBDatabase> | null = null;
 
 function completeRequest<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -59,48 +53,49 @@ function normalizePlayEvent(input: LocalPlayEventInput): LocalPlayEvent {
   };
 }
 
+/** Low-level fixture hook; application consumers use operations, never handles. */
 export async function initializeStorage(): Promise<IDBDatabase> {
-  if (dbPromise === null) {
-    dbPromise = openBrowserDb();
-  }
-
-  const db = await dbPromise;
-  await ensureStorageMigrationMeta(db);
-  return db;
+  return (await acquireBrowserStorage()).db;
 }
 
 export async function getStorageMeta(): Promise<StorageMigrationMeta> {
-  const db = await initializeStorage();
-  return getStorageMigrationMeta(db);
+  const { transaction, done } = await beginStorageTransaction(STORE_META);
+  const store = transaction.objectStore(STORE_META);
+  const [schema, migrated] = await Promise.all([
+    completeRequest(store.get("schemaVersion")), completeRequest(store.get("migratedFromLegacy")),
+  ]);
+  await done;
+  return { schemaVersion: schema?.value ?? 1, migratedFromLegacy: migrated?.value ?? false };
 }
 
 export async function setMigratedFromLegacy(): Promise<void> {
-  const db = await initializeStorage();
-  await markMigratedFromLegacy(db);
+  // Metadata changes are not a data migration and do not copy legacy rows.
+  const generation = getBrowserStorageState().generation;
+  const { transaction, done } = await beginStorageTransaction(STORE_META, "readwrite", generation);
+  transaction.objectStore(STORE_META).put({ key: "migratedFromLegacy", value: true });
+  await done;
+  finishLegacyMigrationMarker(generation);
 }
 
 export async function getMetaValue<T>(key: string): Promise<T | null> {
-  const db = await initializeStorage();
-  const transaction = db.transaction(STORE_META, "readonly");
+  const { transaction, done } = await beginStorageTransaction(STORE_META, "readonly");
   const store = transaction.objectStore(STORE_META);
   const record = (await completeRequest(store.get(key))) as MetaRecord<T> | undefined;
-  await completeTransaction(transaction);
+  await done;
   return record?.value ?? null;
 }
 
 export async function setMetaValue<T>(key: string, value: T): Promise<void> {
-  const db = await initializeStorage();
-  const transaction = db.transaction(STORE_META, "readwrite");
+  const { transaction, done } = await beginStorageTransaction(STORE_META, "readwrite");
   const store = transaction.objectStore(STORE_META);
   store.put({ key, value } satisfies MetaRecord<T>);
-  await completeTransaction(transaction);
+  await done;
 }
 
 export async function listLocalPlaylists(): Promise<LocalPlaylist[]> {
-  const db = await initializeStorage();
-  const transaction = db.transaction(STORE_PLAYLISTS, "readonly");
+  const { transaction, done } = await beginStorageTransaction(STORE_PLAYLISTS, "readonly");
   const playlists = await readAll<LocalPlaylist>(transaction.objectStore(STORE_PLAYLISTS));
-  await completeTransaction(transaction);
+  await done;
   return playlists;
 }
 
@@ -112,9 +107,11 @@ export async function readTransferSnapshot(
   next: (kind: "video" | "history") => void,
   testDatabase?: IDBDatabase,
 ): Promise<void> {
-  const db = testDatabase ?? await initializeStorage();
-  const tx = db.transaction([STORE_PLAYLISTS, STORE_VIDEOS, STORE_PLAY_HISTORY], "readonly");
-  const done = completeTransaction(tx);
+  const transferStores = [STORE_PLAYLISTS, STORE_VIDEOS, STORE_PLAY_HISTORY];
+  const operation = testDatabase
+    ? (() => { const transaction = testDatabase.transaction(transferStores, "readonly"); return { transaction, done: completeTransaction(transaction) }; })()
+    : await beginStorageTransaction(transferStores);
+  const { transaction: tx, done } = operation;
   const names = [STORE_PLAYLISTS, STORE_VIDEOS, STORE_PLAY_HISTORY];
   const kinds = ["playlist", "video", "history"] as const;
   let callbackError: unknown;
@@ -132,15 +129,14 @@ export async function readTransferSnapshot(
 }
 
 export async function getLocalPlaylist(id: string): Promise<LocalPlaylistBundle | null> {
-  const db = await initializeStorage();
-  const transaction = db.transaction([STORE_PLAYLISTS, STORE_VIDEOS], "readonly");
+  const { transaction, done } = await beginStorageTransaction([STORE_PLAYLISTS, STORE_VIDEOS], "readonly");
   const playlistStore = transaction.objectStore(STORE_PLAYLISTS);
   const videosStore = transaction.objectStore(STORE_VIDEOS);
 
   const playlist = (await completeRequest(playlistStore.get(id))) as LocalPlaylist | undefined;
 
   if (!playlist) {
-    await completeTransaction(transaction);
+    await done;
     return null;
   }
 
@@ -148,18 +144,16 @@ export async function getLocalPlaylist(id: string): Promise<LocalPlaylistBundle 
   const videos = (await completeRequest(index.getAll(id))) as LocalVideo[];
   videos.sort((a, b) => a.position - b.position);
 
-  await completeTransaction(transaction);
+  await done;
   return { playlist, videos };
 }
 
-export async function saveLocalPlaylist(bundle: LocalPlaylistBundle): Promise<void> {
-  const db = await initializeStorage();
-  const transaction = db.transaction([STORE_PLAYLISTS, STORE_VIDEOS, STORE_PLAY_HISTORY], "readwrite");
+export async function saveLocalPlaylist(bundle: LocalPlaylistBundle, expectedGeneration = getBrowserStorageState().generation): Promise<void> {
+  const { transaction, done } = await beginStorageTransaction([STORE_PLAYLISTS, STORE_VIDEOS, STORE_PLAY_HISTORY], "readwrite", expectedGeneration);
   const playlistStore = transaction.objectStore(STORE_PLAYLISTS);
   const videosStore = transaction.objectStore(STORE_VIDEOS);
   const historyStore = transaction.objectStore(STORE_PLAY_HISTORY);
   const playlistIndex = videosStore.index("playlistId");
-  const done = completeTransaction(transaction);
   void done.catch(() => {});
 
   try {
@@ -204,8 +198,7 @@ export async function saveLocalPlaylist(bundle: LocalPlaylistBundle): Promise<vo
 }
 
 export async function deleteLocalPlaylist(id: string): Promise<void> {
-  const db = await initializeStorage();
-  const transaction = db.transaction([STORE_PLAYLISTS, STORE_VIDEOS], "readwrite");
+  const { transaction, done } = await beginStorageTransaction([STORE_PLAYLISTS, STORE_VIDEOS], "readwrite");
   const playlistStore = transaction.objectStore(STORE_PLAYLISTS);
   const videosStore = transaction.objectStore(STORE_VIDEOS);
   const playlistIndex = videosStore.index("playlistId");
@@ -216,20 +209,32 @@ export async function deleteLocalPlaylist(id: string): Promise<void> {
   }
 
   playlistStore.delete(id);
-  await completeTransaction(transaction);
+  await done;
 }
 
-export async function recordLocalPlayEvent(input: LocalPlayEventInput): Promise<void> {
-  const db = await initializeStorage();
-  const transaction = db.transaction(STORE_PLAY_HISTORY, "readwrite");
+export async function recordLocalPlayEvent(input: LocalPlayEventInput, expectedGeneration = getBrowserStorageState().generation): Promise<void> {
+  const { transaction, done } = await beginStorageTransaction(STORE_PLAY_HISTORY, "readwrite", expectedGeneration);
   const store = transaction.objectStore(STORE_PLAY_HISTORY);
 
   store.put(normalizePlayEvent(input));
-  await completeTransaction(transaction);
+  await done;
+}
+
+export async function getCompletedLocalVideoIds(playlistId: string): Promise<Set<string>> {
+  const { transaction, done } = await beginStorageTransaction(STORE_PLAY_HISTORY, "readonly");
+  // Observe aborts even if index/request creation throws synchronously.
+  void done.catch(() => {});
+  const request = transaction.objectStore(STORE_PLAY_HISTORY).index("playlistId").getAll(playlistId);
+  const [events] = await Promise.all([
+    completeRequest<LocalPlayEvent[]>(request),
+    done,
+  ]);
+  // Preserve the existing lookup semantics, including unmapped legacy rows.
+  // Matching IDs are not evidence of occurrence continuity.
+  return new Set(events.filter((event) => event.completed).map((event) => event.videoId));
 }
 
 export const browserStorage = {
-  initialize: initializeStorage,
   getMeta: getStorageMeta,
   getMetaValue,
   setMetaValue,
@@ -239,4 +244,5 @@ export const browserStorage = {
   savePlaylist: saveLocalPlaylist,
   deletePlaylist: deleteLocalPlaylist,
   recordPlayEvent: recordLocalPlayEvent,
+  getCompletedVideoIds: getCompletedLocalVideoIds,
 };

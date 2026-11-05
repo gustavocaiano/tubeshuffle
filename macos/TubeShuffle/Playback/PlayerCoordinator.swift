@@ -9,6 +9,9 @@ final class PlayerCoordinator: ObservableObject {
     struct Item: Identifiable {
         let id: Int
         let videoID: String
+        var localOccurrenceID: OccurrenceID? = nil
+        var title: String? = nil
+        var channel: String? = nil
     }
 
     // Queue and accepted state share one publication, so a replacement cannot
@@ -22,7 +25,13 @@ final class PlayerCoordinator: ObservableObject {
         items: ["ScMzIvxBSi4", "jNQXAC9IVRw", "dQw4w9WgXcQ", "M7lc1UVf-VE", "aqz-KE-bpKQ", "ysz5S6PUM-U"]
             .enumerated().map { Item(id: $0.offset, videoID: $0.element) },
         state: QueueState(count: 6)
-    )
+    ) {
+        didSet {
+            if oldValue.state.index != playbackQueue.state.index || oldValue.items.map(\.id) != playbackQueue.items.map(\.id) {
+                onQueueChanged?(playbackQueue.items, playbackQueue.state.index)
+            }
+        }
+    }
     private(set) var queue: [Item] {
         get { playbackQueue.items }
         set { playbackQueue.items = newValue }
@@ -42,6 +51,8 @@ final class PlayerCoordinator: ObservableObject {
     @Published private(set) var elapsed: Double = 0
     @Published private(set) var duration: Double = 0
     private var observedPlaying = false
+    var isPlaying: Bool { observedPlaying }
+    @Published private(set) var volume: Double = 1
     private var intent = PlaybackIntent()
     @Published private var seekGate = SeekGate()
     private var deferredSeekEnd = false
@@ -74,11 +85,19 @@ final class PlayerCoordinator: ObservableObject {
         var draw: () -> Double
         var onMutationWatchdogArmed: ((@escaping @MainActor () -> Void) -> Void)? = nil
         var onLoadFinished: (() -> Void)? = nil
+        var volume: (@MainActor (Double, Int) async throws -> Void)? = nil
     }
     private let testHooks: TestHooks?
+    var onNaturalCompletion: ((Item) -> Void)?
+    var onQueueChanged: (([Item], Int) -> Void)?
+    private var lastCompletedGeneration: Int?
 
-    init(testHooks: TestHooks? = nil) {
+    init(initialItems: [Item]? = nil, initialIndex: Int = 0, testHooks: TestHooks? = nil) {
         self.testHooks = testHooks
+        if let initialItems {
+            precondition(!initialItems.isEmpty && Set(initialItems.map(\.id)).count == initialItems.count)
+            playbackQueue = PlaybackQueue(items: initialItems, state: QueueState(count: initialItems.count, initialIndex: initialIndex))
+        }
         if testHooks == nil {
             setupRemoteCommands()
             Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -148,7 +167,7 @@ final class PlayerCoordinator: ObservableObject {
             }
         }
         if testHooks == nil {
-            player.start()
+            player.start(videoID: queue[index].videoID)
             Task { [weak self] in
                 do { try await Task.sleep(nanoseconds: 15_000_000_000) } catch { return }
                 guard let self, self.startupGate.timeout() else { return }
@@ -183,6 +202,7 @@ final class PlayerCoordinator: ObservableObject {
                     self.invalidateSeek()
                     self.resetProgress()
                     self.requireRestart("player window closed; retained playback state cannot be safely re-armed")
+                    self.stop()
                 }
             }.store(in: &subscriptions)
         }
@@ -230,6 +250,10 @@ final class PlayerCoordinator: ObservableObject {
     }
 
     private func advanceNaturally() {
+        if !queueState.lastEndWasSeekAssisted, lastCompletedGeneration != queueState.activeGeneration {
+            lastCompletedGeneration = queueState.activeGeneration
+            onNaturalCompletion?(queue[index])
+        }
         guard index + 1 < queue.count else { record("queue finished"); return }
         select(index + 1, reason: queueState.lastEndWasSeekAssisted ? .seekAssisted : .natural)
     }
@@ -391,6 +415,16 @@ final class PlayerCoordinator: ObservableObject {
 
     func play() { command("play", wantsPlayback: true) { generation in try await self.player.play(generation: generation) } }
     func pause() { command("pause", wantsPlayback: false) { generation in try await self.player.pause(generation: generation) } }
+    func setVolume(_ value: Double) {
+        guard value.isFinite else { return }
+        let value = min(1, max(0, value))
+        command("volume", wantsPlayback: nil) { generation in
+            if let volume = self.testHooks?.volume { try await volume(value, generation) }
+            else { try await self.player.setVolume(value, generation: generation) }
+            guard self.windowOpen, !self.recoveryRequired, self.queueState.activeGeneration == generation else { return }
+            self.volume = value
+        }
+    }
     func next() { select(queueState.nextTarget) }
     var canTransport: Bool { ready && !playerError && windowOpen && !recoveryRequired && !mutationInFlight && !mutationGate.busy && !seekGate.seeking && queueState.pending == nil }
     var canNext: Bool { windowOpen && (ready || playerError) && !recoveryRequired && !mutationInFlight && !mutationGate.busy && !seekGate.seeking && queueState.pending == nil && queueState.nextTarget < queue.count }
@@ -564,8 +598,9 @@ final class PlayerCoordinator: ObservableObject {
             return
         }
         var info: [String: Any] = [
-            MPMediaItemPropertyTitle: "Playback Lab · last accepted item \(index + 1)"
+            MPMediaItemPropertyTitle: queue[index].title ?? "Playback Lab · last accepted item \(index + 1)"
         ]
+        if let artist = queue[index].channel { info[MPMediaItemPropertyArtist] = artist }
         // The embedded player may change speed; do not assert a rate of 1.
         if !observedPlaying { info[MPNowPlayingInfoPropertyPlaybackRate] = 0.0 }
         if duration > 0 {
@@ -636,6 +671,19 @@ final class PlayerCoordinator: ObservableObject {
         }
     }
 
+    /// A closed listening surface cannot retain media, remote controls or callbacks.
+    func stop() {
+        windowOpen = false
+        recoveryRequired = true
+        onNaturalCompletion = nil
+        onQueueChanged = nil
+        subscriptions.removeAll()
+        player.stop()
+        for (command, token) in remoteHandlers { command.removeTarget(token) }
+        remoteHandlers.removeAll()
+        publishNowPlaying()
+    }
+
     func attach(window: NSWindow) {
         guard playerWindow !== window else { return }
         if isShuffledQueuePending {
@@ -648,9 +696,9 @@ final class PlayerCoordinator: ObservableObject {
         record("player window attached: \(window.windowNumber), occlusion-visible=\(window.occlusionState.contains(.visible)); not a visibility proof")
     }
 
-    private func command(_ name: String, wantsPlayback: Bool, action: @escaping @MainActor (Int) async throws -> Void) {
+    private func command(_ name: String, wantsPlayback: Bool?, action: @escaping @MainActor (Int) async throws -> Void) {
         guard canTransport, let mutation = mutationGate.begin() else { return }
-        let token = intent.admit(wantsPlayback)
+        let token = wantsPlayback.map { intent.admit($0) }
         let generation = windowGeneration
         // No load can interleave with this mutation (select requires
         // !mutationInFlight), so the active occurrence cannot change underneath it.
@@ -673,7 +721,7 @@ final class PlayerCoordinator: ObservableObject {
                 record("\(name) command completed for generation \(occurrenceGeneration)")
             } catch {
                 guard !recoveryRequired, windowOpen, generation == windowGeneration else { return }
-                intent.failed(token)
+                if let token { intent.failed(token) }
                 record("\(name) command failed for generation \(occurrenceGeneration) (details redacted)")
             }
         }

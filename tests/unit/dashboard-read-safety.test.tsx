@@ -1,3 +1,14 @@
+// Real storage subscription and query generation wiring, with an injected session.
+const session = vi.hoisted(() => ({
+  state: { phase: "ready", generation: 0, eligibleForConfirmation: false },
+  listeners: new Set<() => void>(),
+}));
+vi.mock("@/lib/storage/browser-session", () => ({
+  getBrowserStorageState: () => session.state,
+  getServerStorageState: () => session.state,
+  subscribeBrowserStorage: (listener: () => void) => { session.listeners.add(listener); return () => session.listeners.delete(listener); },
+  confirmBrowserStorageCreation: vi.fn(), recheckBrowserStorage: vi.fn(),
+}));
 import React from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -16,12 +27,12 @@ import Dashboard from "@/app/dashboard/DashboardClient";
 const playlist = { id: "one", title: "Cached playlist", youtubeId: "yt", thumbnail: null, channelTitle: null, videoCount: 1 };
 const createClient = () => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
 const show = (client: QueryClient) => render(<QueryClientProvider client={client}><Dashboard appOrigin="https://example.test" /></QueryClientProvider>);
-beforeEach(() => { repository.listPlaylists.mockReset(); repository.deletePlaylist.mockReset(); });
+beforeEach(() => { session.state = { phase: "ready", generation: 0, eligibleForConfirmation: false }; repository.listPlaylists.mockReset(); repository.deletePlaylist.mockReset(); });
 afterEach(() => { cleanup(); onlineManager.setOnline(true); });
 
 it("makes cached cards read-only when the library read fails", async () => {
   const client = createClient();
-  client.setQueryData(["playlists"], [playlist]);
+  client.setQueryData(["playlists", 0], [playlist]);
   repository.listPlaylists.mockRejectedValue(new Error("secret storage failure"));
   show(client);
   await screen.findByRole("alert");
@@ -37,7 +48,7 @@ it("makes cached cards read-only when the library read fails", async () => {
 it("attempts a local library read while offline without exposing cached actions before verification", async () => {
   onlineManager.setOnline(false);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 300000 } } });
-  client.setQueryData(["playlists"], [playlist]);
+  client.setQueryData(["playlists", 0], [playlist]);
   let resolveRead!: (value: typeof playlist[]) => void;
   repository.listPlaylists.mockImplementationOnce(() => new Promise((resolve) => { resolveRead = resolve; }));
   show(client);
@@ -81,13 +92,13 @@ it("removes the deleted playlist detail cache", async () => {
   repository.listPlaylists.mockResolvedValue([playlist]);
   repository.deletePlaylist.mockResolvedValue(undefined);
   const client = createClient();
-  client.setQueryData(["playlist", "one"], { playlist, videos: [] });
+  client.setQueryData(["playlist", "one", 0], { playlist, videos: [] });
   show(client);
   const actions = await screen.findByRole("button", { name: "Actions for Cached playlist" });
   fireEvent.pointerDown(actions, { button: 0, ctrlKey: false });
   fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
   fireEvent.click(await screen.findByRole("button", { name: "Delete playlist" }));
-  await waitFor(() => expect(client.getQueryData(["playlist", "one"])).toBeUndefined());
+  await waitFor(() => expect(client.getQueryData(["playlist", "one", 0])).toBeUndefined());
   expect(repository.deletePlaylist).toHaveBeenCalledWith("one");
 });
 
@@ -104,4 +115,35 @@ it("executes a confirmed local deletion once while offline rather than queueing 
   expect(repository.deletePlaylist).toHaveBeenCalledWith("one");
   await act(async () => { onlineManager.setOnline(true); });
   expect(repository.deletePlaylist).toHaveBeenCalledTimes(1);
+});
+
+it("revokes cached actions on invalidation and reads the new generation before restoring them", async () => {
+  repository.listPlaylists.mockResolvedValueOnce([playlist]);
+  show(createClient());
+  await screen.findByRole("link", { name: "Cached playlist" });
+  act(() => {
+    session.state = { phase: "recheck-required", generation: 1, eligibleForConfirmation: false };
+    session.listeners.forEach(listener => listener());
+  });
+  expect(screen.queryByRole("link", { name: "Cached playlist" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Import Playlist" })).toBeNull();
+  expect(repository.listPlaylists).toHaveBeenCalledTimes(1);
+  let complete!: (value: typeof playlist[]) => void;
+  repository.listPlaylists.mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+  act(() => {
+    session.state = { phase: "ready", generation: 2, eligibleForConfirmation: false };
+    session.listeners.forEach(listener => listener());
+  });
+  await waitFor(() => expect(repository.listPlaylists).toHaveBeenCalledTimes(2));
+  expect(screen.queryByRole("button", { name: "Import Playlist" })).toBeNull();
+  await act(async () => { complete([playlist]); });
+  expect(await screen.findByRole("link", { name: "Cached playlist" })).toBeTruthy();
+});
+
+it("a confirmed missing state does not query or present an empty library", () => {
+  session.state = { phase: "missing", generation: 1, eligibleForConfirmation: true };
+  show(createClient());
+  expect(screen.getByText(/does not prove first use/)).toBeTruthy();
+  expect(screen.queryByText("No playlists yet")).toBeNull();
+  expect(repository.listPlaylists).not.toHaveBeenCalled();
 });

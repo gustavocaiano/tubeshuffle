@@ -246,8 +246,10 @@ struct QueueState {
     private var seekAssisted = false
     private(set) var lastEndWasSeekAssisted = false
 
-    init(count: Int) {
+    init(count: Int, initialIndex: Int = 0) {
         self.count = count
+        precondition(initialIndex >= 0 && (count == 0 ? initialIndex == 0 : initialIndex < count))
+        self.index = initialIndex
     }
 
     var nextTarget: Int { (failedTarget ?? index) + 1 }

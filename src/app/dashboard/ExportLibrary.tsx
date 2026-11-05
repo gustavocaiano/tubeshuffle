@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useBrowserStorage, isStorageGenerationCurrent } from "@/hooks/use-browser-storage";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -8,19 +9,22 @@ import { exportBrowserLibrary, type Diagnostic } from "@/lib/transfer/export";
 
 type Feedback = { type: "error" | "success"; message: string; diagnostics?: Diagnostic[]; remaining?: number };
 
-export function ExportLibrary() {
+export function ExportLibrary({ readOnly = false }: { readOnly?: boolean }) {
+  const storage = useBrowserStorage();
+  const disabled = readOnly || storage.phase !== "ready";
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const inFlight = useRef(false);
 
   async function exportLibrary() {
-    if (inFlight.current) return;
+    if (inFlight.current || disabled || !isStorageGenerationCurrent(storage.generation)) return;
     inFlight.current = true;
     setBusy(true);
     setFeedback(null);
     try {
       const result = await exportBrowserLibrary();
+      if (!isStorageGenerationCurrent(storage.generation)) throw new Error("Storage changed during export.");
       if (!result.ok) {
         setFeedback({
           type: "error",
@@ -55,7 +59,7 @@ export function ExportLibrary() {
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!inFlight.current) setOpen(nextOpen); }}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+        <Button disabled={disabled} variant="outline" className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white">
           <Download className="mr-2 h-4 w-4" aria-hidden="true" /> Export library
         </Button>
       </DialogTrigger>
@@ -78,7 +82,7 @@ export function ExportLibrary() {
           </div>
         )}
         <DialogFooter>
-          <Button onClick={exportLibrary} disabled={busy} className="rounded-full bg-white text-black hover:bg-white/90">
+          <Button onClick={exportLibrary} disabled={busy || disabled} className="rounded-full bg-white text-black hover:bg-white/90">
             {busy ? "Preparing export…" : "Download JSON"}
           </Button>
         </DialogFooter>

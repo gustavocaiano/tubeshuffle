@@ -1,3 +1,8 @@
+// Query/UI tests supply a confirmed storage session; real startup is exercised in the browser harness.
+vi.mock("@/hooks/use-browser-storage", () => ({
+  useBrowserStorage: () => ({ phase: "ready", generation: 0, eligibleForConfirmation: false }),
+  isStorageGenerationCurrent: (generation: number) => generation === 0,
+}));
 import React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

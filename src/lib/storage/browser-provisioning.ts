@@ -5,7 +5,8 @@
  * storage code, opens a named application database, changes the schema or
  * version, replays transactions, or presents UI. The caller supplies the native
  * open request factory, an existing-schema validator, and a creation callback.
- * It is not wired into the app.
+ * The application adapter lives in browser-session.ts; this coordinator itself
+ * remains independent of the target, UI and global browser APIs.
  *
  * Chosen policy:
  * - The coordinator binds one immutable target name and version at construction.

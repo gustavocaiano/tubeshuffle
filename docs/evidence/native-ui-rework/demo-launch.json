@@ -1,0 +1,18 @@
+{
+  "script": "./macos/scripts/run-ui-fixture.sh",
+  "date": "2026-11-05",
+  "rehearsalDirectory": "/var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-ui.xCiSUvPbBU",
+  "buildSucceeded": true,
+  "openCommandExitCode": 0,
+  "processesObserved": [
+    {
+      "pid": 8699,
+      "command": "/private/var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-ui.xCiSUvPbBU/derived/Build/Products/Debug/TubeShuffle.app/Contents/MacOS/TubeShuffle --ui-fixture"
+    }
+  ],
+  "buildLogSHA256": "43e99008db765b319aea2fdea0e2ec1d871cdb27062096ca734a7568f27816d5",
+  "appExecutableSHA256": "bf7660bc1f9ffb8487831df581cd7646d3677a1fde1436daa5a50473a845be9a",
+  "mode": "--ui-fixture; in-memory synthetic library; fresh preferences; account disabled; no playback initiated by agent",
+  "manualAcceptance": "Pending; running process does not prove window interaction/audio/transfer",
+  "processMatchNote": "Matched the canonical /private/var executable path; the initial /var string comparison missed its symlink-equivalent path."
+}

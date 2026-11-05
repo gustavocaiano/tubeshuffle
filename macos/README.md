@@ -1,4 +1,44 @@
-# Playback Lab — P0 only
+# TubeShuffle native app — local integration
+
+Normal launch now opens the SwiftUI library, not the Playback Lab. It never opens a library, reads Keychain credentials or contacts account services automatically. Create/open a local library explicitly, or choose **Try the demo**. The player is created only when starting a queue. This is a local prototype awaiting UI, live-account/security and release-policy acceptance.
+
+The listening screen now follows the web interface: dark rounded player and queue cards, visible thumbnails, centered transport, Normal/Smart shuffle and Daily Suggestions. **Library** opens the playlist grid; **Library files** contains create/open/import/export. The minimum window is 760 × 680 points. Narrow windows stack the queue below the player and expose **Queue** and **Shuffle** jump buttons. The video remains 16:9 and the transport fits in the initial viewport. **Focus** makes the visible video smaller; **Stage** expands the player and hides surrounding navigation until Stage or Escape is pressed. Neither mode replaces the player or hides its video behind artwork.
+
+**Play** starts the displayed track in playlist order. **Shuffle & listen** is an explicit action in **Shape your queue**; once listening it becomes **Reshuffle queue**. Selecting a queue row plays that occurrence. **Stop & close** tears down the player. Artwork uses stored YouTube thumbnails, with a validated video-ID fallback; the demo includes small bundled thumbnails so its artwork is available without network access. Media playback still requires the official YouTube embed and a network connection.
+
+## One grouped UI rehearsal
+
+From the repository root on this Apple Silicon Mac:
+
+```sh
+./macos/scripts/run-ui-fixture.sh
+```
+
+The script builds the current checkout in a new temporary directory and opens an **in-memory synthetic demo** with `--ui-fixture`. It prints the rehearsal directory and build log. Account access stays disabled for the fixture run, and preference changes use a fresh isolated suite. It does not select a real library, deploy anything or delete its rehearsal files. Signing is disabled for this local build; signing, Keychain entitlement and distribution behavior remain separate checks. A first run may download the pinned Swift package.
+
+Send one results block after these checks, marking anything not tried as **not tested**:
+
+1. **Interface:** Library grid, thumbnails/queue, resize down to 760 × 680, Queue/Shuffle jumps, Focus/Stage, keyboard navigation and VoiceOver if available. Confirm that the visible YouTube player and transport fit. Library file shortcuts: Cmd+N / Cmd+O; transfer: Cmd+Shift+I / Cmd+Shift+E; playback: Cmd+Option+P toggles play/pause, Cmd+Option+Left/Right selects previous/next; Escape leaves Stage. The listening interface intentionally uses the web's dark appearance.
+2. **Listening:** use Shuffle → Shuffle & listen, then Play if required. Check audio, queue advancement, row selection, seek, volume, minimize/restore and Cmd+H/restore from this UI. Stop & close must stop playback. Note errors or missing advancement; do not infer audio from displayed counters. The owner reported that playback seemed good in the previous UI; exact observations for the redesigned controls remain unverified.
+3. **Local transfer/persistence:** use Library files → Export library to save the demo JSON **inside the printed rehearsal directory**. Choose Library files → New library and give a new folder name inside that directory. Preview/import the JSON; check counts and any omission notice. Start a queue in this imported synthetic library, then stop playback, close/reopen that library and choose Resume queue. It must retain the exact occurrence/order/selection and wait for Play. Compare content/history after reopening. A second import into this nonempty library must be blocked.
+
+The queue and preferences are **not transferred** by JSON: create the queue after importing to test its persistence. Natural observed ends are recorded once for the exact local occurrence; seeks/manual skips do not fabricate completions. Listening seconds are recorded as zero (not measured), not inferred from track duration. Suggestions opened on YouTube have no local listening events and are excluded from export/history.
+
+Use only these synthetic files, without account login or a real library. Keep the rehearsal files until the results are reviewed. Automated SwiftUI rendering checks cover geometry, demo artwork and retained-player identity across resize/Focus. They render static media fixtures, not live audio; OS keyboard/file-panel behavior and subjective UI acceptance remain owner-observed. A successful build is not a UI/audio pass.
+
+## Current local behavior and limits
+
+- Content/history use SwiftData with CloudKit disabled. Creation requires a new private folder; existing open requires the runtime marker, compatible structure and a cooperative exclusive lock. No library discovery, missing-store creation, repair, merge or destructive refresh runs automatically. SwiftData has no public general no-migration open guarantee; arbitrary or old real stores are not approved by the synthetic checks.
+- Queue is a versioned local JSON sidecar containing only exact occurrence IDs/order/selection. Opening a library never starts audio. A missing sidecar is distinct from an invalid one; malformed/unknown queue files are kept and reported. Queue/history commits are separate; the app does not claim an atomic transaction across them.
+- Transfer v1 preserves IDs and valid history; orphan history is counted and omitted. Nonempty destinations are blocked. Input is capped at 10 MB, 500,000 JSON values and depth 8. A nominally valid but more complex file may be rejected by the resource cap. Files are unencrypted; export never replaces an existing filename. Old overwritten duplicate occurrences cannot be reconstructed.
+- Account setup uses explicitly entered HTTPS origins and a Supabase **publishable** key, for Supabase Free only. Configuration is per run. Google PKCE uses the system authentication browser; credentials are isolated in Keychain by configuration. Sign-in does not upload or fetch playlist content. Cloud save/remove changes only IDs and is explicit. Resume/refresh are explicit; a failed mutation may already have committed and is not retried automatically.
+- Account callback/provider/owner/RLS configuration and real Keychain behavior are still external/manual gates. The exact native callback is `com.tubeshuffle.playbacklab://auth/callback`; no callback allowlist, SQL migration or service setting was changed by this work. The previous diagnostic callback entry was reported removed. Do not assume a live login will work until it is separately configured and tested.
+- Suggestions cache at most five results per playlist/UTC day and 20 entries in memory, scoped to the active account run. They open on YouTube; they are not silently inserted into a local playlist/history. Quota/network/service-paused failures preserve local contents.
+- Normal/Smart shuffle, a visible embedded player, native queue/transport/seeking/volume, local filtering and preferences are implemented. Rendering checks cover seven desktop/compact/Focus/Stage layouts and bundled artwork. Accessibility, live artwork requests, OS interaction and playback through this UI still need owner observation. There are no transcripts, stream downloads, hidden keepalives or visibility/identity overrides.
+
+Run the historical lab explicitly with `--playback-lab`; `--local-oauth-diagnostic` and `--local-two-account-diagnostic` remain separate diagnostic paths. The sections below retain earlier evidence and procedures, not current product acceptance.
+
+# Playback Lab — historical P0 instructions
 
 This is an isolated feasibility experiment, not the native product. It uses one retained WKWebView hosting the official YouTube iframe player and a native-owned queue of six fixed public example IDs. Account sign-in is unavailable by default; a private diagnostic is described below. It has no configured cloud data or API keys, downloads, or media workaround. Video availability and embedding permissions may change. Background playback is not established or approved.
 

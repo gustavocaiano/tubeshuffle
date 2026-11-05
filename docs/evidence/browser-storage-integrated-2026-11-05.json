@@ -1,0 +1,1498 @@
+{
+  "build": {
+    "cases": 13,
+    "productionBundleRetainsTarget": true,
+    "productionTargetAbsentFromTestBundles": true,
+    "realModulesIncluded": true,
+    "sourceHashes": {
+      "src/lib/storage/browser-db-target.ts": "eec23a5193c00a5319a32557d66a85d728d4f7ba3439bdb916cd80d3dd95fdb1",
+      "src/lib/storage/browser-db.ts": "3aaa358806b8a0cbec5dca632e56b8a592f4b4db31b5c4b76701584c2335a7bd",
+      "src/lib/storage/browser-provisioning.ts": "6f46f4cb3536871f0ae850856058194d29aec8dd17b9f72058df9e9651969a67",
+      "src/lib/storage/browser-session.ts": "189e5052d516f030ae3dc36280108505b51cd4494656fab2b977cdd462085ba8",
+      "src/lib/storage/index.ts": "c74644114e78eb5bb2c9dbbf50ce7a05852b755055c1f749f90ff930aa58adc3",
+      "src/lib/storage/storage-migrations.ts": "44a6f76c128feea2fe1ffbeddb19cbbef25f2aba4ba08086270cde9aa5b5e6e2",
+      "src/stores/playlist-store.ts": "34019bfefbb1e1aed62169f984b763cb6e44ea069b65a1dce0f60d591e5bff13"
+    },
+    "virtualLeafOnly": true
+  },
+  "contexts": "Two guarded same-origin iframes per scenario; not independent processes or Safari",
+  "environment": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) T3CodeNightly/0.1.8-nightly.20261105.4205 Chrome/152.0.7977.169 Electron/44.10.1 Safari/537.36",
+  "limits": "Disposable synthetic data only. Exercises the integrated production source graph with a test-only target substitution. No real-library, durability, Safari, or release claim. No OS network firewall.",
+  "ok": true,
+  "outcomes": [
+    {
+      "key": "guard",
+      "observation": "Both realm guards block production/legacy names, database deletion, unknown storage keys, property writes, clear and fetch before native access.",
+      "traces": [
+        {
+          "blocked": 0,
+          "deletes": 1,
+          "denied": 7,
+          "local": [],
+          "network": 1,
+          "opens": [],
+          "schemaCalls": 0,
+          "transactions": [],
+          "upgrades": []
+        },
+        {
+          "blocked": 0,
+          "deletes": 1,
+          "denied": 7,
+          "local": [],
+          "network": 1,
+          "opens": [],
+          "schemaCalls": 0,
+          "transactions": [],
+          "upgrades": []
+        }
+      ]
+    },
+    {
+      "key": "absent",
+      "observation": "Real facade startup in two contexts aborts absent-database creation, reports missing and writes neither metadata nor localStorage. An independent existing-only probe confirms absence.",
+      "traces": [
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-e95bba62-942b-4dcd-955c-cc174f7d3ed7",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-e95bba62-942b-4dcd-955c-cc174f7d3ed7",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 0,
+          "transactions": [],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            },
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        },
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-e95bba62-942b-4dcd-955c-cc174f7d3ed7",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 0,
+          "transactions": [],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "preserved",
+      "observation": "Two real initializers preserve seeded v1 records incl. orphan history; each opens meta readwrite; localStorage marker written.",
+      "traces": [
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "playlist-store",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "setItem"
+            }
+          ],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-24916c54-2566-4cf1-993b-5bbed00d0cb4",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-24916c54-2566-4cf1-993b-5bbed00d0cb4",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-24916c54-2566-4cf1-993b-5bbed00d0cb4",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-24916c54-2566-4cf1-993b-5bbed00d0cb4",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 1,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readwrite",
+              "stores": [
+                "meta"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "playlists"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            }
+          ],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        },
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "playlist-store",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "setItem"
+            }
+          ],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-24916c54-2566-4cf1-993b-5bbed00d0cb4",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 0,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readwrite",
+              "stores": [
+                "meta"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "playlists"
+              ]
+            }
+          ],
+          "upgrades": []
+        }
+      ]
+    },
+    {
+      "key": "legacy",
+      "observation": "Missing meta initialized from synthetic legacy signal; library/history unchanged; legacy value retained.",
+      "traces": [
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "playlist-store",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "setItem"
+            }
+          ],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-fc317904-e0dd-46b6-b19e-6fbacce6040d",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-fc317904-e0dd-46b6-b19e-6fbacce6040d",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-fc317904-e0dd-46b6-b19e-6fbacce6040d",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-fc317904-e0dd-46b6-b19e-6fbacce6040d",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 1,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readwrite",
+              "stores": [
+                "meta"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "playlists"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            }
+          ],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        },
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [],
+          "network": 0,
+          "opens": [],
+          "schemaCalls": 0,
+          "transactions": [],
+          "upgrades": []
+        }
+      ]
+    },
+    {
+      "key": "read-failure",
+      "observation": "INJECTED localStorage read denial rejects real initialization before any metadata write.",
+      "traces": [
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "getItem"
+            }
+          ],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-92e3b706-3eaf-46ae-9b38-478c4de15161",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-92e3b706-3eaf-46ae-9b38-478c4de15161",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-92e3b706-3eaf-46ae-9b38-478c4de15161",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-92e3b706-3eaf-46ae-9b38-478c4de15161",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 1,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            }
+          ],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        },
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [],
+          "network": 0,
+          "opens": [],
+          "schemaCalls": 0,
+          "transactions": [],
+          "upgrades": []
+        }
+      ]
+    },
+    {
+      "key": "write-failure",
+      "observation": "INJECTED localStorage write denial occurs AFTER IDB metadata commit; explicit retry succeeds. Not atomic across stores.",
+      "traces": [
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "playlist-store",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "setItem"
+            },
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "playlist-store",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "setItem"
+            }
+          ],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-88f73ff7-3de0-4834-bdec-7565d455e7cb",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-88f73ff7-3de0-4834-bdec-7565d455e7cb",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-88f73ff7-3de0-4834-bdec-7565d455e7cb",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-88f73ff7-3de0-4834-bdec-7565d455e7cb",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-88f73ff7-3de0-4834-bdec-7565d455e7cb",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-88f73ff7-3de0-4834-bdec-7565d455e7cb",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 1,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readwrite",
+              "stores": [
+                "meta"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readwrite",
+              "stores": [
+                "meta"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            }
+          ],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        },
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [],
+          "network": 0,
+          "opens": [],
+          "schemaCalls": 0,
+          "transactions": [],
+          "upgrades": []
+        }
+      ]
+    },
+    {
+      "key": "incompatible",
+      "observation": "Incomplete same-version schema rejected by structural preflight before metadata; no repair.",
+      "traces": [
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-c131a420-7876-4815-904e-a2b36a56da33",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-c131a420-7876-4815-904e-a2b36a56da33",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-c131a420-7876-4815-904e-a2b36a56da33",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-c131a420-7876-4815-904e-a2b36a56da33",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 0,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "playlists"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "playlists"
+              ]
+            }
+          ],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        },
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [],
+          "network": 0,
+          "opens": [],
+          "schemaCalls": 0,
+          "transactions": [],
+          "upgrades": []
+        }
+      ]
+    },
+    {
+      "key": "stale",
+      "observation": "Real session closes on cross-context versionchange, advances generation, blocks old async writes and requires an explicit existing check; synthetic v2 is rejected without migration.",
+      "traces": [
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "playlist-store",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:playlists",
+              "method": "getItem"
+            }
+          ],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-abbeefd4-2c3d-4ef1-a04b-fb942a950f7b",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-abbeefd4-2c3d-4ef1-a04b-fb942a950f7b",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-abbeefd4-2c3d-4ef1-a04b-fb942a950f7b",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 1,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readwrite",
+              "stores": [
+                "meta"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "playlists"
+              ]
+            }
+          ],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        },
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-abbeefd4-2c3d-4ef1-a04b-fb942a950f7b",
+              "version": 2
+            }
+          ],
+          "schemaCalls": 0,
+          "transactions": [],
+          "upgrades": [
+            {
+              "next": 2,
+              "old": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "confirm",
+      "observation": "Integrated confirmation in two contexts creates one empty v1 library, rejects double submission, makes the losing context explicitly recheck and initializes metadata only after confirmation.",
+      "traces": [
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "playlist-store",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:playlists",
+              "method": "getItem"
+            }
+          ],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-8e46aa02-75b4-441a-89cb-328f48eaaa57",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-8e46aa02-75b4-441a-89cb-328f48eaaa57",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-8e46aa02-75b4-441a-89cb-328f48eaaa57",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-8e46aa02-75b4-441a-89cb-328f48eaaa57",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 0,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readwrite",
+              "stores": [
+                "meta"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "playlists"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            }
+          ],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            },
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        },
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "playlist-store",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:playlists",
+              "method": "getItem"
+            }
+          ],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-8e46aa02-75b4-441a-89cb-328f48eaaa57",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-8e46aa02-75b4-441a-89cb-328f48eaaa57",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-8e46aa02-75b4-441a-89cb-328f48eaaa57",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 0,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readwrite",
+              "stores": [
+                "meta"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "playlists"
+              ]
+            }
+          ],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "drain",
+      "observation": "INERT coordinator: native blocked/draining across realms, late upgrade aborted after blocker closes; synthetic v1 unchanged.",
+      "traces": [
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-0882aef5-c448-4e7e-9fcf-ad95d05eeb52",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-0882aef5-c448-4e7e-9fcf-ad95d05eeb52",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-0882aef5-c448-4e7e-9fcf-ad95d05eeb52",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-0882aef5-c448-4e7e-9fcf-ad95d05eeb52",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 1,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            }
+          ],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        },
+        {
+          "blocked": 1,
+          "deletes": 0,
+          "denied": 0,
+          "local": [],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-0882aef5-c448-4e7e-9fcf-ad95d05eeb52",
+              "version": 2
+            }
+          ],
+          "schemaCalls": 0,
+          "transactions": [],
+          "upgrades": [
+            {
+              "next": 2,
+              "old": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "export",
+      "observation": "Real exporter omits/reports synthetic orphan without rewriting history, initializes meta after schema confirmation; no provenance guarantee.",
+      "traces": [
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "playlist-store",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:playlists",
+              "method": "getItem"
+            }
+          ],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-f92a6093-71c4-44a3-948f-72798ab13708",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-f92a6093-71c4-44a3-948f-72798ab13708",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-f92a6093-71c4-44a3-948f-72798ab13708",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-f92a6093-71c4-44a3-948f-72798ab13708",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 1,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readwrite",
+              "stores": [
+                "meta"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "playlists",
+                "videos",
+                "playHistory"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            }
+          ],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        },
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [],
+          "network": 0,
+          "opens": [],
+          "schemaCalls": 0,
+          "transactions": [],
+          "upgrades": []
+        }
+      ]
+    },
+    {
+      "key": "history",
+      "observation": "Real repository delegates history lookup to facade in two realms; duplicates collapse by stored ID, partial/other-playlist rows excluded, unmapped legacy IDs preserved without continuity inference.",
+      "traces": [
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "playlist-store",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:playlists",
+              "method": "getItem"
+            }
+          ],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-861280e7-17f9-43ec-9efc-9f4369ea6f17",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-861280e7-17f9-43ec-9efc-9f4369ea6f17",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-861280e7-17f9-43ec-9efc-9f4369ea6f17",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-861280e7-17f9-43ec-9efc-9f4369ea6f17",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 1,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readwrite",
+              "stores": [
+                "meta"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "playHistory"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "playHistory"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            }
+          ],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        },
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "playlist-store",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:playlists",
+              "method": "getItem"
+            }
+          ],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-861280e7-17f9-43ec-9efc-9f4369ea6f17",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 0,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readwrite",
+              "stores": [
+                "meta"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "playHistory"
+              ]
+            }
+          ],
+          "upgrades": []
+        }
+      ]
+    },
+    {
+      "key": "history-abort",
+      "observation": "INJECTED native abort after history request success rejects the repository read; no partial success or automatic retry; all rows preserved.",
+      "traces": [
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [
+            {
+              "key": "tubeshuffle:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:legacy-migrated",
+              "method": "getItem"
+            },
+            {
+              "key": "playlist-store",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler-playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffler:playlists",
+              "method": "getItem"
+            },
+            {
+              "key": "tubeshuffle:playlists",
+              "method": "getItem"
+            }
+          ],
+          "network": 0,
+          "opens": [
+            {
+              "name": "tubeshuffle-startup-test-87d73d7e-a47d-4cb3-84e7-93476e54d835",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-87d73d7e-a47d-4cb3-84e7-93476e54d835",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-87d73d7e-a47d-4cb3-84e7-93476e54d835",
+              "version": 1
+            },
+            {
+              "name": "tubeshuffle-startup-test-87d73d7e-a47d-4cb3-84e7-93476e54d835",
+              "version": 1
+            }
+          ],
+          "schemaCalls": 1,
+          "transactions": [
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readwrite",
+              "stores": [
+                "meta"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "playHistory"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "meta",
+                "playHistory",
+                "playlists",
+                "videos"
+              ]
+            },
+            {
+              "mode": "readonly",
+              "stores": [
+                "playHistory"
+              ]
+            }
+          ],
+          "upgrades": [
+            {
+              "next": 1,
+              "old": 0
+            }
+          ]
+        },
+        {
+          "blocked": 0,
+          "deletes": 0,
+          "denied": 0,
+          "local": [],
+          "network": 0,
+          "opens": [],
+          "schemaCalls": 0,
+          "transactions": [],
+          "upgrades": []
+        }
+      ]
+    }
+  ]
+}

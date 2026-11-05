@@ -1,0 +1,302 @@
+[
+  {
+    "bounds" : {
+      "deck" : {
+        "height" : 682,
+        "width" : 876,
+        "x" : 28,
+        "y" : 158
+      },
+      "queue" : {
+        "height" : 682,
+        "width" : 328,
+        "x" : 924,
+        "y" : 158
+      },
+      "transport" : {
+        "height" : 80,
+        "width" : 844,
+        "x" : 44,
+        "y" : 744
+      },
+      "video" : {
+        "height" : 406,
+        "width" : 721.77777777777783,
+        "x" : 105.11111111111109,
+        "y" : 250
+      }
+    },
+    "boundsCoordinateSpace" : "Initial unscrolled content viewport",
+    "case" : "ready-1280x860",
+    "height" : 860,
+    "initialViewportAssertionsPassed" : true,
+    "media" : "Real idle view, bundled demo artwork",
+    "width" : 1280
+  },
+  {
+    "bounds" : {
+      "deck" : {
+        "height" : 682,
+        "width" : 876,
+        "x" : 28,
+        "y" : -382
+      },
+      "queue" : {
+        "height" : 682,
+        "width" : 328,
+        "x" : 924,
+        "y" : -382
+      },
+      "transport" : {
+        "height" : 80,
+        "width" : 844,
+        "x" : 44,
+        "y" : 204
+      },
+      "video" : {
+        "height" : 406,
+        "width" : 721.77777777777783,
+        "x" : 105.11111111111109,
+        "y" : -290
+      }
+    },
+    "boundsCoordinateSpace" : "Content viewport after scrolling down 540 points; offscreen upper content is expected",
+    "case" : "lower-paused-1280x860",
+    "height" : 860,
+    "initialViewportAssertionsPassed" : false,
+    "media" : "Static bundled image in the real WKWebView; synthetic paused event",
+    "width" : 1280
+  },
+  {
+    "bounds" : {
+      "deck" : {
+        "height" : 682,
+        "width" : 876,
+        "x" : 28,
+        "y" : 158
+      },
+      "queue" : {
+        "height" : 682,
+        "width" : 328,
+        "x" : 924,
+        "y" : 158
+      },
+      "transport" : {
+        "height" : 80,
+        "width" : 844,
+        "x" : 44,
+        "y" : 744
+      },
+      "video" : {
+        "height" : 406,
+        "width" : 721.77777777777783,
+        "x" : 105.11111111111109,
+        "y" : 250
+      }
+    },
+    "boundsCoordinateSpace" : "Initial unscrolled content viewport",
+    "case" : "paused-1280x860",
+    "height" : 860,
+    "initialViewportAssertionsPassed" : true,
+    "media" : "Static bundled image in the real WKWebView; synthetic paused event",
+    "width" : 1280
+  },
+  {
+    "bounds" : {
+      "deck" : {
+        "height" : 588,
+        "width" : 731.67999999999995,
+        "x" : 28,
+        "y" : 112
+      },
+      "queue" : {
+        "height" : 588,
+        "width" : 292.32000000000016,
+        "x" : 779.67999999999984,
+        "y" : 112
+      },
+      "transport" : {
+        "height" : 68,
+        "width" : 707.67999999999995,
+        "x" : 40,
+        "y" : 620
+      },
+      "video" : {
+        "height" : 388,
+        "width" : 689.77777777777783,
+        "x" : 48.951111111111061,
+        "y" : 168
+      }
+    },
+    "boundsCoordinateSpace" : "Initial unscrolled content viewport",
+    "case" : "paused-1100x720",
+    "height" : 720,
+    "initialViewportAssertionsPassed" : true,
+    "media" : "Static bundled image in the real WKWebView; synthetic paused event",
+    "width" : 1100
+  },
+  {
+    "bounds" : {
+      "deck" : {
+        "height" : 548,
+        "width" : 720,
+        "x" : 20,
+        "y" : -428
+      },
+      "queue" : {
+        "height" : 420,
+        "width" : 720,
+        "x" : 20,
+        "y" : 140
+      },
+      "transport" : {
+        "height" : 68,
+        "width" : 696,
+        "x" : 32,
+        "y" : 40
+      },
+      "video" : {
+        "height" : 348,
+        "width" : 618.66666666666652,
+        "x" : 70.666666666666686,
+        "y" : -372
+      }
+    },
+    "boundsCoordinateSpace" : "Content viewport after scrolling down 540 points; offscreen upper content is expected",
+    "case" : "lower-paused-760x680",
+    "height" : 680,
+    "initialViewportAssertionsPassed" : false,
+    "media" : "Static bundled image in the real WKWebView; synthetic paused event",
+    "width" : 760
+  },
+  {
+    "bounds" : {
+      "deck" : {
+        "height" : 548,
+        "width" : 720,
+        "x" : 20,
+        "y" : 112
+      },
+      "queue" : {
+        "height" : 420,
+        "width" : 720,
+        "x" : 20,
+        "y" : 680
+      },
+      "transport" : {
+        "height" : 68,
+        "width" : 696,
+        "x" : 32,
+        "y" : 580
+      },
+      "video" : {
+        "height" : 348,
+        "width" : 618.66666666666652,
+        "x" : 70.666666666666686,
+        "y" : 168
+      }
+    },
+    "boundsCoordinateSpace" : "Initial unscrolled content viewport",
+    "case" : "paused-760x680",
+    "height" : 680,
+    "initialViewportAssertionsPassed" : true,
+    "media" : "Static bundled image in the real WKWebView; synthetic paused event",
+    "width" : 760
+  },
+  {
+    "bounds" : {
+      "deck" : {
+        "height" : 440,
+        "width" : 731.67999999999995,
+        "x" : 28,
+        "y" : 112
+      },
+      "queue" : {
+        "height" : 440,
+        "width" : 292.32000000000016,
+        "x" : 779.67999999999984,
+        "y" : 112
+      },
+      "transport" : {
+        "height" : 68,
+        "width" : 707.67999999999995,
+        "x" : 40,
+        "y" : 472
+      },
+      "video" : {
+        "height" : 240,
+        "width" : 426.66666666666663,
+        "x" : 180.50666666666663,
+        "y" : 168
+      }
+    },
+    "boundsCoordinateSpace" : "Initial unscrolled content viewport",
+    "case" : "focus-1100x720",
+    "height" : 720,
+    "initialViewportAssertionsPassed" : true,
+    "media" : "Static bundled image in the real WKWebView; synthetic paused event",
+    "width" : 1100
+  },
+  {
+    "bounds" : {
+      "deck" : {
+        "height" : 688,
+        "width" : 1044,
+        "x" : 28,
+        "y" : 12
+      },
+      "transport" : {
+        "height" : 68,
+        "width" : 1020,
+        "x" : 40,
+        "y" : 620
+      },
+      "video" : {
+        "height" : 488,
+        "width" : 867.55555555555566,
+        "x" : 116.22222222222223,
+        "y" : 68
+      }
+    },
+    "boundsCoordinateSpace" : "Initial unscrolled content viewport",
+    "case" : "stage-1100x720",
+    "height" : 720,
+    "initialViewportAssertionsPassed" : true,
+    "media" : "Static bundled image in the real WKWebView; synthetic paused event",
+    "width" : 1100
+  },
+  {
+    "bounds" : {
+      "deck" : {
+        "height" : 738,
+        "width" : 892,
+        "x" : 136,
+        "y" : 158
+      },
+      "queue" : {
+        "height" : 738,
+        "width" : 328,
+        "x" : 1048,
+        "y" : 158
+      },
+      "transport" : {
+        "height" : 80,
+        "width" : 860,
+        "x" : 152,
+        "y" : 800
+      },
+      "video" : {
+        "height" : 462,
+        "width" : 821.33333333333348,
+        "x" : 171.33333333333331,
+        "y" : 250
+      }
+    },
+    "boundsCoordinateSpace" : "Initial unscrolled content viewport",
+    "case" : "paused-1600x1000",
+    "height" : 1000,
+    "initialViewportAssertionsPassed" : true,
+    "media" : "Static bundled image in the real WKWebView; synthetic paused event",
+    "width" : 1600
+  }
+]

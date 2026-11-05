@@ -2,19 +2,20 @@
 
 ## Project Responsibility
 
-TubeShuffle is a local-first YouTube playlist shuffler built with Next.js App Router, React, Zustand, TanStack Query, Tailwind, and shadcn/Radix primitives. Users import public YouTube playlists, store them in browser IndexedDB, shuffle videos with multiple presets, and play them through the YouTube IFrame API without accounts or a backend database.
+TubeShuffle is a local-first YouTube playlist shuffler built with Next.js App Router, React, Zustand, TanStack Query, Tailwind, and shadcn/Radix primitives. Users import public YouTube playlists, store them in browser IndexedDB, shuffle videos with multiple presets, and play them through the YouTube IFrame API with local contents/history and owner-authenticated server APIs for playlist links.
 
 ## System Entry Points
 
 | Entry point | Responsibility |
 | --- | --- |
 | `src/app/page.tsx` | Landing page with marketing copy, feature cards, FAQ, and dashboard CTA. |
-| `src/app/dashboard/page.tsx` | Playlist library: list local playlists, import, sync, delete. |
+| `src/app/dashboard/page.tsx` | Playlist library: confirm/open local storage, list playlists, fresh import, export, delete. |
 | `src/app/playlist/[id]/page.tsx` | Core shuffle/player experience for a stored local playlist UUID. |
 | `src/app/api/youtube/playlist/route.ts` | Server-side YouTube Data API proxy using `YOUTUBE_API_KEY`. |
 | `src/components/providers.tsx` | Client provider boundary for TanStack Query and Sonner toasts. |
 | `src/stores/playlist-store.ts` | Repository facade for playlist import/sync/delete/history. |
 | `src/stores/player-store.ts` | Persisted playback queue and transport state. |
+| `macos/TubeShuffle/App/TubeShuffleApp.swift` | Native library entry; explicit `--playback-lab` or `--ui-fixture`. |
 | `src/lib/storage/index.ts` | IndexedDB persistence API over playlists, videos, play history, and meta. |
 | `src/lib/shuffle/shuffle-service.ts` | Pure shuffle algorithms and preset dispatcher. |
 | `package.json` | Next.js scripts: `dev`, `build`, `start`, `lint`, `test`. |
@@ -24,7 +25,7 @@ TubeShuffle is a local-first YouTube playlist shuffler built with Next.js App Ro
 | Surface | Current functionality |
 | --- | --- |
 | `/` | Dark ambient landing page with hero player mock, anti-SaaS value props, bento features, shuffle explanation, and FAQ. |
-| `/dashboard` | Dark ambient playlist library for saved IndexedDB playlists; supports import, sync, delete, and open playlist. |
+| `/dashboard` | Dark ambient playlist library for saved IndexedDB playlists; supports fresh import, delete and open; destructive refresh/re-import is blocked. |
 | `/playlist/:id` | Dark ambient player shell that loads one local playlist, auto-shuffles on first visit, plays embedded YouTube videos, shows a viewport-height queue, supports keyboard/media controls, Focus/No Artwork/Stage preferences, shuffle modes, and exclude-watched filtering. |
 | `GET /api/youtube/playlist?playlistId=...` | Fetches playlist metadata/items/details from YouTube, filters unavailable videos, and returns `YouTubePlaylistData`. |
 
@@ -71,7 +72,9 @@ Primary state stores:
 
 ## Notable Current Constraints
 
-- App has no auth, no server database, and no cross-device sync by design.
+- Web owner-authentication and playlist-link APIs now exist under `src/lib/server/` and `src/app/api/`, with SQL/RLS definitions in `supabase/`. Cloud scope is playlist IDs only; production validation/deployment is not implied.
+- `macos/` contains the integrated SwiftUI local library, account/API services, transfer preview, SwiftData persistence, local queue sidecar and a visible WKWebView player. `App/NativeLibraryView.swift` owns the web-style listening screen and native sheets; `NativePlayerComponents.swift` owns the bounded player/thumbnail queue, and `NativeUIStyle.swift` holds shared layout/artwork. Demo mode uses synthetic data and bundled thumbnails; `NativeUIRenderingTests` captures actual native layouts with static media fixtures. The old Playback Lab is explicit. Owner/live-service/release acceptance remains open; see `docs/plans/native-macos-app.md`.
+- Browser provisioning is integrated through `browser-session.ts`: schema preflight, existing-only startup, explicit one-shot creation, generation-owned transactions and UI subscription. `tests/browser/storage-startup/` exercises shared startup code with build-only fixture targets and guarded disposable contexts; see `docs/plans/browser-storage-phase2.md`.
 - Shuffle UI/types expose `RANDOM`/Normal and `SMART`; Smart is now a metadata-inferred energy-flow shuffle rather than artist/channel spacing.
 - Playlist pages include daily YouTube suggestion discovery: five cached suggestions per playlist/browser/day via the server-side YouTube API proxy, with one local refresh per day.
 - Player UI now includes persisted Focus Mode, No Artwork, and Stage preferences for simplified playback presentation.

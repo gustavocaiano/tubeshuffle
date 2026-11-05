@@ -1,0 +1,25 @@
+{
+  "recordedAtUTC": "2026-11-05T13:17:07.588649+00:00",
+  "commandRunByOwner": "./macos/scripts/run-ui-fixture.sh",
+  "rehearsalDirectory": "/var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-ui.NEWwD9f6cz",
+  "ownerReported": "Script returned to the shell after printing the build, demo launch and temporary-file instructions; reported elapsed time 21s.",
+  "agentVerified": {
+    "buildResult": "BUILD SUCCEEDED",
+    "buildLog": "/var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-ui.NEWwD9f6cz/build.log",
+    "buildLogSHA256": "b88bae4008952b749a3e167dbc73de4e778d131f5c26c904e3d904713ee425c2",
+    "binary": "/var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-ui.NEWwD9f6cz/derived/Build/Products/Debug/TubeShuffle.app/Contents/MacOS/TubeShuffle",
+    "binarySHA256": "d8ecb6b9230521bef0279146e1bfb94283b11129cf32884835f6c768ce63acc1"
+  },
+  "launch": "Launch request reported by the script; visible window and successful UI startup not yet confirmed.",
+  "manualResults": {
+    "layoutNavigationKeyboardResize": "pending",
+    "audioQueueMinimizeRestoreStop": "pending",
+    "exportCreateImportReopenSavedQueue": "pending"
+  },
+  "limits": [
+    "No visual/audio behavior inferred from build or launch output.",
+    "No duplicate launch performed by the agent.",
+    "Only the owner-provided disposable build artifacts were read; no library opened.",
+    "Real-account, release and YouTube policy gates remain open."
+  ]
+}

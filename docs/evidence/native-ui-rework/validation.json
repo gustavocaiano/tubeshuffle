@@ -1,0 +1,72 @@
+{
+  "date": "2026-11-05",
+  "head": "e168bd58005c22a240fd9052d69fbef62ddbd2b2",
+  "branch": "t3/native-macos-app",
+  "uncommittedWorkingTree": true,
+  "scope": "Native web-style UI redesign; synthetic data only; no deployment",
+  "sourceSHA256": {
+    "macos/TubeShuffle/App/NativeLibraryView.swift": "ffb5bcb2c988acd3e495e6587618de420467af8ddc3b3483269f32e454d0db86",
+    "macos/TubeShuffle/App/NativePlayerComponents.swift": "682fb73616485f1e00691b7d1c0fd7b6691b10ccfb2ba0ba95d26268791fd386",
+    "macos/TubeShuffle/App/NativeUIStyle.swift": "236436c983eb53ba97f61ba8eb86a5b4b65473d9987db208ebe2eab1a7bb3918",
+    "macos/TubeShuffle/App/NativeLibraryModel.swift": "4e0409c2899679fd09170318a6aa65f17e6b77a76b0c8b11b347364748edf40e",
+    "macos/TubeShuffle/App/TubeShuffleApp.swift": "b888ae91daa7dfa826d0ec72010abdce44e84a5861c3a14c97e75fb2af8a6d08",
+    "macos/TubeShuffle/Playback/DirectPlayer.swift": "95cdbd7f2b65c49428a8373b9cf46a6beb432257a6f4c112642906a8894cc1a4",
+    "macos/TubeShuffle/Playback/PlayerCoordinator.swift": "b8be6896a71b40fcc13a627b7d8707c415a1ec624cb6dabf788429175bdbc84b",
+    "macos/TubeShuffle.xcodeproj/project.pbxproj": "c3349a49c6f680d7b31ffa0b179cfd07c9e6dec51b87da6f4af3bb4d51cd49d7",
+    "macos/TubeShuffleTests/Domain/Library/NativeUIRenderingTests.swift": "299f220e77eeac218948eda22dda83ad8354f946b022cbb0b19524a9c4902985",
+    "macos/scripts/run-ui-fixture.sh": "98e17a2e43e70d281b70cb1f4b14523a9c769230a89b5e0b87f5421d192cffd0",
+    "macos/TubeShuffle/Resources/DemoArtwork/jNQXAC9IVRw.jpg": "8cc043f4fa59fb6492c18072c8621bbbb2e1a25dff6b508823a6a229fdc1c8b2",
+    "macos/TubeShuffle/Resources/DemoArtwork/aqz-KE-bpKQ.jpg": "b21501d9cfcc8d2c02b4ff5e7b00d372055772f05af7a8a9bb1d26adf1bb48b6",
+    "macos/TubeShuffle/Resources/DemoArtwork/ScMzIvxBSi4.jpg": "6c04186f95688afdcba59267d99fefe08ef60d07f0a42156d8ead3e677a0a8c8",
+    "macos/TubeShuffle/Resources/DemoArtwork/dQw4w9WgXcQ.jpg": "2fc77b4a0620f5dca2d3cae6d917af3acdeb3b2e5558ba1727f8d651351fc692",
+    "macos/TubeShuffle/Resources/DemoArtwork/M7lc1UVf-VE.jpg": "056129e50d3b499e3a6b2056bd73adcc97fe3f8365e34e91175ddc6ccf4314ac"
+  },
+  "captureSource": "/var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-ui-render-7497F943-198B-4095-B0CF-92EBD5BF0BA8",
+  "captureMethod": "NSHostingView cacheDisplay of actual SwiftUI and a real WKWebView with static bundled-image HTML at the genuine allowed app origin; synthetic readiness/paused events",
+  "durableCaptureSHA256": {
+    "docs/evidence/native-ui-rework/captures/paused-1280x860.png": "6ead6930bccf7330f414ffa4b1294db5b8e4d040ac61716d259e31064897d183",
+    "docs/evidence/native-ui-rework/captures/paused-1100x720.png": "f288b645d023ca150949c6142c8d183d50d050a7189573c39e85dbfe973fc5f4",
+    "docs/evidence/native-ui-rework/captures/paused-760x680.png": "1a4bbaa9dd0e3ba18ed66cf89c17a535ec0716d742151af4ab46ae43515ffb50",
+    "docs/evidence/native-ui-rework/captures/stage-1100x720.png": "84da5b0d28c4b7bbd2b46e07bf156c8197e504f4519d22f7852474e73fc0222e",
+    "docs/evidence/native-ui-rework/captures/lower-paused-1280x860.png": "18a12e03a9b3a3fbd92dc5fe12a188eb673a4c4b6ad7fcb41ad9515a1c7183f2"
+  },
+  "measurementsSHA256": "78972b62f5991854e9f14abb5b8ba29ed3d2e06718d184f862a1e91f77b35e61",
+  "measurementsNotes": "Seven unscrolled initial cases contain the asserted bounds; two separately named lower- cases describe scrolled coordinates. Their initialViewportAssertionsPassed=false indicates not applicable to those extra captures, not a failed initial assertion.",
+  "fullHostedSuite": {
+    "executed": 239,
+    "passed": 237,
+    "skipped": 2,
+    "failures": 0,
+    "log": "/private/tmp/tubeshuffle-ui-rework-full-tests.log",
+    "scope": "Full native regression before the final compact-spacing adjustment; unchanged playback engine since this run"
+  },
+  "finalTargetedRerun": {
+    "executed": 4,
+    "passed": 4,
+    "skipped": 0,
+    "failures": 0,
+    "log": "/private/tmp/tubeshuffle-ui-review3-final.log",
+    "scope": "NativeUIRenderingTests after compact spacing, Stage footer and measurement fixes; includes build"
+  },
+  "logSHA256": {
+    "/private/tmp/tubeshuffle-ui-rework-full-tests.log": "50b14abfe7bb492b0f0ad5d9b36c9a45ff46c66108269cf111763ea928820c29",
+    "/private/tmp/tubeshuffle-ui-review3-final.log": "94fa110cb29af913b64259530063129bc25bc6f5c56d00abc4e941d9155abdeb"
+  },
+  "skips": [
+    "CooperativeFileLockTests.testProcessDeathReleasesLock: hosted child reaping unavailable",
+    "LocalLibraryStoreTests.testSuccessfulExistingStoreReopenRequiresSeparateProcess: separate-process harness required"
+  ],
+  "environment": {
+    "destination": "platform=macOS,arch=arm64",
+    "configuration": "Debug",
+    "codeSigningAllowed": false,
+    "dependencyResolution": "Pinned packages, automatic resolution disabled"
+  },
+  "limits": [
+    "No live YouTube/audio in the UI rendering tests",
+    "No manual keyboard, media keys, VoiceOver or file panels acceptance",
+    "No real libraries or browser profiles",
+    "No live account, provider/RLS, migration, deployment or rollout",
+    "YouTube policy and release authorization remain open"
+  ]
+}

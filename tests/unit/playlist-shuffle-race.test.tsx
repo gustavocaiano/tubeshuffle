@@ -1,3 +1,8 @@
+// Query/UI tests supply a confirmed storage session; real startup is exercised in the browser harness.
+vi.mock("@/hooks/use-browser-storage", () => ({
+  useBrowserStorage: () => ({ phase: "ready", generation: 0, eligibleForConfirmation: false }),
+  isStorageGenerationCurrent: (generation: number) => generation === 0,
+}));
 import React from "react";
 import {
   act,
@@ -238,7 +243,7 @@ describe("playlist shuffle request identity", () => {
   });
   it("shares the initial verification under Strict Mode", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { staleTime: 300000, retry: false } } });
-    client.setQueryData(["playlist", "playlist-a"], bundleA);
+    client.setQueryData(["playlist", "playlist-a", 0], bundleA);
     const pending = deferred<typeof bundleA>();
     repositoryMocks.getPlaylist.mockReturnValueOnce(pending.promise);
     render(<React.StrictMode>{pageElement(client)}</React.StrictMode>);
@@ -251,7 +256,7 @@ describe("playlist shuffle request identity", () => {
   it("revalidates fresh cached B after an in-place route change before enabling playback", async () => {
     usePlayerStore.getState().setQueue([videoB1], "playlist-b", "Playlist B");
     const client = new QueryClient({ defaultOptions: { queries: { staleTime: 300000, retry: false } } });
-    client.setQueryData(["playlist", "playlist-b"], bundleB);
+    client.setQueryData(["playlist", "playlist-b", 0], bundleB);
     const pending = deferred<typeof bundleB>();
     repositoryMocks.getPlaylist.mockImplementation((id: string) => id === "playlist-b" ? pending.promise : Promise.resolve(bundleA));
     const { view } = renderPage(client);
@@ -266,7 +271,7 @@ describe("playlist shuffle request identity", () => {
 
   it("does not claim cached null is not found before route verification", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { staleTime: 300000, retry: false } } });
-    client.setQueryData(["playlist", "playlist-a"], null);
+    client.setQueryData(["playlist", "playlist-a", 0], null);
     const pending = deferred<typeof bundleA | null>();
     repositoryMocks.getPlaylist.mockReturnValueOnce(pending.promise);
     renderPage(client);
@@ -290,7 +295,7 @@ describe("playlist shuffle request identity", () => {
   it("revalidates a fresh cached detail before mounting playback, including offline", async () => {
     usePlayerStore.getState().setQueue([videoA1], "playlist-a", "Playlist A");
     const client = new QueryClient({ defaultOptions: { queries: { staleTime: 300000, retry: false } } });
-    client.setQueryData(["playlist", "playlist-a"], bundleA);
+    client.setQueryData(["playlist", "playlist-a", 0], bundleA);
     const pending = deferred<typeof bundleA>();
     repositoryMocks.getPlaylist.mockReturnValueOnce(pending.promise);
     onlineManager.setOnline(false);
@@ -353,7 +358,7 @@ describe("playlist shuffle request identity", () => {
     usePlayerStore.getState().setQueue([videoA1], "playlist-a", "Playlist A");
     route.playlistId = "playlist-b";
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 300000, gcTime: Infinity } } });
-    client.setQueryData(["playlist", "playlist-b"], bundleB);
+    client.setQueryData(["playlist", "playlist-b", 0], bundleB);
     repositoryMocks.getPlaylist.mockRejectedValue(new Error("secret database error"));
     renderPage(client);
     await screen.findByRole("alert");
@@ -831,7 +836,7 @@ describe("playlist shuffle request identity", () => {
 
   it("keeps autoshow working under Strict Mode without duplicate queue writes or success toasts", async () => {
     const client = createClient();
-    client.setQueryData(["playlist", "playlist-a"], bundleA);
+    client.setQueryData(["playlist", "playlist-a", 0], bundleA);
     shuffleMocks.shuffleVideos.mockImplementation((videos: LocalVideo[]) => [
       ...videos,
     ]);

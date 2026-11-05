@@ -24,9 +24,12 @@ import { usePlayerStore, type VideoItem } from "@/stores/player-store";
 import { playlistRepository, type LocalPlaylistBundle } from "@/stores/playlist-store";
 import { useUiPreferencesStore } from "@/stores/ui-preferences-store";
 import type { ShufflePreset } from "@/types/playlist";
+import { BrowserStorageNotice } from "@/components/BrowserStorageNotice";
+import { useBrowserStorage, isStorageGenerationCurrent } from "@/hooks/use-browser-storage";
 import { QueryReadError } from "@/components/QueryReadError";
 
 interface ShuffleInvocation {
+  generation: number;
   requestId: number;
   routePlaylistId: string;
   bundle: LocalPlaylistBundle;
@@ -78,6 +81,7 @@ export default function PlaylistPage() {
 }
 
 function PlaylistView({ playlistId }: { playlistId: string }) {
+  const storage = useBrowserStorage();
   const [shufflePreset, setShufflePreset] = useState<ShufflePreset>("RANDOM");
   const [excludeWatched, setExcludeWatched] = useState(false);
 
@@ -112,6 +116,7 @@ function PlaylistView({ playlistId }: { playlistId: string }) {
 
   const isCurrentShuffle = useCallback(
     (request: ShuffleInvocation) =>
+      isStorageGenerationCurrent(request.generation) &&
       mountedRef.current &&
       canUsePlaylistRef.current &&
       routePlaylistIdRef.current === request.routePlaylistId &&
@@ -121,15 +126,16 @@ function PlaylistView({ playlistId }: { playlistId: string }) {
   );
 
   const playlistQuery = useQuery({
-    queryKey: ["playlist", playlistId],
+    queryKey: ["playlist", playlistId, storage.generation],
+    retry: false,
     queryFn: () => playlistRepository.getPlaylist(playlistId),
     networkMode: "always",
-    enabled: Boolean(playlistId),
+    enabled: Boolean(playlistId) && (storage.phase === "unknown" || storage.phase === "ready"),
     refetchOnMount: "always",
   });
   const showReadError = playlistQuery.isError || (playlistQuery.isPending && playlistQuery.errorUpdatedAt > 0);
 
-  const canUsePlaylist = playlistQuery.isSuccess && playlistQuery.isFetchedAfterMount && playlistQuery.data?.playlist.id === playlistId;
+  const canUsePlaylist = storage.phase === "ready" && playlistQuery.isSuccess && playlistQuery.isFetchedAfterMount && playlistQuery.data?.playlist.id === playlistId;
   useLayoutEffect(() => {
     canUsePlaylistRef.current = canUsePlaylist;
     if (!canUsePlaylist) {
@@ -186,10 +192,14 @@ function PlaylistView({ playlistId }: { playlistId: string }) {
 
   const recordPlayMutation = useMutation({
     mutationFn: (input: {
+      generation: number;
       playlistId: string;
       videoId: string;
       completed: boolean;
-    }) => playlistRepository.recordPlay({ ...input, watchedSeconds: 0 }),
+    }) => {
+      const { generation, ...event } = input;
+      return playlistRepository.recordPlay({ ...event, watchedSeconds: 0 }, generation);
+    },
   });
 
   const handleShuffle = useCallback(
@@ -197,9 +207,10 @@ function PlaylistView({ playlistId }: { playlistId: string }) {
       setShufflePreset(preset);
 
       const bundle = playlistQuery.data;
-      if (!bundle || !canUsePlaylistRef.current || bundle.playlist.id !== playlistId || routePlaylistIdRef.current !== playlistId) return;
+      if (!isStorageGenerationCurrent(storage.generation) || !bundle || !canUsePlaylistRef.current || bundle.playlist.id !== playlistId || routePlaylistIdRef.current !== playlistId) return;
 
       shuffleMutation.mutate({
+        generation: storage.generation,
         requestId: ++shuffleRequestIdRef.current,
         routePlaylistId: playlistId,
         bundle,
@@ -207,20 +218,21 @@ function PlaylistView({ playlistId }: { playlistId: string }) {
         shouldExcludeWatched: excludeWatched,
       });
     },
-    [excludeWatched, playlistId, playlistQuery.data, shuffleMutation],
+    [excludeWatched, playlistId, playlistQuery.data, shuffleMutation, storage.generation],
   );
 
   const handleVideoEnd = useCallback(
     (video: VideoItem) => {
-      if (mountedRef.current && canUsePlaylistRef.current && routePlaylistIdRef.current === playlistId && usePlayerStore.getState().playlistId === playlistId) {
+      if (isStorageGenerationCurrent(storage.generation) && mountedRef.current && canUsePlaylistRef.current && routePlaylistIdRef.current === playlistId && usePlayerStore.getState().playlistId === playlistId) {
         recordPlayMutation.mutate({
+          generation: storage.generation,
           playlistId,
           videoId: video.id,
           completed: true,
         });
       }
     },
-    [playlistId, recordPlayMutation],
+    [playlistId, recordPlayMutation, storage.generation],
   );
 
   // Auto-shuffle on first load
@@ -319,7 +331,8 @@ function PlaylistView({ playlistId }: { playlistId: string }) {
             )}
           </div>
 
-          {showReadError && (
+          <BrowserStorageNotice />
+          {showReadError && storage.phase === "ready" && (
             <QueryReadError subject="playlist" stale={Boolean(playlist)} />
           )}
 

@@ -9,9 +9,9 @@ Reactive state and repository layer. Provides the playlist repository facade use
 ### `playlist-store.ts`
 
 - Exports `playlistRepository` object rather than requiring components to call services/storage directly.
-- `importPlaylistFromUrl()` validates/extracts playlist ID, fetches YouTube data, upserts local entities, and preserves `createdAt` on sync/import of an existing YouTube playlist.
-- Local video IDs are composite: `${playlistId}:${youtubeVideoId}`.
-- `getCompletedVideoIds()` reads play-history rows for exclude-watched filtering.
+- `importPlaylistFromUrl()` captures the storage generation, validates the URL/ID, fetches metadata and adds only a new playlist. Sync and re-import/refresh of existing playlists are blocked to avoid ambiguous occurrence/history remapping.
+- New local video occurrences get independent UUIDs; repeated YouTube IDs retain separate occurrences. Existing stored IDs/history are preserved without inferred continuity.
+- `getCompletedVideoIds()` delegates to `browserStorage.getCompletedVideoIds()` for exclude-watched filtering; the repository does not own an IndexedDB handle or transaction. The storage operation waits for transaction completion and preserves existing history semantics.
 - Also exports a small UI store for import-modal/selected-playlist flags; current dashboard uses local `useState` instead.
 
 ### `player-store.ts`
