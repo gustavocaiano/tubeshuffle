@@ -1,3 +1,5 @@
+import AppKit
+import Auth
 import Foundation
 import XCTest
 @testable import TubeShuffle
@@ -5,7 +7,7 @@ import XCTest
 // Test-target-only bridge: this synthetic label assumes server traversal completion;
 // it does not exercise pagination or prove a consistent server snapshot.
 @MainActor
-private struct APIAccountLinkService: AccountLinkService {
+private struct SyntheticAPIAccountLinkService: AccountLinkService {
     let client: APIClient
 
     func list(bearer: String) async throws -> AccountLinkPage {
@@ -24,6 +26,43 @@ private struct APIAccountLinkService: AccountLinkService {
 
 @MainActor
 final class AccountSessionCoordinatorTests: XCTestCase {
+    func testPublicSetupRoundTripDoesNotConfigureOrStartAccount() throws {
+        let configuration = try NativeAccountConfiguration(supabaseOrigin: URL(string: "https://example.supabase.co")!,
+            publishableKey: "sb_publishable_abcdefghijklmnopqrstuv", applicationAPIOrigin: URL(string: "https://example.test")!)
+        let data = try NativeAccountSetupDocument.encode(configuration)
+        XCTAssertEqual(try NativeAccountSetupDocument.decode(data), configuration)
+        let model = NativeAccountModel()
+        try model.applySetup(data)
+        XCTAssertEqual(model.apiURL, "https://example.test")
+        XCTAssertFalse(model.configured)
+        XCTAssertFalse(model.busy)
+        XCTAssertEqual(model.state, .signedOut)
+    }
+
+    func testPublicSetupRejectsUnknownFieldsDuplicatesAndOversizedInput() throws {
+        let valid = "{\"format\":\"tubeshuffle-account-setup\",\"version\":1,\"supabaseOrigin\":\"https://example.supabase.co\",\"publishableKey\":\"sb_publishable_abcdefghijklmnopqrstuv\",\"applicationAPIOrigin\":\"https://example.test\"}"
+        for invalid in [valid.replacingOccurrences(of: "\"version\":1", with: "\"version\":1,\"token\":\"do-not-import\""),
+                        valid.replacingOccurrences(of: "\"version\":1", with: "\"version\":1,\"version\":1"),
+                        valid.replacingOccurrences(of: "\"version\":1", with: "\"version\":1.00000000000000001"),
+                        valid.replacingOccurrences(of: "sb_publishable_abcdefghijklmnopqrstuv", with: "sb_secret_abcdefghijklmnopqrstuv"),
+                        valid.replacingOccurrences(of: "https://example.test", with: "http://example.test"),
+                        valid + String(repeating: " ", count: 8_192)] {
+            XCTAssertThrowsError(try NativeAccountSetupDocument.decode(Data(invalid.utf8)))
+        }
+        let oversized = try NativeAccountConfiguration(supabaseOrigin: URL(string: "https://example.supabase.co")!,
+            publishableKey: "sb_publishable_" + String(repeating: "a", count: 8_192),
+            applicationAPIOrigin: URL(string: "https://example.test")!)
+        XCTAssertThrowsError(try NativeAccountSetupDocument.encode(oversized))
+    }
+
+    func testInvalidPublicSetupKeepsCurrentFormValues() {
+        let model = NativeAccountModel()
+        model.apiURL = "https://previous.test"
+        XCTAssertThrowsError(try model.applySetup(Data("{}".utf8)))
+        XCTAssertEqual(model.apiURL, "https://previous.test")
+        XCTAssertFalse(model.configured)
+    }
+
     enum Failure: Error { case secretBearingError }
 
     final class Auth: AccountAuthenticationService {
@@ -628,7 +667,7 @@ final class AccountAPIIntegrationTests: XCTestCase {
 
     private func makeCoordinator(_ transport: SyntheticAccountTransport) throws -> AccountSessionCoordinator {
         let client = try APIClient(origin: URL(string: "https://example.test")!, transport: transport)
-        return AccountSessionCoordinator(authentication: SyntheticAccountAuth(), links: APIAccountLinkService(client: client))
+        return AccountSessionCoordinator(authentication: SyntheticAccountAuth(), links: SyntheticAPIAccountLinkService(client: client))
     }
 
     func testExplicitLinkRequestsAndNonSnapshotTraversal() async throws {
@@ -732,5 +771,188 @@ final class AccountAPIIntegrationTests: XCTestCase {
                 }
             }
         }
+    }
+}
+
+final class NativeAccountConfigurationTests: XCTestCase {
+    private let key = "sb_publishable_synthetic_only"
+
+    func testExplicitConfigurationAcceptsOnlyNonSecretHTTPSOriginsAndFixedCallback() throws {
+        let configuration = try NativeAccountConfiguration(
+            supabaseOrigin: try XCTUnwrap(URL(string: "https://example.supabase.co")),
+            publishableKey: key,
+            applicationAPIOrigin: try XCTUnwrap(URL(string: "https://api.example.test"))
+        )
+        XCTAssertEqual(configuration.authURL.absoluteString, "https://example.supabase.co/auth/v1")
+        XCTAssertEqual(configuration.redirect, NativeAccountConfiguration.requiredRedirect)
+    }
+
+    func testConfigurationRejectsSecretLikeOrUnsafeInputsBeforeAnyServiceIsMade() throws {
+        XCTAssertThrowsError(try NativeAccountConfiguration(
+            supabaseOrigin: try XCTUnwrap(URL(string: "http://example.supabase.co")),
+            publishableKey: key,
+            applicationAPIOrigin: try XCTUnwrap(URL(string: "https://api.example.test"))
+        ))
+        XCTAssertThrowsError(try NativeAccountConfiguration(
+            supabaseOrigin: try XCTUnwrap(URL(string: "https://example.supabase.co")),
+            publishableKey: "eyJservice_role.synthetic",
+            applicationAPIOrigin: try XCTUnwrap(URL(string: "https://api.example.test"))
+        ))
+        XCTAssertThrowsError(try NativeAccountConfiguration(
+            supabaseOrigin: try XCTUnwrap(URL(string: "https://example.supabase.co")),
+            publishableKey: key,
+            applicationAPIOrigin: try XCTUnwrap(URL(string: "http://api.example.test"))
+        ))
+        XCTAssertThrowsError(try NativeAccountConfiguration(
+            supabaseOrigin: try XCTUnwrap(URL(string: "https://example.supabase.co")),
+            publishableKey: key,
+            applicationAPIOrigin: try XCTUnwrap(URL(string: "https://api.example.test")),
+            redirect: try XCTUnwrap(URL(string: "com.example.other://auth/callback"))
+        ))
+    }
+}
+
+private final class NativeAuthenticationBackend: NativeCredentialBackend {
+    private var values: [String: Data] = [:]
+    private func namespaced(_ service: String, _ key: String) -> String { service + "\u{0}" + key }
+    func add(service: String, key: String, value: Data) -> OSStatus {
+        let name = namespaced(service, key)
+        guard values[name] == nil else { return errSecDuplicateItem }
+        values[name] = value; return errSecSuccess
+    }
+    func update(service: String, key: String, value: Data) -> OSStatus {
+        let name = namespaced(service, key)
+        guard values[name] != nil else { return errSecItemNotFound }
+        values[name] = value; return errSecSuccess
+    }
+    func read(service: String, key: String) -> (OSStatus, Data?) {
+        let value = values[namespaced(service, key)]
+        return value.map { (errSecSuccess, $0) } ?? (errSecItemNotFound, nil)
+    }
+    func delete(service: String, key: String) -> OSStatus {
+        values.removeValue(forKey: namespaced(service, key)) == nil ? errSecItemNotFound : errSecSuccess
+    }
+}
+
+@MainActor
+private final class NativeAuthenticationBrowserSession: TransientAuthSession {
+    var startAction: () -> Void = {}
+    var cancelCount = 0
+    func start() -> Bool { startAction(); return true }
+    func cancel() { cancelCount += 1 }
+}
+
+@MainActor
+final class NativeSupabaseAccountAuthenticationTests: XCTestCase {
+    private func configuration() throws -> NativeAccountConfiguration {
+        try NativeAccountConfiguration(supabaseOrigin: try XCTUnwrap(URL(string: "https://example.supabase.co")),
+                                       publishableKey: "sb_publishable_synthetic",
+                                       applicationAPIOrigin: try XCTUnwrap(URL(string: "https://api.example.test")))
+    }
+
+    private func sessionData(access: String = "synthetic-access", refresh: String = "synthetic-refresh", encoder: JSONEncoder = JSONEncoder()) throws -> Data {
+        let user = User(id: UUID(uuidString: "00000000-0000-4000-8000-000000000001")!, appMetadata: [:], userMetadata: [:], aud: "authenticated",
+                        createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0))
+        return try encoder.encode(Session(accessToken: access, tokenType: "bearer", expiresIn: 3600,
+                                                expiresAt: 4_102_444_800, refreshToken: refresh, user: user))
+    }
+
+    nonisolated private static func response(_ body: Data, _ request: URLRequest) -> (Data, URLResponse) {
+        (body, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!)
+    }
+
+    private func callback(from authorizationURL: URL) throws -> URL {
+        let items = URLComponents(url: authorizationURL, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let redirect = try XCTUnwrap(items.first(where: { $0.name == "redirect_to" })?.value)
+        var components = try XCTUnwrap(URLComponents(string: redirect))
+        components.queryItems = (components.queryItems ?? []) + [URLQueryItem(name: "code", value: "synthetic-code")]
+        return try XCTUnwrap(components.url)
+    }
+
+    func testGooglePKCESucceedsThroughSystemBrowserAdapterWithoutExposingBearer() async throws {
+        let config = try configuration(), backend = NativeAuthenticationBackend()
+        let storage = NativeCredentialStorage(configuration: config, backend: backend)
+        let window = NSWindow(), started = expectation(description: "browser started")
+        let browser = TransientAuthBrowser(anchor: window) { url, _, _, completion in
+            let session = NativeAuthenticationBrowserSession()
+            session.startAction = {
+                started.fulfill()
+                let result = try? self.callback(from: url)
+                Task { @MainActor in completion(result ?? nil, nil) }
+            }
+            return session
+        }
+        // The HTTP API uses ISO dates/snake case; SDK persistence uses its own
+        // JSONEncoder defaults. Keep those two fixture formats distinct.
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let payload = try sessionData(encoder: encoder)
+        let service = try NativeSupabaseAccountAuthentication(configuration: config, browser: browser, storage: storage) { request in
+            XCTAssertEqual(request.url?.path, "/auth/v1/token")
+            return Self.response(payload, request)
+        }
+        let task = Task { try await service.signIn() }
+        await fulfillment(of: [started], timeout: 1)
+        let account = try await task.value
+        XCTAssertEqual(account.bearer, "synthetic-access")
+        XCTAssertEqual(account.accountID, "00000000-0000-4000-8000-000000000001")
+        XCTAssertNotNil(try storage.retrieve(key: NativeCredentialStorage.sessionKey))
+    }
+
+    func testWrongCallbackAndCancellationClearOwnedSessionAndVerifier() async throws {
+        for mode in ["wrong", "cancel"] {
+            let config = try configuration(), backend = NativeAuthenticationBackend()
+            let storage = NativeCredentialStorage(configuration: config, backend: backend)
+            let window = NSWindow(), started = expectation(description: "browser \(mode) started")
+            var fake: NativeAuthenticationBrowserSession?
+            let browser = TransientAuthBrowser(anchor: window) { url, _, _, completion in
+                let session = NativeAuthenticationBrowserSession()
+                fake = session
+                session.startAction = {
+                    started.fulfill()
+                    if mode == "wrong" {
+                        var invalid = try! self.callback(from: url)
+                        var components = URLComponents(url: invalid, resolvingAgainstBaseURL: false)!
+                        components.queryItems = components.queryItems?.map {
+                            $0.name == "flow_correlation" ? URLQueryItem(name: $0.name, value: "wrong") : $0
+                        }
+                        invalid = components.url!
+                        Task { @MainActor in completion(invalid, nil) }
+                    }
+                }
+                return session
+            }
+            let service = try NativeSupabaseAccountAuthentication(configuration: config, browser: browser, storage: storage) { _ in
+                throw URLError(.notConnectedToInternet)
+            }
+            let task = Task { () -> Result<AccountSession, Error> in
+                do { return .success(try await service.signIn()) }
+                catch { return .failure(error) }
+            }
+            await fulfillment(of: [started], timeout: 1)
+            if mode == "cancel" { task.cancel() }
+            let result = await task.value
+            if case .success = result { XCTFail("authentication must not succeed") }
+            XCTAssertNil(try storage.retrieve(key: NativeCredentialStorage.sessionKey))
+            XCTAssertNil(try storage.retrieve(key: NativeCredentialStorage.verifierKey))
+            if mode == "cancel" { XCTAssertEqual(fake?.cancelCount, 1) }
+        }
+    }
+
+    func testRefreshFailureRemovesPriorSessionAndVerifier() async throws {
+        let config = try configuration(), backend = NativeAuthenticationBackend()
+        let storage = NativeCredentialStorage(configuration: config, backend: backend)
+        try storage.store(key: NativeCredentialStorage.sessionKey, value: sessionData())
+        try storage.store(key: NativeCredentialStorage.verifierKey, value: Data("synthetic-verifier".utf8))
+        let browser = TransientAuthBrowser(anchor: NSWindow()) { _, _, _, _ in NativeAuthenticationBrowserSession() }
+        let service = try NativeSupabaseAccountAuthentication(configuration: config, browser: browser, storage: storage) { _ in
+            throw URLError(.notConnectedToInternet)
+        }
+        let existing = AccountSession(bearer: "synthetic-access", accountID: "00000000-0000-4000-8000-000000000001")
+        do { _ = try await service.refresh(existing); XCTFail("expected refresh failure") }
+        catch {}
+        XCTAssertNil(try storage.retrieve(key: NativeCredentialStorage.sessionKey))
+        XCTAssertNil(try storage.retrieve(key: NativeCredentialStorage.verifierKey))
     }
 }

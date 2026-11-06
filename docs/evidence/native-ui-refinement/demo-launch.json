@@ -1,0 +1,29 @@
+{
+  "recordedAtUTC": "2026-11-05T23:12:20.104054+00:00",
+  "script": "./macos/scripts/run-ui-fixture.sh",
+  "scriptExitCode": 0,
+  "rehearsalDirectory": "/var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-ui.ZMUtZfk7BR",
+  "app": "/var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-ui.ZMUtZfk7BR/derived/Build/Products/Debug/TubeShuffle.app",
+  "observedProcesses": [
+    {
+      "pid": 67397,
+      "resolvedExecutable": "/private/var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-ui.ZMUtZfk7BR/derived/Build/Products/Debug/TubeShuffle.app/Contents/MacOS/TubeShuffle",
+      "arguments": [
+        "--ui-fixture"
+      ]
+    }
+  ],
+  "buildSucceeded": true,
+  "buildLog": "/var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-ui.ZMUtZfk7BR/build.log",
+  "buildLogSHA256": "3897dc5add619dd4e5e5c2881dbd481f1d33863515c9ad97ef241e6eed935705",
+  "launchLog": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-ui-refine-svj4dwxn/demo-launch.log",
+  "binarySHA256": "49cf00e4d75a15cf8eb52949877ad9c65c0b7de901a46ab61740f13f214fe9b6",
+  "nativeSourceManifest": "build-info.json",
+  "matchingNativeSources": 85,
+  "accountDisabledByFixture": true,
+  "fixturePreferencesIsolated": true,
+  "agentStartedPlayback": false,
+  "existingApplicationInstancesPreserved": true,
+  "newDemoLeftOpenForOwner": true,
+  "scope": "Successful build, launch and exact process observation only; no live audio, keyboard or transfer acceptance inferred."
+}

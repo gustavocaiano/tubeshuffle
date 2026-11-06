@@ -1,0 +1,173 @@
+{
+  "recordedAtUTC": "2026-11-05T21:19:09.103510+00:00",
+  "project": {
+    "projectRef": "rkgbxjwmnlsmguhctguf",
+    "name": "TubeShuffle",
+    "status": "ACTIVE_HEALTHY",
+    "region": "eu-west-1"
+  },
+  "scope": "GET configuration reads and five fixed read-only SQL queries: existing owner pin plus catalog ACLs, function bodies, policy expressions and stored dependencies. No playlist/library rows, Auth user records, login or remote mutation.",
+  "observations": {
+    "auth": {
+      "operation": "auth",
+      "httpStatus": 200,
+      "googleEnabled": true,
+      "siteURL": "http://localhost:3000",
+      "webCallbackListed": true,
+      "nativeCallbackListed": false,
+      "redirectCount": 2,
+      "hasWildcardRedirect": false,
+      "anonymousUsersEnabled": false
+    },
+    "apiKeys": {
+      "operation": "apiKeys",
+      "httpStatus": 200,
+      "publishableKeyCount": 1,
+      "publishableValuesAvailable": 1
+    },
+    "dataAPI": {
+      "operation": "dataAPI",
+      "httpStatus": 200,
+      "exposedSchemas": [
+        "public",
+        "graphql_public"
+      ],
+      "privateSchemaExposed": false,
+      "maxRows": 1000
+    },
+    "ownerPin": {
+      "operation": "ownerPin",
+      "httpStatus": 201,
+      "rows": 1,
+      "singleValidOwnerPin": true,
+      "libraryRowsQueried": false
+    },
+    "catalog": {
+      "httpStatus": 201,
+      "scope": "catalog metadata only; no playlist rows",
+      "snapshot": {
+        "tables": [
+          {
+            "rls": true,
+            "name": "playlist_links",
+            "schema": "public",
+            "anon_any_dml": false,
+            "authenticated_delete": true,
+            "authenticated_select": true,
+            "authenticated_insert_or_update": false
+          },
+          {
+            "rls": false,
+            "name": "approved_owner",
+            "schema": "private",
+            "anon_any_dml": false,
+            "authenticated_delete": false,
+            "authenticated_select": false,
+            "authenticated_insert_or_update": false
+          }
+        ],
+        "executor": {
+          "login": false,
+          "inherit": false,
+          "bypassrls": false,
+          "superuser": false
+        },
+        "functions": [
+          {
+            "name": "is_approved_owner",
+            "owner_role": "tubeshuffle_link_executor",
+            "search_path": [
+              "search_path=\"\""
+            ],
+            "anon_execute": false,
+            "security_definer": true,
+            "authenticated_execute": true
+          },
+          {
+            "name": "save_playlist_link",
+            "owner_role": "tubeshuffle_link_executor",
+            "search_path": [
+              "search_path=\"\""
+            ],
+            "anon_execute": false,
+            "security_definer": true,
+            "authenticated_execute": true
+          }
+        ]
+      },
+      "limits": "Not live JWT/RLS, indirect role membership, write denial or concurrency acceptance."
+    },
+    "functionBodiesAndInitialPolicyComparison": {
+      "httpStatus": 201,
+      "scope": "catalog function source and policy metadata only; no user records",
+      "functions": {
+        "is_approved_owner": {
+          "exactBodyMatch": true,
+          "bodySHA256": "10c2c68a11c188441513dafef8ee87c974e2309a45f58062e98578e9ff999587"
+        },
+        "save_playlist_link": {
+          "exactBodyMatch": true,
+          "bodySHA256": "a35aee665c4f90fa673b947ebf77048302f52de443af276b81400b598b603caa"
+        }
+      },
+      "policyShapeMatches": {
+        "executor_select": true,
+        "executor_insert": true,
+        "owner_select": false,
+        "owner_delete": false
+      },
+      "expectedFunctionAndPolicyCounts": true,
+      "limits": "Exact function bodies and policy shape are configuration evidence, not runtime JWT/RLS or concurrency acceptance."
+    },
+    "correctedPolicyComparison": {
+      "httpStatus": 201,
+      "ownerPoliciesMatch": {
+        "owner_select": true,
+        "owner_delete": true
+      },
+      "functionReferences": {
+        "owner_delete": [
+          "auth.uid",
+          "public.is_approved_owner"
+        ],
+        "owner_select": [
+          "auth.uid",
+          "public.is_approved_owner"
+        ]
+      },
+      "comparisonNote": "The initial textual comparator expected public.is_approved_owner in pg_policies output. PostgreSQL omitted the visible schema prefix. The corrected comparison checks the exact displayed predicate and stored function dependencies; no database change was made.",
+      "limits": "Stored catalog state only; no JWT, policy-execution or concurrency test."
+    }
+  },
+  "publicNativeSetup": {
+    "path": "build/tubeshuffle-delivery-_fcy8y2w/TubeShuffle-account-setup.json",
+    "sha256": "ac6813b24393c3628fe0134715dc03d7302aef439f115d8b71ae625788c2c472",
+    "contains": "HTTPS origins and one publishable key only; no owner pin, CSRF secret or management/session tokens",
+    "state": "Prepared; not loaded into the app and not operational acceptance. Callback/server configuration remains pending."
+  },
+  "preparedChanges": {
+    "vercelProductionAdd": [
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      "OWNER_USER_ID",
+      "APP_ORIGIN",
+      "CSRF_HMAC_SECRET"
+    ],
+    "ownerValue": "Matches the existing pin; not printed or committed",
+    "csrf": "Generated privately; not applied",
+    "supabaseAuth": {
+      "siteURLFrom": "http://localhost:3000",
+      "siteURLTo": "https://www.tubeshuffle.online",
+      "addRedirect": "com.tubeshuffle.playbacklab://auth/callback",
+      "existingRedirectsPreserved": 2
+    }
+  },
+  "remoteChangesApplied": [],
+  "limits": [
+    "Flags and catalog ACLs are not live Google/PKCE/callback or real JWT/RLS proof",
+    "Indirect memberships, live policy execution and concurrent mutations were not tested",
+    "No current billing-plan proof; no project, paid feature, resource or plan change",
+    "No real library or cloud playlist rows accessed",
+    "No deploy, migration or release approval"
+  ]
+}

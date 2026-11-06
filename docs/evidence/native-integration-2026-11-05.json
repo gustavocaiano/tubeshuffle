@@ -1,0 +1,1618 @@
+{
+  "recordedAtUTC": "2026-11-05T12:33:29.615611+00:00",
+  "scope": "Local uncommitted integration at e168bd5; synthetic fixture validation, not release acceptance.",
+  "baseline": {
+    "branch": "t3/native-macos-app",
+    "head": "e168bd58005c22a240fd9052d69fbef62ddbd2b2",
+    "workingTreeChanges": true
+  },
+  "environment": {
+    "macOS": "27.0.1",
+    "macOSBuild": "26A434",
+    "architecture": "arm64",
+    "xcode": "Xcode 26.6\nBuild version 17F113"
+  },
+  "native": {
+    "command": "xcodebuild -project macos/TubeShuffle.xcodeproj -scheme TubeShuffle -configuration Debug -destination 'platform=macOS,arch=arm64' -derivedDataPath <disposable-derived> -clonedSourcePackagesDirPath <disposable-packages> -disableAutomaticPackageResolution ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO test",
+    "outcome": "TEST SUCCEEDED",
+    "executed": 235,
+    "passed": 233,
+    "skipped": 2,
+    "failed": 0,
+    "resultBundle": "/var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-native-build-wnm0fl1d/derived/Logs/Test/Test-TubeShuffle-2026.11.05_12-26-59-+0000.xcresult",
+    "testHost": "XCTest host renders no product UI. Synthetic transports and credential backends; disposable local-store roots. Player hooks do not start network playback.",
+    "skips": [
+      {
+        "test": "CooperativeFileLockTests.testProcessDeathReleasesLock",
+        "reason": "No safely bounded child reaping helper in hosted test; sandbox may prevent launch."
+      },
+      {
+        "test": "LocalLibraryStoreTests.testSuccessfulExistingStoreReopenRequiresSeparateProcess",
+        "reason": "Reopen requires an exited separate fixture process; standalone harness is separate evidence, not a conversion of this skip to a pass."
+      }
+    ],
+    "results": [
+      {
+        "suite": "APIClientTests",
+        "test": "testClientRejectsLateSuccessfulTransportCompletionAfterCancellation",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "APIClientTests",
+        "test": "testConcurrentTransportUseAndCleanup",
+        "result": "passed",
+        "seconds": 0.005
+      },
+      {
+        "suite": "APIClientTests",
+        "test": "testErrorsAreClassifiedAndNeverExposeServerText",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "APIClientTests",
+        "test": "testMalformedNonHTTPAndCancellation",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "APIClientTests",
+        "test": "testPlaylistQueryCannotInjectAndUsesBearer",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "APIClientTests",
+        "test": "testRejectsInvalidOriginsCredentialsAndPathInjectionBeforeTransport",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "APIClientTests",
+        "test": "testSuggestionsAndLinkMethodsAndBodies",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "APIClientTests",
+        "test": "testUnexpectedStatusDeleteBodyAndRetryAfter",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "APIClientTests",
+        "test": "testURLSessionAdapterRejectsRedirects",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "APIModelsTests",
+        "test": "testExistingPlaylistAndPopulatedVideoFixtures",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "APIModelsTests",
+        "test": "testExistingSuggestionsAndLegacyErrors",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "APIModelsTests",
+        "test": "testOwnerFixtureResponsesAndDistinctEnvelopes",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "APIModelsTests",
+        "test": "testPresenceNullUnknownFieldsAndNumbers",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AccountAPIIntegrationTests",
+        "test": "testExplicitLinkRequestsAndNonSnapshotTraversal",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AccountAPIIntegrationTests",
+        "test": "testLateResponsesAfterCancellationOrSignOutAreDiscarded",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "AccountAPIIntegrationTests",
+        "test": "testServerErrorsAreSanitizedAndNeverRetried",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testAcknowledgementKeepsEachPendingMutationAcrossGenerationsAndAccounts",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testAuthenticationFailuresAndEmptyBearer",
+        "result": "passed",
+        "seconds": 0.004
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testCallerCancellationLeavesUncertaintyEvenIfServiceSucceeds",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testCancelledAuthenticationRequiresSignOutAfterActualCompletion",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testCancelledMutationAndAccountIsolationAcrossGenerations",
+        "result": "passed",
+        "seconds": 0.005
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testConcurrentSuccessDoesNotClearMutationUncertainty",
+        "result": "passed",
+        "seconds": 0.004
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testExplicitCallsAndSessionTransitions",
+        "result": "passed",
+        "seconds": 0.016
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testFailedInvalidationBlocksAuthenticationUntilExplicitRetry",
+        "result": "passed",
+        "seconds": 0.008
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testGatedAuthenticationRejectsOverlapAndSignOutDrainsBeforeNextAttempt",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testLateAuthenticationCannotReplaceNewSession",
+        "result": "passed",
+        "seconds": 0.054
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testLateLinkOperationsAndUncertainMutations",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testLinkFailuresAreSanitizedAndNotRetried",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testPendingCancellationIsImmediatelyConservativeAndCannotBeAcknowledged",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testRefreshPreservesPendingUncertaintyForSameAccountBeforeLateResponse",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AccountSessionCoordinatorTests",
+        "test": "testSignOutFencesPendingSignInAndRejectsOperationsUntilComplete",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AccountViewModelTests",
+        "test": "testCancelledLateCompletionCannotRestoreSession",
+        "result": "passed",
+        "seconds": 0.011
+      },
+      {
+        "suite": "AccountViewModelTests",
+        "test": "testExpiredCompletionSignsOutLocally",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "AccountViewModelTests",
+        "test": "testRemovedTrackingViewDoesNotEndSessionButWindowCloseDoes",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "AccountViewModelTests",
+        "test": "testRepeatedAttachAndUnrelatedWindowCloseDoNotCancel",
+        "result": "passed",
+        "seconds": 0.005
+      },
+      {
+        "suite": "AccountViewModelTests",
+        "test": "testUnavailableByDefault",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "AccountViewModelTests",
+        "test": "testWindowCloseCancelsAndStaleCompletionCannotAffectRetry",
+        "result": "passed",
+        "seconds": 0.014
+      },
+      {
+        "suite": "AuthOperationGateTests",
+        "test": "testConcurrentAuthenticationIsRejectedWhileOperationIsSuspended",
+        "result": "passed",
+        "seconds": 0.004
+      },
+      {
+        "suite": "AuthOperationGateTests",
+        "test": "testFailureIsSanitizedAndAdmissionStaysClosedUntilRetry",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AuthOperationGateTests",
+        "test": "testSignOutDrainsDelayedExchangeAndRefreshBeforeInvalidation",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testCurrentSessionAndSwallowedReadFailure",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testGatedSyntheticWriterIsDrainedAndAllKeysVerifiedOnRetry",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testLegacyDeleteFailureCanResurrectSession",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testLegacyMigrationAndDestinationWriteFailure",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testOldDirectSessionStringDatesBlockedByScopeButMigratedBySDK",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testOwnedCleanupReportsVerificationReadFailure",
+        "result": "passed",
+        "seconds": 1.031
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testOwnedCleanupRetryWithoutLegacyDoesNotRequestAgain",
+        "result": "passed",
+        "seconds": 0.004
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testOwnedRefreshDrainsBeforeCleanupAndRetry",
+        "result": "passed",
+        "seconds": 0.007
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testOwnedReportsRemoteAndCleanupFailureTogether",
+        "result": "passed",
+        "seconds": 0.004
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testOwnedServiceDetectsSwallowedSDKStorageFailure",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testOwnedServiceReportsRemoteFailureSeparatelyFromLocalCleanup",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testPKCEVerifierUsesConfiguredKeyWithoutNetwork",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testScopedCleanupFailuresKeepAdmissionClosedUntilVerifiedRetry",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testScopedOwnerDistinguishesAbsentAndCorruptWithoutNetwork",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testScopedOwnerPreservesUnownedBytesAndCleansOnlyOwnedKeys",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testScopedStorageAllowsSDKPKCEVerifierWithoutNetwork",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testScopedStorageBlocksLegacyMigrationAndOtherNamespaces",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testScopedStorageCurrentSessionOutcomesWithoutNetwork",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testScopedStorageRejectsOldSessionEnvelopeBeforeMigration",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testSDKLocalSignOutRecordsSwallowedRemoveFailureAndControl",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "AuthStorageProbeTests",
+        "test": "testSDKRefreshRecordsSwallowedStoreFailureAndControl",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "CallbackRegistrationTests",
+        "test": "testHostAppDeclaresCallbackScheme",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "CooperativeFileLockTests",
+        "test": "testHardLinkIsRejected",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "CooperativeFileLockTests",
+        "test": "testIndependentDescriptorsContendThenRelease",
+        "result": "passed",
+        "seconds": 0.032
+      },
+      {
+        "suite": "CooperativeFileLockTests",
+        "test": "testInvalidNamesAreRejectedBeforeOpening",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "CooperativeFileLockTests",
+        "test": "testProcessDeathReleasesLock",
+        "result": "skipped",
+        "seconds": 0.001
+      },
+      {
+        "suite": "CooperativeFileLockTests",
+        "test": "testReplacementDemonstratesInodeStabilityRequirement",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "CooperativeFileLockTests",
+        "test": "testSymlinkAndNonRegularFileAreRejected",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "KeychainAuthLocalStorageTests",
+        "test": "testBinaryEmptyReplacementAndDistinctKeys",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "KeychainAuthLocalStorageTests",
+        "test": "testConcurrentCallsOnOneInstance",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "KeychainAuthLocalStorageTests",
+        "test": "testFailuresAreSanitizedAndDoNotDestroyExistingValue",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "KeychainAuthLocalStorageTests",
+        "test": "testNamespacesWithSeparatorsDoNotCollide",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "KeychainAuthLocalStorageTests",
+        "test": "testRealKeychainUsesIsolatedServiceAndTargetedCleanup",
+        "result": "passed",
+        "seconds": 0.056
+      },
+      {
+        "suite": "KeychainAuthLocalStorageTests",
+        "test": "testSeparateInstancesDeletionAfterDuplicateFailsClosed",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "KeychainAuthLocalStorageTests",
+        "test": "testSeparateInstancesDuplicateAddUpdatesExistingItem",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LibraryQueueBuilderTests",
+        "test": "testExactUnicodePlaylistAndOccurrenceIdentity",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LibraryQueueBuilderTests",
+        "test": "testNormalShuffleFiltersOccurrencesWithoutDeduplicatingOrMutating",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LibraryQueueBuilderTests",
+        "test": "testNoSelectionMissingPlaylistEmptyAndAllWatchedConsumeNoDraws",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LibraryQueueBuilderTests",
+        "test": "testSmartDrawsAreDeterministicWithWatchedFilterDisabled",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LibraryQueueBuilderTests",
+        "test": "testSmartMatchesShuffleV1OnFilteredCandidatesWithVariedDraws",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "LibraryQueueBuilderTests",
+        "test": "testSmartUsesFilteredIndicesAndAllMetadata",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LibrarySnapshotTests",
+        "test": "testEmptySnapshot",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "LibrarySnapshotTests",
+        "test": "testHistoryEventEqualityComparesEveryFieldWithExactScalars",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LibrarySnapshotTests",
+        "test": "testNamespacesAndExactUnicodeIdentity",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LibrarySnapshotTests",
+        "test": "testOccurrenceEqualityComparesEveryFieldWithExactScalars",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "LibrarySnapshotTests",
+        "test": "testPlaylistEqualityComparesEveryFieldWithExactScalars",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "LibrarySnapshotTests",
+        "test": "testRepeatedYouTubeVideoKeepsDistinctOccurrencesAndHistoryReference",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "LibrarySnapshotTests",
+        "test": "testSnapshotEqualityComposesRecordEquality",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LibrarySnapshotTests",
+        "test": "testUnwatchedEmptyMissingAndAllCompleted",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "LibrarySnapshotTests",
+        "test": "testUnwatchedFiltersCompletedOccurrencesAndPreservesInputOrder",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LibrarySnapshotTests",
+        "test": "testUnwatchedUsesExactUnicodeIdentityForPlaylistAndOccurrence",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "LocalLibraryStoreTests",
+        "test": "testCorruptHeaderAndSymlinkAreRejectedWithoutReplacement",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "LocalLibraryStoreTests",
+        "test": "testCreateAndProcessLifetimeOwnership",
+        "result": "passed",
+        "seconds": 0.007
+      },
+      {
+        "suite": "LocalLibraryStoreTests",
+        "test": "testCreateRefusesExistingDirectoryAndPreservesSentinel",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LocalLibraryStoreTests",
+        "test": "testExistingCooperativeLockPreventsInspection",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LocalLibraryStoreTests",
+        "test": "testFailedSwiftDataOpenStillOwnsLock",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "LocalLibraryStoreTests",
+        "test": "testOpenMissingOrInvalidMarkerAndMissingStoreRejects",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "LocalLibraryStoreTests",
+        "test": "testRejectedInspectionStillOwnsLock",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LocalLibraryStoreTests",
+        "test": "testSuccessfulExistingStoreReopenRequiresSeparateProcess",
+        "result": "skipped",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LocalLibraryStoreTests",
+        "test": "testUnknownMarkerDoesNotOpenSyntheticStore",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "LocalOAuthDiagnosticConfigurationTests",
+        "test": "testPinnedDestination",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "LocalOAuthDiagnosticConfigurationTests",
+        "test": "testPrivateRuntimeFileFailsClosed",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "NamespaceReservationDecisionTests",
+        "test": "testCollisionAndMalformedInputsFailClosed",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "NamespaceReservationDecisionTests",
+        "test": "testCompetingReservationsAreOnlyProposals",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "NamespaceReservationDecisionTests",
+        "test": "testPrefixedForeignMarkerIsNotOwnership",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "NamespaceReservationDecisionTests",
+        "test": "testReservationCommitAndAllowAcrossRestarts",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "NativeAccountConfigurationTests",
+        "test": "testConfigurationRejectsSecretLikeOrUnsafeInputsBeforeAnyServiceIsMade",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "NativeAccountConfigurationTests",
+        "test": "testExplicitConfigurationAcceptsOnlyNonSecretHTTPSOriginsAndFixedCallback",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "NativeCredentialStorageTests",
+        "test": "testAbsentCorruptAndReadFailureAreDistinct",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "NativeCredentialStorageTests",
+        "test": "testBackendFailuresAreSanitizedAndRecorded",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "NativeCredentialStorageTests",
+        "test": "testConfigurationNamespacesKeepSameKeysInSeparateStores",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "NativeCredentialStorageTests",
+        "test": "testLegacyEnvelopeIsCorruptNotMigrated",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "NativeCredentialStorageTests",
+        "test": "testOnlyReservedKeysReachBackend",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "NativeCredentialStorageTests",
+        "test": "testUnknownCollisionNeverMutatesAndDuplicateNeverRetries",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "NativeIntegrationTests",
+        "test": "testFileExportNeverReplacesAnExistingFile",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "NativeIntegrationTests",
+        "test": "testFiveThousandOccurrenceTransferAndQueueRetainDistinctIDs",
+        "result": "passed",
+        "seconds": 2.244
+      },
+      {
+        "suite": "NativeIntegrationTests",
+        "test": "testNaturalLastItemCompletionIsOnceAndStopRevokesCallbacks",
+        "result": "passed",
+        "seconds": 0.049
+      },
+      {
+        "suite": "NativeIntegrationTests",
+        "test": "testRestoredQueueStartsAtExactSavedOccurrenceWithoutCompletionOrLoad",
+        "result": "passed",
+        "seconds": 0.019
+      },
+      {
+        "suite": "NativeIntegrationTests",
+        "test": "testSharedValidationVectorsAndFractionalIntegerDoNotSilentlyRound",
+        "result": "passed",
+        "seconds": 0.004
+      },
+      {
+        "suite": "NativeIntegrationTests",
+        "test": "testTransferPersistsAndReopensWithoutChangingOccurrenceHistory",
+        "result": "passed",
+        "seconds": 0.024
+      },
+      {
+        "suite": "NativeIntegrationTests",
+        "test": "testTransferResourceLimitsRejectBeforeBuildingAnUnboundedTree",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "NativeSupabaseAccountAuthenticationTests",
+        "test": "testGooglePKCESucceedsThroughSystemBrowserAdapterWithoutExposingBearer",
+        "result": "passed",
+        "seconds": 0.014
+      },
+      {
+        "suite": "NativeSupabaseAccountAuthenticationTests",
+        "test": "testRefreshFailureRemovesPriorSessionAndVerifier",
+        "result": "passed",
+        "seconds": 1.128
+      },
+      {
+        "suite": "NativeSupabaseAccountAuthenticationTests",
+        "test": "testWrongCallbackAndCancellationClearOwnedSessionAndVerifier",
+        "result": "passed",
+        "seconds": 0.039
+      },
+      {
+        "suite": "PlayerCoordinatorTests",
+        "test": "testBufferedPlayingEndedAdvancesInCommittedOrder",
+        "result": "passed",
+        "seconds": 0.026
+      },
+      {
+        "suite": "PlayerCoordinatorTests",
+        "test": "testCommitBufferedPlayingAndActiveErrorRejectsLateReady",
+        "result": "passed",
+        "seconds": 0.015
+      },
+      {
+        "suite": "PlayerCoordinatorTests",
+        "test": "testCurrentErrorIsNotOverwrittenByAutoplayBlocked",
+        "result": "passed",
+        "seconds": 0.005
+      },
+      {
+        "suite": "PlayerCoordinatorTests",
+        "test": "testFailedStagedLoadDoesNotMarkOldQueueItem",
+        "result": "passed",
+        "seconds": 0.01
+      },
+      {
+        "suite": "PlayerCoordinatorTests",
+        "test": "testPendingPlayerErrorMarksStagedFailureAndRejectsCompletion",
+        "result": "passed",
+        "seconds": 0.006
+      },
+      {
+        "suite": "PlayerCoordinatorTests",
+        "test": "testPendingShuffleBuffersPlayingWithoutClaimingOldQueueIsPlaying",
+        "result": "passed",
+        "seconds": 0.01
+      },
+      {
+        "suite": "PlayerCoordinatorTests",
+        "test": "testTimeoutAndCloseQuarantineLateCallbacks",
+        "result": "passed",
+        "seconds": 0.033
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testByteLimitAndDeepNesting",
+        "result": "passed",
+        "seconds": 0.006
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testByteLimitPrecedesUTF8AndJSONValidation",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testDecodedDuplicateKeysAndExactEquality",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testDuplicateAndSyntaxChecksContinuePastTransferSchemaArrayLimits",
+        "result": "passed",
+        "seconds": 0.009
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testDuplicateKeysUseDecodedScalarsWhileDistinctKeysAndLexemesRemainExact",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testEscapedDuplicateChildAndOuterDuplicatesAfterNestedReturns",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testFrameRepresentationAndObjectStateMeasurement",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testLexemesAndPresence",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testMalformedBytesAndBOM",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testMaximumBytesLeavesParentEncodingHeadroom",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testNestedObjectStateAllowsRepeatedKeysAndPreservesMixedNodes",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testNodeStrideIsNotLargerThanPreviousParentLayout",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testParentEncodingAcrossScaledBroadAndDeepDocuments",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testParentEncodingPreservesRootNilAndParentIndexZero",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testRawJSONErrorsPrecedeEnvelopeVersionAndPlaylistCount",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testSameKeyInDifferentObjectsAndUnvalidatedNumericLexemesRemainExact",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testSharedRawValidationVectors",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testSurrogatesAndSyntax",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RawJSONScannerTests",
+        "test": "testWholeInputUTF8ValidationPrecedesDuplicateAndMalformedJSONErrors",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RevocableSessionMemoryTests",
+        "test": "testCanonicallyEquivalentKeysRemainDistinct",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RevocableSessionMemoryTests",
+        "test": "testConcurrentWritesAndRevokeCannotRepopulate",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "RevocableSessionMemoryTests",
+        "test": "testExactKeysReplacementAndRemoval",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RevocableSessionMemoryTests",
+        "test": "testFreshInstanceIsIndependent",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "RevocableSessionMemoryTests",
+        "test": "testRevocationIsPermanentAndErrorIsSanitized",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "SampleLibraryModelTests",
+        "test": "testSamplePlaylistsAndOccurrenceSpecificWatchedStatus",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "ShuffleTests",
+        "test": "testClassifierVectors",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "ShuffleTests",
+        "test": "testDifferentialClassifierVectors",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "ShuffleTests",
+        "test": "testOccurrenceAndDrawVectors",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "SwiftDataLibraryRepositoryTests",
+        "test": "testCorruptKeysAndDanglingReferencesRejected",
+        "result": "passed",
+        "seconds": 0.007
+      },
+      {
+        "suite": "SwiftDataLibraryRepositoryTests",
+        "test": "testCrossPlaylistHistoryRejected",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "SwiftDataLibraryRepositoryTests",
+        "test": "testDisposableDiskRehearsalPropagatesInvariantFailureAfterReopen",
+        "result": "passed",
+        "seconds": 0.01
+      },
+      {
+        "suite": "SwiftDataLibraryRepositoryTests",
+        "test": "testDisposableDiskRehearsalPropagatesOpenFailureWithoutReplacingFixture",
+        "result": "passed",
+        "seconds": 0.004
+      },
+      {
+        "suite": "SwiftDataLibraryRepositoryTests",
+        "test": "testDisposableDiskRehearsalRefusesPreexistingDirectory",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "SwiftDataLibraryRepositoryTests",
+        "test": "testDisposableDiskRehearsalReopenFilterShuffleAndReopen",
+        "result": "passed",
+        "seconds": 0.009
+      },
+      {
+        "suite": "SwiftDataLibraryRepositoryTests",
+        "test": "testDuplicateIDsRejectedInEachNamespace",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "SwiftDataLibraryRepositoryTests",
+        "test": "testDuplicatePositionsRejectedPerPlaylist",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "SwiftDataLibraryRepositoryTests",
+        "test": "testMemorySnapshot",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "SwiftDataLibraryRepositoryTests",
+        "test": "testNewContainerReopensUniqueDiskStore",
+        "result": "passed",
+        "seconds": 0.007
+      },
+      {
+        "suite": "SwiftDataLibraryRepositoryTests",
+        "test": "testOptionalValuesAndBothBooleanValuesSurviveRead",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "SwiftDataLibraryRepositoryTests",
+        "test": "testOrderingDoesNotDependOnInsertionOrder",
+        "result": "passed",
+        "seconds": 0.005
+      },
+      {
+        "suite": "SwiftDataProbeTests",
+        "test": "testDistinctUnicodeByteKeysSurviveReopen",
+        "result": "passed",
+        "seconds": 0.007
+      },
+      {
+        "suite": "SwiftDataProbeTests",
+        "test": "testSuccessfulMutationSurvivesReopen",
+        "result": "passed",
+        "seconds": 0.008
+      },
+      {
+        "suite": "SwiftDataProbeTests",
+        "test": "testSyntheticFailureBeforeSaveRollsBackBaseline",
+        "result": "passed",
+        "seconds": 0.006
+      },
+      {
+        "suite": "TransientAuthBrowserTests",
+        "test": "testAlreadyCancelledDoesNotCreateOrStartSession",
+        "result": "passed",
+        "seconds": 0.007
+      },
+      {
+        "suite": "TransientAuthBrowserTests",
+        "test": "testCancellationDuringFactoryDoesNotStartSession",
+        "result": "passed",
+        "seconds": 0.008
+      },
+      {
+        "suite": "TransientAuthBrowserTests",
+        "test": "testCancelWithoutCallbackAndLateCallbackCannotAffectNextFlow",
+        "result": "passed",
+        "seconds": 0.007
+      },
+      {
+        "suite": "TransientAuthBrowserTests",
+        "test": "testMissingAnchorDoesNotCreateSession",
+        "result": "passed",
+        "seconds": 0.004
+      },
+      {
+        "suite": "TransientAuthBrowserTests",
+        "test": "testOSCancelledLoginMapsToCancelled",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "TransientAuthBrowserTests",
+        "test": "testOSFailureIsSanitizedAndMissingCallbackFails",
+        "result": "passed",
+        "seconds": 0.007
+      },
+      {
+        "suite": "TransientAuthBrowserTests",
+        "test": "testRetainedPresentationContextRemainsValidAfterCancellation",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "TransientAuthBrowserTests",
+        "test": "testStartFalseResolves",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "TransientAuthBrowserTests",
+        "test": "testSuccessAndDuplicateCallback",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "TransientAuthBrowserTests",
+        "test": "testTaskCancellationAndConcurrentStart",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "TransientFlowStateTests",
+        "test": "testCallerCancellationRevokesBeforeMainActorCanRunAndDrainsExchange",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientFlowStateTests",
+        "test": "testCancelAndLogoutDrainIgnoringCancellation",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientFlowStateTests",
+        "test": "testCorrelationGenerationReplayAndSuccessfulLogin",
+        "result": "passed",
+        "seconds": 0.006
+      },
+      {
+        "suite": "TransientFlowStateTests",
+        "test": "testErrorsAreSanitizedAndFailedExchangeRevokesMemory",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientFlowStateTests",
+        "test": "testPreCancelledReceiveNeverDispatchesExchange",
+        "result": "passed",
+        "seconds": 0.011
+      },
+      {
+        "suite": "TransientFlowStateTests",
+        "test": "testProviderErrorConsumesFlowAndRejectsAllReplay",
+        "result": "passed",
+        "seconds": 0.033
+      },
+      {
+        "suite": "TransientOAuthCallbackTests",
+        "test": "testEmptyTrailingFragmentPreservesEncodedValuesAndValidation",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientOAuthCallbackTests",
+        "test": "testInvalidConfiguration",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "TransientOAuthCallbackTests",
+        "test": "testProviderErrorsAreFixedAndSecretFree",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientOAuthCallbackTests",
+        "test": "testRejectsDestinationAndMalformedQuery",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "TransientOAuthCallbackTests",
+        "test": "testRejectsDotSegmentsInRedirectConfiguration",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "TransientOAuthCallbackTests",
+        "test": "testRejectsInvalidDNSLabelsInConfigurationAndCallback",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "TransientOAuthCallbackTests",
+        "test": "testUnicodePathIsComparedAsExactEncodedBytes",
+        "result": "passed",
+        "seconds": 0.021
+      },
+      {
+        "suite": "TransientOAuthCallbackTests",
+        "test": "testValidCodeAndCaseInsensitiveDestination",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "TransientOAuthTransportTests",
+        "test": "testBoundedNonSuccessResponseIsReturned",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientOAuthTransportTests",
+        "test": "testCancellationRacingCompletionSelectsOneTerminalResult",
+        "result": "passed",
+        "seconds": 0.007
+      },
+      {
+        "suite": "TransientOAuthTransportTests",
+        "test": "testCancellationStopsPendingRequest",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientOAuthTransportTests",
+        "test": "testCompletionBeforeCancellationRemainsSuccessful",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientOAuthTransportTests",
+        "test": "testDeliveredOverBoundWithMisleadingLengthFailsClosed",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "TransientOAuthTransportTests",
+        "test": "testEarlyOversizeCancelsUnderlyingTask",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientOAuthTransportTests",
+        "test": "testErrorsDoNotExposeSensitiveRequestOrResponse",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientOAuthTransportTests",
+        "test": "testRedirectDelegateRejectsProposedRequest",
+        "result": "passed",
+        "seconds": 0.108
+      },
+      {
+        "suite": "TransientOAuthTransportTests",
+        "test": "testRedirectStatusRejectedWithoutFollowing",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientOAuthTransportTests",
+        "test": "testReuseAndConcurrentInvocationAreRejected",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientOAuthTransportTests",
+        "test": "testSuccessAndExactBound",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientOAuthTransportTests",
+        "test": "testURLProtocolRedirectNotificationRejected",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientSupabaseAccountTests",
+        "test": "testConfigurationRejectsUntrustedAndNoncanonicalURLsAndKeys",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientSupabaseAccountTests",
+        "test": "testDuplicateCorrelationRejected",
+        "result": "passed",
+        "seconds": 0.0
+      },
+      {
+        "suite": "TransientSupabaseAccountTests",
+        "test": "testEmptyFragmentStillRequiresMatchingCorrelationBeforeExchange",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientSupabaseAccountTests",
+        "test": "testLateExchangeAfterCancelCannotPublishAndAdmissionDrains",
+        "result": "passed",
+        "seconds": 0.004
+      },
+      {
+        "suite": "TransientSupabaseAccountTests",
+        "test": "testMismatchedCorrelationNeverExchanges",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientSupabaseAccountTests",
+        "test": "testNetworkFailureIsNotRetried",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TransientSupabaseAccountTests",
+        "test": "testPKCEPostFailureIsNotRetriedAndLogoutIsLocal",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testBothAccountsRequireExplicitConsistentLinkedAccountEvidence",
+        "result": "passed",
+        "seconds": 0.007
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testCallerCancellationCancelsInFlightTask",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testCancellationAtEveryReadRejectsNoncooperativeLateResults",
+        "result": "passed",
+        "seconds": 0.096
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testCloseFencesLateCompletionAndBlocksRetryUntilDrained",
+        "result": "passed",
+        "seconds": 0.009
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testEmailShapeForEachAccountFailsClosedWithoutDisclosingEmail",
+        "result": "passed",
+        "seconds": 0.008
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testExpiredOwnerSessionFailsAndRevokesWithoutReads",
+        "result": "passed",
+        "seconds": 0.006
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testIsolationAndIdentityOutcomes",
+        "result": "passed",
+        "seconds": 0.109
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testMalformedOversizeRedirectAndBadCredentialsFailClosed",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testRealTransportCancellationStopsOfflineRequest",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testRealTransportRejectsOversizeOfflineBody",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testResetAndCloseAtEveryReadFenceLateModelResults",
+        "result": "passed",
+        "seconds": 0.079
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testRevocationCancelsInFlightTask",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testRevocationRejectsLateResultAndBusy",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testSelectedOwnerRowHiddenFromSecondAccountUsesOnlyFixedRequests",
+        "result": "passed",
+        "seconds": 0.002
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testSequentialFlowAndLocalCleanup",
+        "result": "passed",
+        "seconds": 0.008
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testTaskCancellationRejectsLateSuccess",
+        "result": "passed",
+        "seconds": 0.001
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testValidConfirmationTimestampVariants",
+        "result": "passed",
+        "seconds": 0.003
+      },
+      {
+        "suite": "TwoAccountReadOnlyDiagnosticTests",
+        "test": "testValidEmailShapeVariantsForEachAccount",
+        "result": "passed",
+        "seconds": 0.004
+      }
+    ],
+    "sourceSHA256": {
+      "macos/TubeShuffle/Account/AccountSessionCoordinator.swift": "0b5b0f9a32bcccc2700e3d8b96608b8feed6d2b9a18a47f69e13babd65792127",
+      "macos/TubeShuffle/Account/AuthOperationGate.swift": "f2235873f83cedb4b0e1d277b633114cea0b0cf89c9b1e74b0a57f5767191178",
+      "macos/TubeShuffle/Account/NativeCredentialStorage.swift": "4010fb816408270f3c71a2af0484a4e3cd989692ccf7149344c3dab78d6c0d99",
+      "macos/TubeShuffle/Account/RevocableSessionMemory.swift": "37305959e3006ec4033d0d292d3aa246ae49fa6d1002a083b4901381da7a7b0b",
+      "macos/TubeShuffle/Account/TransientAuthBrowser.swift": "cdc3b4226a316253a556d80e39c13b4cda26398a2785fbdd003995ebc97a2983",
+      "macos/TubeShuffle/Account/TransientFlowState.swift": "70b8d12efefa631143c162f9e4fe8350be67d5b26ab5778ecec4bb390decfc7b",
+      "macos/TubeShuffle/Account/TransientOAuthCallback.swift": "bfec23a73d6f35cd663b090ff6fab30f6cea0dadffffacd4750bd0c1c59ee0fb",
+      "macos/TubeShuffle/Account/TransientSupabaseAccount.swift": "74713cd79cf581cefdd524868ca7b3f557ca10fe73ec261f52d43c38ae73f113",
+      "macos/TubeShuffle/Account/TwoAccountReadOnlyDiagnostic.swift": "0c23a0efe9e555b3380b7d4d8ea80f7d765cf67f86d7c1cac0af1606d0daa007",
+      "macos/TubeShuffle/App/NativeAccountModel.swift": "eb80e9eff253b4d1f4378ebb4e781af7bd1eb4f01ea5c2d1640dc346ed51bd3d",
+      "macos/TubeShuffle/App/NativeLibraryModel.swift": "31ad2fb12713fae56be7208420efecc241cd9c8eb11c3358c4a4257eb26c1de4",
+      "macos/TubeShuffle/App/NativeLibraryView.swift": "664da5c12f03e9b7f9fc23d8ece5d0f8356cd6e3f270e188e76128af8c3780e0",
+      "macos/TubeShuffle/App/SampleLibraryModel.swift": "28a3d233267abbeddd973db3e99678c2a563a09401b366fbb60b1b298e1fd0bd",
+      "macos/TubeShuffle/App/SampleLibraryView.swift": "fdb3573c49feffb86273343fcf78788689d5ed83688d8dad406d0550aef535e9",
+      "macos/TubeShuffle/App/TubeShuffleApp.swift": "a69e40d778b8aa0b4b014ba2ed873c9b164b55ada7a99ba6af4ca8224382e81b",
+      "macos/TubeShuffle/Domain/DTO/APIModels.swift": "9592259b07000f0d084da2adab519a89b34fc497de1730fb63563e20cf0e4195",
+      "macos/TubeShuffle/Domain/Library/LibrarySnapshot.swift": "cc7ae401bb0f21913b4d9cfff95b860ba9183d906e420d4aca129ee1a451fdba",
+      "macos/TubeShuffle/Domain/Library/PlaylistAPIImport.swift": "8e8f17810a4ee561a75de93ced7f4aeee5ebb746f89d6e476c552d5e99a5eaa1",
+      "macos/TubeShuffle/Domain/Shuffle/LibraryQueueBuilder.swift": "e31ea1d15319257e28080f5c0753d37f3ebf0fdb2266e08ed98f809024664154",
+      "macos/TubeShuffle/Domain/Shuffle/Shuffle.swift": "f341f931a18511c92d2973981e768d10ce879b344c058cadc3d2e4ad8834b400",
+      "macos/TubeShuffle/Domain/Transfer/RawJSONScanner.swift": "ed06f743480a2c289ab8df4905bef42a880fe76007ba638385ee603362e5cd9e",
+      "macos/TubeShuffle/Domain/Transfer/TransferV1.swift": "64db6e576ba283ae9f4677fe5ef39993fb0c1d889a6f20fb31957ef65945cdf2",
+      "macos/TubeShuffle/Networking/APIClient.swift": "37a2eab05a2901b4deaee953383bf0a7d970d2e0cf941236b27906ba98534c53",
+      "macos/TubeShuffle/Persistence/NativeLocalLibraryStore.swift": "5ac5dbfc9f69f3f8052891a19dd7dfcbda18990b691b0bd3d491ec165b885ab8",
+      "macos/TubeShuffle/Persistence/SwiftDataLibraryRepository.swift": "620f317c1dc688fdd8f30a7623b3136033052f5abb7e96921ac4535d04056090",
+      "macos/TubeShuffle/Playback/DirectPlayer.swift": "c0b655a0ba25f02ef7d518767e183f5bb78e5faf51bccec8b7c2db9e77560fb8",
+      "macos/TubeShuffle/Playback/PlayerCoordinator.swift": "0b8a378c72b8aa73c85faadab2a79a195ae86b7248c4bd611a3e7fce5f1a779e",
+      "macos/TubeShuffle/Playback/QueueState.swift": "b12cdcb5530dc30148b15307ff86e8de8da0a6b9ed5f791f1c91698f5f56bda7",
+      "macos/TubeShuffle/Resources/Info.plist": "4e8c5e6bc70c365e4176bc7622740ad9244c935aabc25050bb0bcb8e84e0f70b",
+      "macos/TubeShuffle/Resources/TubeShuffle.entitlements": "5bbcc972c524191b1fa53409ad44915aac4b641b55e6bf9278a3d5d3a8f667e8",
+      "macos/TubeShuffle.xcodeproj/project.pbxproj": "502ecf5aff8c1be15aca8b550a2264b21c476c5966fec955cd10715f1f433877",
+      "macos/TubeShuffle.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved": "805b50d73d2627b5306ef67fe704d1c5096053b21dae07d00ca8506c25d543eb",
+      "macos/TubeShuffleTests/Account/AccountSessionCoordinatorTests.swift": "08decdecfaaab23297b0fee366409ec169127eb6426784ad3b0f239aa4f46546",
+      "macos/TubeShuffleTests/Account/AuthOperationGateTests.swift": "fa841eb9805a8dc8fde5c5f5e78f065d046d6adad6fd5c995e3c1e31534477ad",
+      "macos/TubeShuffleTests/Account/AuthStorageProbeTests.swift": "61cd7df402a2fb0c36b04fccec1ebadd7235193dcf51b3a6a9d0ec8362d2bf54",
+      "macos/TubeShuffleTests/Account/CooperativeFileLockTests.swift": "6f43600c7030d9bd56224d33fb328a2c668464bb8fcdee90de24d980cbeaf8a1",
+      "macos/TubeShuffleTests/Account/KeychainAuthLocalStorage.swift": "1c9c458c12a253bd4cb9f3eb381dcdfae0175dbc57e6a966ce1c507925d8a0cb",
+      "macos/TubeShuffleTests/Account/KeychainAuthLocalStorageTests.swift": "363680b4c75a1ab8d7fd21d94df07990642e7880019c382ce522e003ad21b58b",
+      "macos/TubeShuffleTests/Account/NamespaceReservationDecisionTests.swift": "47fdce2423427f8d337f87b0b787d4fb28b2bad91589367ed758b8fb23a96550",
+      "macos/TubeShuffleTests/Account/NativeCredentialStorageTests.swift": "b7aa8860a20b2a646bccc9e12bccdd1c18d60881e65aa4cf076435d0a009cfb8",
+      "macos/TubeShuffleTests/Account/RevocableSessionMemoryTests.swift": "050c7c0ea5d2d8a699cbebd53da4f11b63c8db28849c0f336ca623699e79bb78",
+      "macos/TubeShuffleTests/Account/TransientAuthBrowserTests.swift": "633ae9312a7880e1e37ecff8431326f736cc7a1ac57830c2fe58b6acd1f77843",
+      "macos/TubeShuffleTests/Account/TransientFlowStateTests.swift": "b21b855191b5e1567114690617bbb66a8e3713123fb466fa0580fb8aec416988",
+      "macos/TubeShuffleTests/Account/TransientOAuthCallbackTests.swift": "1df4cd5d13649c4f5fc88a85a22cd44121fef182d0979fd8d24a7ac7bf3df0c3",
+      "macos/TubeShuffleTests/Account/TransientSupabaseAccountTests.swift": "1d9ff5e13d92854e130a01db931d571fe5ce0c241625ca2af78eb620f2cba75e",
+      "macos/TubeShuffleTests/Account/TwoAccountReadOnlyDiagnosticTests.swift": "3cb5ee04d51a1ea51e9255882fadb96ef7d884dd404541737659d54d727e6406",
+      "macos/TubeShuffleTests/Domain/DTO/APIModelsTests.swift": "ba3e92894f136c4d2ba8fcd517e3f886c8c3868fc1f4c35f91cfe03af63494a9",
+      "macos/TubeShuffleTests/Domain/Library/ExperimentalLocalLibraryStore.swift": "93885b952c021bf27b231e71b3f5a591f128db384206a5fde8878aee6185fec4",
+      "macos/TubeShuffleTests/Domain/Library/LibrarySnapshotTests.swift": "2a1fd03db903278b7bd1877eeaad48cd03c593a0a9ec2477f0bf8983280501cd",
+      "macos/TubeShuffleTests/Domain/Library/LocalLibraryStoreTests.swift": "3b2087e3cd4abda43001f57ab68ac3b398f479c1d2a026a0a39e27a68bc6cbb9",
+      "macos/TubeShuffleTests/Domain/Library/NativeIntegrationTests.swift": "ee88a32d183a0079ddec736f514cb764a479b1d2923a5955e8c3aa73229bfae8",
+      "macos/TubeShuffleTests/Domain/Library/SampleLibraryModelTests.swift": "f27129d175e7ceffd5e582df537af625a1a52304b96a325918816d0fde86f8c4",
+      "macos/TubeShuffleTests/Domain/Library/SwiftDataLibraryRepositoryTests.swift": "ee0b624ac5384ab897e6d594b6668a8cf6a80dfa849afdd9f8a3c951423fbdbb",
+      "macos/TubeShuffleTests/Domain/Library/SwiftDataProbeTests.swift": "8fb4e23c0c8cf140c43e045ebe4778688152e82169ed701f1795879d0ac9bc23",
+      "macos/TubeShuffleTests/Domain/Shuffle/LibraryQueueBuilderTests.swift": "1450e5659f4214381e5ef28ad0ef744ef14fcbac386fb274f582fe6098f6bd75",
+      "macos/TubeShuffleTests/Domain/Shuffle/ShuffleTests.swift": "39628695b147f41191e2338d36c0a1a04e8dcf6274fc11163e98de92bb976cd2",
+      "macos/TubeShuffleTests/Domain/Transfer/RawJSONScannerTests.swift": "869f1b93073740e9b2e34baf10000ffcca2648648b80fb5e89cdd1655a22933e",
+      "macos/TubeShuffleTests/Networking/APIClientTests.swift": "72b20d162a35ddaeace8522e10e3e115dd7b5f8c81e2a82f63b101638ec5be0a",
+      "macos/TubeShuffleTests/Playback/PlayerCoordinatorTests.swift": "781561e7c180566c0701aaf07dfd39c14f3f552418da6a14daccad01d2114ec2",
+      "macos/TubeShuffleTests/Playback/QueueStateTests.swift": "39dba9aa3a41b47da9268f08e1add4e6efe8f40c5260b346d3c1644d9e0941ee",
+      "macos/scripts/run-ui-fixture.sh": "98e17a2e43e70d281b70cb1f4b14523a9c769230a89b5e0b87f5421d192cffd0",
+      "macos/tests/playlist_api_import_synthetic.swift": "66ad24793b187b8c733a8f9959777ff841828accd829976c206fc58da0e89965",
+      "macos/tests/run_playlist_api_import_synthetic.py": "af9d773c9ab089064b87f35d032d2441581e69a3ea9008c47b8fd64a7217f45b",
+      "macos/tests/run_standalone_library_store_probe.py": "ed3e8ee9aa7fefbfbba0d1bf51bc98c4087f4a07388f7c3940c5e41b742fc39a",
+      "macos/tests/run_standalone_native_local_library_probe.py": "83bd65077a0912aef4f1e7c9ec4fd77c1adeee044ce344b98cd807baabe5d989",
+      "macos/tests/standalone_library_probe.swift": "ebed4fa4e3a6f06b27efa334c129d4b33600ccc6ab0e3a275c76822c564e9f00",
+      "macos/tests/standalone_native_local_library_probe.swift": "2f3aa12fb44d273dd97d0def2082ddaeb7d61cd79178ae68dd06921d5b017366",
+      "macos/tests/test_account_build_config.py": "ebbe136043da1ad5481678191fb75dbbdaca65771dba7ba4823599c60a1022a4",
+      "macos/tests/test_experimental_library_store_boundary.py": "c006d0ca3a6ee88f2e1d2229dedf8a3539c04745c7dcaf1908fa61a3fc0bdf57",
+      "macos/tests/test_standalone_probe_runner.py": "1cbfed3faeea12023e91b5a75a9de6a77ecefdc0daa0463e74afb5d3f2ccaac5",
+      "macos/tests/transfer_v1_synthetic.swift": "d4b962be92a96db65100f7956f97c14d9256db0af3d6fc5704cd25c1e7d88565",
+      "shared/fixtures/existing-api.json": "19ab34fac8b4c8a73ca7669b224361b6e7467684aea90aa36c9f14f268f84d7d",
+      "shared/fixtures/owner-api-proposed.json": "4a20e13694fd066e80fd5f13bb0fa2850f0055c4c4ba7df566ed75120d5a4b60",
+      "shared/fixtures/smart.json": "87b2bb2cfbf232b99f994d0c414107a0f4d57775302834a43f2df87d4fba4ddd",
+      "shared/fixtures/transfer-v1.json": "24cba830661ba67456dced817ae6f7f54146c1aaf50cc1aefd171c88b800c089"
+    },
+    "correctedIntermediateFailure": "The new PKCE success fixture initially encoded HTTP dates using numeric persistence encoding. ISO dates and snake-case HTTP keys fixed the fixture; real SDK validation was unchanged. Final full run above includes the correction.",
+    "standaloneNativeStore": {
+      "command": "python3 -B macos/tests/run_standalone_native_local_library_probe.py",
+      "outcome": "standalone native local library probe: ok",
+      "coverage": "Synthetic transaction/no-overwrite; separate-process lock contention; holder exit then reopen. No crash durability claim."
+    }
+  },
+  "web": {
+    "command": "NODE_OPTIONS=--no-experimental-webstorage npm test",
+    "filesPassed": 22,
+    "passed": 461,
+    "skipped": 2,
+    "failed": 0,
+    "typecheck": "npx tsc --noEmit: exit 0 (earlier verified output; source unchanged afterward)",
+    "lint": {
+      "command": "npm run lint",
+      "errors": 0,
+      "warnings": 1,
+      "warning": "Existing unused _id in src/stores/playlist-store.ts:76"
+    },
+    "build": {
+      "command": "NEXT_TELEMETRY_DISABLED=1 npm run build",
+      "outcome": "passed; no deploy"
+    },
+    "backendHTTP": {
+      "command": "node --test tests/integration/p2-http.test.mjs",
+      "passed": 6,
+      "evidence": "Earlier verified synthetic loopback output in this session; backend code unchanged afterward; no live JWT/RLS claim."
+    },
+    "browserEvidence": "docs/evidence/browser-storage-integrated-final-2026-11-05.json",
+    "browserEvidenceSHA256": "dcc1fd5cc7bae8f81a322d0e38a5abcf76affe47ffeb1be176c46f61c3caaf1f",
+    "browserModuleHashesRechecked": true,
+    "browserScenariosPassed": 13,
+    "additionalRealTabRun": "Two concurrent app confirmations plus uncooperative fixture blocked/draining; final two app rechecks preserved v1."
+  },
+  "localLogArtifacts": [
+    {
+      "path": "/private/tmp/tubeshuffle-native-ui-guard-tests.log",
+      "sha256": "ae861b29b3e06f39f9db50e298523887f02674c3f5d0f0dd14ae74ca9162b31f"
+    },
+    {
+      "path": "/private/tmp/tubeshuffle-native-store-final.log",
+      "sha256": "4d35672c888b391c7d057bb44ff9686624c42af0b4f9aa9f79b4704d2c26d8f2"
+    },
+    {
+      "path": "/private/tmp/tubeshuffle-web-final-tests.log",
+      "sha256": "8d0e50c157b4c8d7702131b202d6053029f0600984b5730afe6272a59aea6f8d"
+    },
+    {
+      "path": "/private/tmp/tubeshuffle-web-final-lint.log",
+      "sha256": "5f9dfa71b729f5ea701097f79c54005371938718d3274e9d0a8bf73e1545c0a3"
+    },
+    {
+      "path": "/private/tmp/tubeshuffle-web-final-build.log",
+      "sha256": "67d1608fabd115eec6d1843babb0ffd2efcb0b34ed0c1d2dc9e8d7392e9a81c7"
+    }
+  ],
+  "manualUI": {
+    "status": "pending owner result",
+    "command": "./macos/scripts/run-ui-fixture.sh",
+    "procedure": "macos/README.md#one-grouped-ui-rehearsal",
+    "scope": "In-memory demo, account disabled for the run, isolated preferences; transfer only to newly created rehearsal files."
+  },
+  "limitations": [
+    "No real libraries, production browser profiles or live account credentials accessed.",
+    "No production migration, schema bump, destructive repair, deployment, rollout or paid service.",
+    "Unsigned Debug test/build does not validate signing, real Keychain entitlements, distribution, callback allowance, real OAuth/JWT or general RLS.",
+    "Synthetic playback tests do not establish audible playback, native visual/accessibility quality, hidden/minimized transitions or YouTube policy compliance.",
+    "Owner earlier said sim funciona sempre; qualitative report only, predates current native UI/player integration.",
+    "Transfer only imports into empty stores. No provenance/ambiguous continuity merge. Orphans omitted/disclosed, source preserved. Queue/preferences/journal/suggestion events/credentials/media excluded from v1.",
+    "Queue is a separate local sidecar; no cross-file atomicity, crash durability, physical no-migration SwiftData or hostile same-user process guarantee.",
+    "Browser evidence is Chromium in disposable Incognito fixtures, not Safari or real-data acceptance.",
+    "The .slim/deepwork/browser-storage-provisioning artifacts were missing; prior reported validation was not reconstructed as a new pass."
+  ],
+  "additionalChecks": [
+    {
+      "command": "python3 -B macos/tests/test_account_build_config.py",
+      "passed": 6,
+      "failed": 0,
+      "scope": "Offline Info.plist/project/diagnostic-guard structural checks; no live account or Keychain."
+    },
+    {
+      "command": "zsh -n macos/scripts/run-ui-fixture.sh",
+      "exitCode": 0,
+      "scope": "Shell syntax only; the UI script itself has not been launched by the agent."
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    {
+      "check": "Native evidence hashes and current documentation links",
+      "result": "75 native/fixture source hashes match; 12 local links resolve."
+    }
+  ]
+}

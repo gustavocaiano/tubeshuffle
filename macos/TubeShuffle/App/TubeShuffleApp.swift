@@ -131,6 +131,25 @@ final class AccountViewModel: NSObject, ObservableObject {
 
 @main
 struct TubeShuffleApp: App {
+    private let diagnostic = ProcessInfo.processInfo.arguments.contains { $0 == "--playback-lab" || $0.hasPrefix("--local-") }
+
+    var body: some Scene {
+        Window("TubeShuffle", id: "player") {
+            if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+                // Hosted synthetic tests must not open libraries, preferences,
+                // credentials or a live player merely by launching their host.
+                Color.clear.frame(width: 1, height: 1)
+            } else if diagnostic {
+                PlaybackLabRoot().frame(minWidth: 780, minHeight: 620)
+            } else {
+                NativeLibraryView().frame(minWidth: 480, minHeight: 680)
+            }
+        }.defaultSize(width: 1280, height: 860)
+            .commands { NativeZoomCommands() }
+    }
+}
+
+private struct PlaybackLabRoot: View {
     @StateObject private var coordinator = PlayerCoordinator()
     @StateObject private var account: AccountViewModel = {
         #if DEBUG && LOCAL_OAUTH_DIAGNOSTIC
@@ -144,12 +163,7 @@ struct TubeShuffleApp: App {
         return AccountViewModel()
     }()
 
-    var body: some Scene {
-        Window("TubeShuffle Playback Lab", id: "player") {
-            ContentView(coordinator: coordinator, account: account)
-                .frame(minWidth: 780, minHeight: 620)
-        }
-    }
+    var body: some View { ContentView(coordinator: coordinator, account: account) }
 }
 
 struct ContentView: View {

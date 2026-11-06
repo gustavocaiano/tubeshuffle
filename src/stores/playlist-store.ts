@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { browserStorage } from "@/lib/storage";
+import { browserStorage, getBrowserStorageState } from "@/lib/storage";
 import { fetchPlaylistData } from "@/lib/services/youtube-provider";
 import { extractPlaylistId } from "@/lib/utils";
 import type { LocalPlayEventInput, LocalPlaylist, LocalVideo } from "@/types/playlist";
@@ -10,6 +10,7 @@ export interface LocalPlaylistBundle {
 }
 
 async function upsertPlaylistFromYouTubeId(playlistYoutubeId: string): Promise<LocalPlaylistBundle> {
+  const generation = getBrowserStorageState().generation;
   const playlists = await browserStorage.listPlaylists();
   if (playlists.some((playlist) => playlist.youtubeId === playlistYoutubeId)) {
     throw new Error("Syncing or reimporting an existing playlist is temporarily blocked to protect your watch history. Keep your library unchanged and retry when safe sync is available.");
@@ -47,7 +48,7 @@ async function upsertPlaylistFromYouTubeId(playlistYoutubeId: string): Promise<L
     publishedAt: video.publishedAt,
   }));
 
-  await browserStorage.savePlaylist({ playlist, videos });
+  await browserStorage.savePlaylist({ playlist, videos }, generation);
   return { playlist, videos };
 }
 
@@ -80,34 +81,12 @@ export const playlistRepository = {
     await browserStorage.deletePlaylist(id);
   },
 
-  async recordPlay(input: LocalPlayEventInput): Promise<void> {
-    await browserStorage.recordPlayEvent(input);
+  async recordPlay(input: LocalPlayEventInput, generation?: number): Promise<void> {
+    await browserStorage.recordPlayEvent(input, generation);
   },
 
   async getCompletedVideoIds(playlistId: string): Promise<Set<string>> {
-    const db = await browserStorage.initialize();
-    const transaction = db.transaction("playHistory", "readonly");
-    const store = transaction.objectStore("playHistory");
-    const index = store.index("playlistId");
-
-    const events = await new Promise<Array<{ videoId: string; completed: boolean }>>(
-      (resolve, reject) => {
-        const request = index.getAll(playlistId);
-        request.onsuccess = () =>
-          resolve((request.result ?? []) as Array<{ videoId: string; completed: boolean }>);
-        request.onerror = () => reject(request.error ?? new Error("Failed to read play history"));
-      }
-    );
-
-    await new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () =>
-        reject(transaction.error ?? new Error("Failed to complete play history transaction"));
-      transaction.onabort = () =>
-        reject(transaction.error ?? new Error("Play history transaction aborted"));
-    });
-
-    return new Set(events.filter((event) => event.completed).map((event) => event.videoId));
+    return browserStorage.getCompletedVideoIds(playlistId);
   },
 };
 

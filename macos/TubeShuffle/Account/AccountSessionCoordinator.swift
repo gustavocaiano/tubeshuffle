@@ -1,5 +1,7 @@
+import AppKit
+import Auth
 import Foundation
-@testable import TubeShuffle
+import Security
 
 // These boundaries deliberately have no persistence, SDK, or transport policy.
 struct AccountSession {
@@ -24,6 +26,47 @@ protocol AccountLinkService {
     func list(bearer: String) async throws -> AccountLinkPage
     func save(_ playlistID: String, bearer: String) async throws -> PlaylistLinkDTO
     func unlink(_ playlistID: String, bearer: String) async throws
+}
+
+/// Optional capability: older link-only test doubles remain valid, while the
+/// configured production service can fetch playlist data with its bearer held
+/// entirely below the view-model boundary.
+@MainActor
+protocol AccountPlaylistService {
+    func playlist(id: String, bearer: String) async throws -> YouTubePlaylistDTO
+    func suggestions(_ input: SuggestionsRequest, bearer: String) async throws -> DailySuggestionsDTO
+}
+
+/// The only cloud records exposed to the native account flow are playlist
+/// links.  The API client already applies the bearer and owner checks on the
+/// server; this adapter deliberately does not inspect or upload local library
+/// data, history, queue state, or preferences.
+@MainActor
+struct APIAccountLinkService: AccountLinkService, AccountPlaylistService {
+    let client: APIClient
+
+    func list(bearer: String) async throws -> AccountLinkPage {
+        let response = try await client.links(bearer: bearer)
+        // The current endpoint performs its own complete traversal. It is not
+        // a snapshot: writes racing the request can still be missed.
+        return AccountLinkPage(links: response.links, completeness: .serverTraversalCompleteNonSnapshot)
+    }
+
+    func save(_ playlistID: String, bearer: String) async throws -> PlaylistLinkDTO {
+        try await client.saveLink(playlistID, bearer: bearer).link
+    }
+
+    func unlink(_ playlistID: String, bearer: String) async throws {
+        try await client.deleteLink(playlistID, bearer: bearer)
+    }
+
+    func playlist(id: String, bearer: String) async throws -> YouTubePlaylistDTO {
+        try await client.playlist(id: id, bearer: bearer)
+    }
+
+    func suggestions(_ input: SuggestionsRequest, bearer: String) async throws -> DailySuggestionsDTO {
+        try await client.suggestions(input, bearer: bearer)
+    }
 }
 
 // GET returns { links }, after server-side keyset pagination, with no client
@@ -57,6 +100,7 @@ enum AccountResult<Value> {
 final class AccountSessionCoordinator {
     private let authentication: any AccountAuthenticationService
     private let links: any AccountLinkService
+    private let playlists: (any AccountPlaylistService)?
     private var session: AccountSession?
     private var generation = UUID()
     private var activeAuthentication: UUID?
@@ -86,6 +130,7 @@ final class AccountSessionCoordinator {
     init(authentication: any AccountAuthenticationService, links: any AccountLinkService) {
         self.authentication = authentication
         self.links = links
+        playlists = links as? any AccountPlaylistService
     }
 
     private func invalidate() {
@@ -234,6 +279,31 @@ final class AccountSessionCoordinator {
         }
     }
 
+    func playlist(id: String) async -> AccountResult<YouTubePlaylistDTO> {
+        guard let playlists else { return .unavailable }
+        return await read { bearer in try await playlists.playlist(id: id, bearer: bearer) }
+    }
+
+    func suggestions(_ input: SuggestionsRequest) async -> AccountResult<DailySuggestionsDTO> {
+        guard let playlists else { return .unavailable }
+        return await read { bearer in try await playlists.suggestions(input, bearer: bearer) }
+    }
+
+    private func read<T>(_ operation: @escaping @MainActor (String) async throws -> T) async -> AccountResult<T> {
+        guard let session = session, valid(session) else { return .unavailable }
+        let current = generation
+        do {
+            let result = try await run { try await operation(session.bearer) }
+            guard current == generation, !Task.isCancelled else { return .unavailable }
+            state = .signedIn
+            return .success(result)
+        } catch {
+            guard current == generation, !Task.isCancelled else { return .unavailable }
+            state = .recoverableError(.links)
+            return .unavailable
+        }
+    }
+
     func save(_ playlistID: String) async -> AccountResult<PlaylistLinkDTO> {
         await mutate { service, bearer in try await service.save(playlistID, bearer: bearer) }
     }
@@ -267,5 +337,244 @@ final class AccountSessionCoordinator {
             if current == generation, !Task.isCancelled { state = .recoverableError(.mutationOutcomeUnknown) }
             return .mutationOutcomeUnknown
         }
+    }
+}
+
+// MARK: - Normal native account service
+
+/// Explicit, non-secret configuration supplied by the person using the app.
+/// It is never discovered automatically. A setup document can be selected
+/// explicitly and reviewed in the account form before use. Service-role keys
+/// and OAuth client secrets are not accepted here.
+struct NativeAccountConfiguration: Equatable {
+    enum Failure: Error, Equatable { case invalidSupabaseOrigin, invalidPublishableKey, invalidAPIOrigin, invalidRedirect }
+    static let requiredRedirect = URL(string: "com.tubeshuffle.playbacklab://auth/callback")!
+
+    let supabaseOrigin: URL
+    let publishableKey: String
+    let applicationAPIOrigin: URL
+    let redirect: URL
+
+    init(supabaseOrigin: URL, publishableKey: String, applicationAPIOrigin: URL,
+         redirect: URL = Self.requiredRedirect) throws {
+        guard TransientSupabaseAccount.validEndpoint(supabaseOrigin.appendingPathComponent("auth/v1"), trustedOrigin: supabaseOrigin) else {
+            throw Failure.invalidSupabaseOrigin
+        }
+        guard TransientSupabaseAccount.validPublishableKey(publishableKey) else { throw Failure.invalidPublishableKey }
+        guard Self.validAPIOrigin(applicationAPIOrigin) else { throw Failure.invalidAPIOrigin }
+        guard redirect == Self.requiredRedirect else { throw Failure.invalidRedirect }
+        _ = try TransientOAuthCallback(redirect: redirect.absoluteString, correlationKey: "flow_correlation")
+        self.supabaseOrigin = supabaseOrigin
+        self.publishableKey = publishableKey
+        self.applicationAPIOrigin = applicationAPIOrigin
+        self.redirect = redirect
+    }
+
+    var authURL: URL { supabaseOrigin.appendingPathComponent("auth/v1") }
+
+    private static func validAPIOrigin(_ origin: URL) -> Bool {
+        guard let parts = URLComponents(url: origin, resolvingAgainstBaseURL: false),
+              parts.scheme?.lowercased() == "https", let host = parts.host, !host.isEmpty,
+              parts.user == nil, parts.password == nil, parts.query == nil, parts.fragment == nil,
+              parts.path.isEmpty || parts.path == "/",
+              parts.port == nil || (1...65535).contains(parts.port!) else { return false }
+        return true
+    }
+}
+
+/// Portable public setup only. Tokens, passwords and owner pins have no fields.
+enum NativeAccountSetupDocument {
+    enum Failure: Error { case invalidDocument }
+    static let maximumBytes = 8_192
+    private struct Payload: Codable {
+        let format: String
+        let version: Int
+        let supabaseOrigin: String
+        let publishableKey: String
+        let applicationAPIOrigin: String
+    }
+
+    static func decode(_ data: Data) throws -> NativeAccountConfiguration {
+        guard data.count <= maximumBytes else { throw Failure.invalidDocument }
+        let document = try RawJSONScanner.scan(data, maximumNodes: 6, maximumDepth: 2)
+        guard document.nodes.count == 6,
+              case .object = document.nodes[0].value,
+              Set(document.nodes.dropFirst().compactMap(\.key)) == Set(["format", "version", "supabaseOrigin", "publishableKey", "applicationAPIOrigin"]),
+              let version = document.nodes.first(where: { $0.key == "version" }),
+              case .number("1") = version.value else { throw Failure.invalidDocument }
+        let payload = try JSONDecoder().decode(Payload.self, from: data)
+        guard payload.format == "tubeshuffle-account-setup",
+              let auth = URL(string: payload.supabaseOrigin),
+              let api = URL(string: payload.applicationAPIOrigin) else { throw Failure.invalidDocument }
+        return try NativeAccountConfiguration(supabaseOrigin: auth, publishableKey: payload.publishableKey, applicationAPIOrigin: api)
+    }
+
+    static func encode(_ configuration: NativeAccountConfiguration) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(Payload(format: "tubeshuffle-account-setup", version: 1,
+            supabaseOrigin: configuration.supabaseOrigin.absoluteString, publishableKey: configuration.publishableKey,
+            applicationAPIOrigin: configuration.applicationAPIOrigin.absoluteString))
+        guard data.count <= maximumBytes else { throw Failure.invalidDocument }
+        return data
+    }
+}
+
+/// A SwiftUI-facing factory with explicit dependencies. Constructing it does no
+/// Keychain I/O, network request, browser launch, restore, or implicit upload.
+@MainActor
+struct NativeAccountServiceFactory {
+    let configuration: NativeAccountConfiguration
+
+    func makeCoordinator(browser: TransientAuthBrowser, storage: NativeCredentialStorage? = nil,
+                         transport: any APITransport = URLSessionAPITransport(),
+                         fetch: @escaping AuthClient.FetchHandler = { try await TransientOAuthTransport().fetch($0) }) throws -> AccountSessionCoordinator {
+        let auth = try NativeSupabaseAccountAuthentication(configuration: configuration, browser: browser,
+                                                            storage: storage ?? NativeCredentialStorage(configuration: configuration), fetch: fetch)
+        return AccountSessionCoordinator(authentication: auth,
+                                         links: APIAccountLinkService(client: try APIClient(origin: configuration.applicationAPIOrigin, transport: transport)))
+    }
+}
+
+/// Google PKCE authentication with a system browser. Only the session and PKCE
+/// verifier use the dedicated Keychain namespace. Sign-out drains active work,
+/// clears and verifies those keys, and drops the in-memory SDK client; it is not
+/// a guarantee of remote revocation, cross-process fencing, or crash recovery.
+@MainActor
+final class NativeSupabaseAccountAuthentication: AccountAuthenticationService {
+    enum Failure: Error { case invalidSession, storage, authorization }
+
+    private let configuration: NativeAccountConfiguration
+    private let browser: TransientAuthBrowser
+    private let storage: NativeCredentialStorage
+    private let fetch: AuthClient.FetchHandler
+    private var client: AuthClient?
+    private let gate: AuthOperationGate
+
+    init(configuration: NativeAccountConfiguration, browser: TransientAuthBrowser,
+         storage: NativeCredentialStorage? = nil,
+         fetch: @escaping AuthClient.FetchHandler = { try await TransientOAuthTransport().fetch($0) }) throws {
+        let resolvedStorage = storage ?? NativeCredentialStorage(configuration: configuration)
+        self.configuration = configuration
+        self.browser = browser
+        self.storage = resolvedStorage
+        self.fetch = fetch
+        gate = AuthOperationGate { [resolvedStorage] in
+            var failed = false
+            for key in [NativeCredentialStorage.sessionKey, NativeCredentialStorage.verifierKey] {
+                do { try resolvedStorage.remove(key: key) } catch { failed = true }
+            }
+            for key in [NativeCredentialStorage.sessionKey, NativeCredentialStorage.verifierKey] {
+                do { if try resolvedStorage.retrieve(key: key) != nil { failed = true } }
+                catch { failed = true }
+            }
+            if failed { throw Failure.storage }
+        }
+    }
+
+    func restore() async throws -> AccountSession? {
+        try await gate.run { [self] in
+            let before = storage.observations.count
+            // Avoid even an SDK session operation when our owned session key is
+            // absent. If it exists, `session` refreshes an expired token rather
+            // than handing the API an already-expired bearer.
+            guard try storage.retrieve(key: NativeCredentialStorage.sessionKey) != nil else { return nil }
+            let value = try await makeClient().session
+            try ensureStorageHealthy(since: before)
+            return try accountSession(from: value)
+        }
+    }
+
+    func signIn() async throws -> AccountSession {
+        try await gate.run { [self] in
+            do {
+                let before = storage.observations.count
+                let correlation = try randomCorrelation()
+                guard var components = URLComponents(url: configuration.redirect, resolvingAgainstBaseURL: false) else { throw Failure.authorization }
+                components.queryItems = [URLQueryItem(name: "flow_correlation", value: correlation)]
+                guard let redirect = components.url, let scheme = configuration.redirect.scheme else { throw Failure.authorization }
+                let validator = try TransientOAuthCallback(redirect: configuration.redirect.absoluteString, correlationKey: "flow_correlation")
+                let auth = makeClient(redirect: redirect)
+                return try await withTaskCancellationHandler {
+                    let url = try auth.getOAuthSignInURL(provider: .google, redirectTo: redirect)
+                    let callback = try await browser.start(url: url, callbackScheme: scheme)
+                    guard try validator.correlation(from: callback.absoluteString) == correlation else { throw Failure.authorization }
+                    let session = try await auth.exchangeCodeForSession(authCode: validator.code(from: callback.absoluteString))
+                    try Task.checkCancellation()
+                    try ensureStorageHealthy(since: before)
+                    return try accountSession(from: session)
+                } onCancel: {
+                    Task { @MainActor [browser] in browser.cancel() }
+                }
+            } catch is CancellationError {
+                try clearOwnedCredentialsAfterFailedAuthentication()
+                throw CancellationError()
+            } catch {
+                // A failed exchange may have written a session or left a PKCE
+                // verifier. Do not make a later attempt inherit either value.
+                try clearOwnedCredentialsAfterFailedAuthentication()
+                throw Failure.authorization
+            }
+        }
+    }
+
+    func refresh(_ session: AccountSession) async throws -> AccountSession {
+        try await gate.run { [self] in
+            do {
+                let before = storage.observations.count
+                let refreshed = try await makeClient().refreshSession()
+                try Task.checkCancellation()
+                let result = try accountSession(from: refreshed)
+                try ensureStorageHealthy(since: before)
+                guard result.accountID == session.accountID else { throw Failure.invalidSession }
+                return result
+            } catch {
+                try clearOwnedCredentialsAfterFailedAuthentication()
+                throw error
+            }
+        }
+    }
+
+    func signOut() async throws {
+        browser.cancel()
+        try await gate.signOutLocally()
+        client = nil
+    }
+
+    private func makeClient(redirect: URL? = nil) -> AuthClient {
+        if let client, redirect == nil { return client }
+        let value = AuthClient(configuration: .init(url: configuration.authURL, headers: ["apikey": configuration.publishableKey],
+            flowType: .pkce, redirectToURL: redirect ?? configuration.redirect, storageKey: NativeCredentialStorage.sessionKey,
+            localStorage: storage, logger: nil, fetch: fetch, autoRefreshToken: false))
+        client = value
+        return value
+    }
+
+    private func ensureStorageHealthy(since start: Int) throws {
+        if storage.observations.dropFirst(start).contains(where: { $0.category != .absent }) { throw Failure.storage }
+    }
+
+    private func clearOwnedCredentialsAfterFailedAuthentication() throws {
+        var failed = false
+        for key in [NativeCredentialStorage.sessionKey, NativeCredentialStorage.verifierKey] {
+            do { try storage.remove(key: key) } catch { failed = true }
+        }
+        for key in [NativeCredentialStorage.sessionKey, NativeCredentialStorage.verifierKey] {
+            do { if try storage.retrieve(key: key) != nil { failed = true } }
+            catch { failed = true }
+        }
+        client = nil
+        if failed { throw Failure.storage }
+    }
+
+    private func accountSession(from session: Session) throws -> AccountSession {
+        guard !session.accessToken.isEmpty else { throw Failure.invalidSession }
+        return AccountSession(bearer: session.accessToken, accountID: session.user.id.uuidString.lowercased())
+    }
+
+    private func randomCorrelation() throws -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { throw Failure.authorization }
+        return bytes.map { String(format: "%02x", $0) }.joined()
     }
 }

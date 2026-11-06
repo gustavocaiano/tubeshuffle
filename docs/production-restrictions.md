@@ -4,6 +4,8 @@ Status: engineering risk register for the native prototype.
 Scope: `docs/plans/native-macos-app.md` (P0 and later phases), the existing web client, and any shared API surface.
 Sources checked: 2026-10-28. Policy text can change; re-read the [revision history](https://developers.google.com/youtube/terms/revision-history) before implementation and before any release.
 
+**2026-11-05 UI continuation:** the owner explicitly requested a thumbnail-only Focus presentation with a small image and no visible video. This supersedes the earlier native design that merely reduced a still-visible video. The implementation uses actual native `isHidden`, retains the official player, and adds no visibility spoofing, keepalive, extraction or playback workaround. The requested presentation does **not** clear PR-1/PR-2/PR-5 below; hidden playback, natural advancement and policy acceptance remain open. The owner request authorizes this local prototype change, not deployment or release. The revision history and Developer Policies were re-read for this continuation; no exemption or approval was established.
+
 > **This document is not legal advice and is not YouTube approval.** It records published requirements and unresolved technical behavior so release decisions are made with eyes open. Classification below separates contractual restrictions from uncertain runtime behavior from obligations whose applicability to this design has not been settled. Where a question is unresolved, it is a risk requiring review by the owner, counsel, or YouTube — not a definitive legal ruling in either direction.
 
 ## How to read this document

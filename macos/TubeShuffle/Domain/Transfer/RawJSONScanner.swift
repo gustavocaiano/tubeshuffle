@@ -44,14 +44,16 @@ struct RawJSONDocument {
 }
 
 enum RawJSONError: Error, Equatable {
-    case tooLarge, invalidUTF8, invalidJSON, duplicateKey
+    case tooLarge, invalidUTF8, invalidJSON, duplicateKey, resourceLimit
 }
 
 enum RawJSONScanner {
     static let maximumBytes = 10_485_760
 
-    static func scan(_ input: Data) throws -> RawJSONDocument {
+    static func scan(_ input: Data, maximumNodes: Int = maximumBytes, maximumDepth: Int = maximumBytes) throws -> RawJSONDocument {
         var parser = try makeParser(input)
+        parser.maximumNodes = maximumNodes
+        parser.maximumDepth = maximumDepth
         return try parser.parse()
     }
 
@@ -80,6 +82,8 @@ enum RawJSONScanner {
     private struct Parser {
         let bytes: [UInt8]
         var index = 0
+        var maximumNodes = RawJSONScanner.maximumBytes
+        var maximumDepth = RawJSONScanner.maximumBytes
         var nodes: [RawJSONDocument.Node] = []
         var stack: [Frame] = []
         var objectStack: [ObjectState] = []
@@ -159,6 +163,7 @@ enum RawJSONScanner {
         }
 
         mutating func value(parent: Int?, key: String?) throws {
+            guard nodes.count < maximumNodes, stack.count < maximumDepth else { throw RawJSONError.resourceLimit }
             guard let c = current else { throw RawJSONError.invalidJSON }
             let v: RawJSONDocument.Node.Value
             switch c {

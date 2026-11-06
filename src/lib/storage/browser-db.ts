@@ -1,5 +1,5 @@
-export const DB_NAME = "tubeshuffle_local";
-export const DB_VERSION = 1;
+import { DB_NAME, DB_VERSION } from "./browser-db-target";
+export { DB_NAME, DB_VERSION } from "./browser-db-target";
 
 export const STORE_PLAYLISTS = "playlists";
 export const STORE_VIDEOS = "videos";
@@ -12,7 +12,7 @@ export type StoreName =
   | typeof STORE_PLAY_HISTORY
   | typeof STORE_META;
 
-function createStores(db: IDBDatabase): void {
+export function createBrowserSchema(db: IDBDatabase): void {
   if (!db.objectStoreNames.contains(STORE_PLAYLISTS)) {
     const playlists = db.createObjectStore(STORE_PLAYLISTS, { keyPath: "id" });
     playlists.createIndex("youtubeId", "youtubeId", { unique: true });
@@ -42,29 +42,25 @@ export function isIndexedDbAvailable(): boolean {
   return typeof window !== "undefined" && typeof window.indexedDB !== "undefined";
 }
 
-export function openBrowserDb(): Promise<IDBDatabase> {
-  if (!isIndexedDbAvailable()) {
-    return Promise.reject(new Error("IndexedDB is not available in this environment."));
-  }
-
-  return new Promise((resolve, reject) => {
-    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      createStores(db);
-    };
-
-    request.onsuccess = () => {
-      resolve(request.result);
-    };
-
-    request.onerror = () => {
-      reject(request.error ?? new Error("Failed to open IndexedDB database."));
-    };
-
-    request.onblocked = () => {
-      reject(new Error("Database open request blocked by another connection."));
-    };
+/** Validate structure only; never repair or read/rewrite library records. */
+export function validateBrowserSchema(db: IDBDatabase): boolean {
+  if (db.name !== DB_NAME || db.version !== DB_VERSION) return false;
+  const expected = [STORE_PLAYLISTS, STORE_VIDEOS, STORE_PLAY_HISTORY, STORE_META].sort();
+  if (JSON.stringify(Array.from(db.objectStoreNames).sort()) !== JSON.stringify(expected)) return false;
+  const tx = db.transaction(expected, "readonly");
+  const shape: Record<string, { key: string; indexes: [string, string | string[], boolean][] }> = {
+    playlists: { key: "id", indexes: [["youtubeId", "youtubeId", true], ["updatedAt", "updatedAt", false]] },
+    videos: { key: "id", indexes: [["playlistId", "playlistId", false], ["youtubeId", "youtubeId", false], ["playlistPosition", ["playlistId", "position"], false]] },
+    playHistory: { key: "id", indexes: [["playlistId", "playlistId", false], ["videoId", "videoId", false], ["watchedAt", "watchedAt", false]] },
+    meta: { key: "key", indexes: [] },
+  };
+  return expected.every(name => {
+    const store = tx.objectStore(name), spec = shape[name];
+    return store.keyPath === spec.key && !store.autoIncrement && store.indexNames.length === spec.indexes.length &&
+      spec.indexes.every(([name, key, unique]) => {
+        if (!store.indexNames.contains(name)) return false;
+        const index = store.index(name);
+        return JSON.stringify(index.keyPath) === JSON.stringify(key) && index.unique === unique && !index.multiEntry;
+      });
   });
 }

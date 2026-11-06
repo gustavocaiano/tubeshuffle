@@ -1,0 +1,49 @@
+{
+  "recordedAtUTC": "2026-11-05T18:07:13.118617+00:00",
+  "access": "New privately provided Vercel token accepted. GET-only inspection. No secret values retained.",
+  "project": "tubeshuffle",
+  "repository": "gustavocaiano/tubeshuffle",
+  "verifiedDomains": [
+    "tubeshuffle.online",
+    "www.tubeshuffle.online",
+    "tubeshuffle.vercel.app"
+  ],
+  "canonicalOrigin": "https://www.tubeshuffle.online",
+  "projectEnvironment": [
+    {
+      "key": "NEXT_PUBLIC_YOUTUBE_API_MODE",
+      "type": "encrypted",
+      "targets": [
+        "production",
+        "preview",
+        "development"
+      ]
+    },
+    {
+      "key": "YOUTUBE_API_KEY",
+      "type": "encrypted",
+      "targets": [
+        "production",
+        "preview",
+        "development"
+      ]
+    }
+  ],
+  "sharedEnvironmentVariableIds": null,
+  "production": {
+    "state": "READY",
+    "target": "production",
+    "commit": "e168bd58005c22a240fd9052d69fbef62ddbd2b2",
+    "requiredEnvironmentPresent": {
+      "NEXT_PUBLIC_SUPABASE_URL": false,
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": false,
+      "OWNER_USER_ID": false,
+      "APP_ORIGIN": false,
+      "CSRF_HMAC_SECRET": false
+    }
+  },
+  "diagnosis": "The project and deployed environment omit the account configuration. verifyOwner at the deployed commit returns 503 before authentication when Supabase URL/key or owner pin are absent. APP_ORIGIN and CSRF_HMAC_SECRET are also required for the cookie flow.",
+  "changesApplied": [],
+  "supabase": "Management access not available; no provider, callback, publishable key, owner pin or current Free plan verified.",
+  "rollout": "Production remains at e168bd5. The integrated browser storage startup in 051bb26 has not been deployed by this work."
+}

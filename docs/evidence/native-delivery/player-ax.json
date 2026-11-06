@@ -1,0 +1,660 @@
+[
+  {
+    "description": "",
+    "index": "0",
+    "role": "AXApplication",
+    "title": "TubeShuffle",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "1",
+    "role": "AXWindow",
+    "title": "TubeShuffle",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "2",
+    "role": "AXGroup",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "TubeShuffle",
+    "index": "3",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Library",
+    "index": "4",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "5",
+    "role": "AXMenuButton",
+    "title": "Library files",
+    "value": ""
+  },
+  {
+    "description": "Account",
+    "index": "6",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "7",
+    "role": "AXScrollArea",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Back to library",
+    "index": "8",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "9",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "A little room to shuffle"
+  },
+  {
+    "description": "",
+    "index": "10",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Demo"
+  },
+  {
+    "description": "",
+    "index": "11",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "\u00b7"
+  },
+  {
+    "description": "",
+    "index": "12",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "6 videos"
+  },
+  {
+    "description": "Queue",
+    "index": "13",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Shuffle",
+    "index": "14",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Video",
+    "index": "15",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Focus",
+    "index": "16",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Artwork",
+    "index": "17",
+    "role": "AXCheckBox",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Stage",
+    "index": "18",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "19",
+    "role": "AXGroup",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "20",
+    "role": "AXGroup",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "21",
+    "role": "AXScrollArea",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "22",
+    "role": "AXWebArea",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "23",
+    "role": "AXScrollArea",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Big Buck Bunny 60fps 4K - Official Blender Foundation Short Film",
+    "index": "24",
+    "role": "AXWebArea",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "YouTube Video Player",
+    "index": "25",
+    "role": "AXGroup",
+    "title": "YouTube Video Player",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "26",
+    "role": "AXGroup",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "27",
+    "role": "AXGroup",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Show player controls",
+    "index": "28",
+    "role": "AXButton",
+    "title": "Show player controls",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "29",
+    "role": "AXGroup",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "30",
+    "role": "AXGroup",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "31",
+    "role": "AXGroup",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "32",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Now playing \u00b7 Track 1 of 6"
+  },
+  {
+    "description": "",
+    "index": "33",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Big Buck Bunny \u00b7 Blender Foundation"
+  },
+  {
+    "description": "",
+    "index": "34",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Public playback example"
+  },
+  {
+    "description": "",
+    "index": "35",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "0:20"
+  },
+  {
+    "description": "Playback position",
+    "index": "36",
+    "role": "AXSlider",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "37",
+    "role": "AXValueIndicator",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "38",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "10:34"
+  },
+  {
+    "description": "Stop & close",
+    "index": "39",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Previous track",
+    "index": "40",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Pause",
+    "index": "41",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Next track",
+    "index": "42",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Volume High",
+    "index": "43",
+    "role": "AXImage",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Volume",
+    "index": "44",
+    "role": "AXSlider",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "45",
+    "role": "AXValueIndicator",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "46",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Queue"
+  },
+  {
+    "description": "",
+    "index": "47",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "6 videos"
+  },
+  {
+    "description": "",
+    "index": "48",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Track 1 of 6"
+  },
+  {
+    "description": "",
+    "index": "49",
+    "role": "AXScrollArea",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "50",
+    "role": "AXOpaqueProviderGroup",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "1. Big Buck Bunny \u00b7 Blender Foundation, Public playback example",
+    "index": "51",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "More",
+    "index": "52",
+    "role": "AXMenuButton",
+    "title": "Actions for Big Buck Bunny \u00b7 Blender Foundation",
+    "value": ""
+  },
+  {
+    "description": "2. YouTube player \u00b7 public example, Public playback example",
+    "index": "53",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "More",
+    "index": "54",
+    "role": "AXMenuButton",
+    "title": "Actions for YouTube player \u00b7 public example",
+    "value": ""
+  },
+  {
+    "description": "3. A little room to shuffle \u2014 playback sample, Public playback example",
+    "index": "55",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "More",
+    "index": "56",
+    "role": "AXMenuButton",
+    "title": "Actions for A little room to shuffle \u2014 playback sample",
+    "value": ""
+  },
+  {
+    "description": "4. Another listen \u2014 repeated occurrence, Public playback example",
+    "index": "57",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "More",
+    "index": "58",
+    "role": "AXMenuButton",
+    "title": "Actions for Another listen \u2014 repeated occurrence",
+    "value": ""
+  },
+  {
+    "description": "5. Me at the zoo, Public playback example",
+    "index": "59",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "More",
+    "index": "60",
+    "role": "AXMenuButton",
+    "title": "Actions for Me at the zoo",
+    "value": ""
+  },
+  {
+    "description": "6. Never Gonna Give You Up \u2014 Rick Astley, Public playback example",
+    "index": "61",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "More",
+    "index": "62",
+    "role": "AXMenuButton",
+    "title": "Actions for Never Gonna Give You Up \u2014 Rick Astley",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "63",
+    "role": "AXScrollBar",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "64",
+    "role": "AXValueIndicator",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "65",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "66",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "67",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "68",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "69",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Player status: Playback: Playing"
+  },
+  {
+    "description": "",
+    "index": "70",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Shape your queue"
+  },
+  {
+    "description": "Normal, Every track, a surprise",
+    "index": "71",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Smart, A smoother energy flow",
+    "index": "72",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Reshuffle queue",
+    "index": "73",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "74",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Skip watched"
+  },
+  {
+    "description": "",
+    "index": "75",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Leave completed tracks out of your next shuffle."
+  },
+  {
+    "description": "Skip watched",
+    "index": "76",
+    "role": "AXCheckBox",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "Shortcuts & media keys",
+    "index": "77",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "78",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Daily Suggestions"
+  },
+  {
+    "description": "",
+    "index": "79",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Discover more with your account"
+  },
+  {
+    "description": "Sparkle",
+    "index": "80",
+    "role": "AXImage",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "81",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Suggestions are off in the demo. Your sample queue is ready to explore."
+  },
+  {
+    "description": "",
+    "index": "82",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Demo library \u00b7 sample videos \u00b7 changes stay in memory"
+  },
+  {
+    "description": "",
+    "index": "83",
+    "role": "AXScrollBar",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "84",
+    "role": "AXValueIndicator",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "85",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "86",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "87",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "88",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "89",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "90",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "91",
+    "role": "AXGroup",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "92",
+    "role": "AXButton",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "index": "93",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "TubeShuffle"
+  }
+]

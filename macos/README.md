@@ -1,4 +1,82 @@
-# Playback Lab — P0 only
+# TubeShuffle native app — local integration
+
+Normal launch now opens the SwiftUI library, not the Playback Lab. It never opens a library, reads Keychain credentials or contacts account services automatically. Create/open a local library explicitly, or choose **Try the demo**. The player is created only when starting a queue. This is a local prototype awaiting UI, live-account/security and release-policy acceptance.
+
+The listening screen follows the web interface: dark rounded player and queue cards, visible thumbnails, centered transport, Normal/Smart shuffle and Daily Suggestions. **Library** opens the playlist grid; **Library files** contains create/open/import/export. The minimum window is **480 × 680 points**. Narrow windows stack the queue and expose **Queue** and **Shuffle** jumps; view and volume controls wrap when needed. **Cmd+ / Cmd−** zoom the interface from 80% to 125%; **Cmd0** restores 100%. Cmd= also increases zoom. The same actions are in View. Zoom is a local preference; demo runs use a fresh isolated preference suite. At larger zoom in a short window, scroll vertically to reach lower controls.
+
+**Focus** shows an **80-point thumbnail** and the track information, with no visible video. Artwork off removes the thumbnail too. The existing WKWebView is retained and genuinely hidden with AppKit; no page visibility signal is falsified, no media is extracted, and switching views sends no playback/load command. **Video** reveals that same player. **Stage** expands the selected presentation; Stage or Escape returns to the queue. The visible video remains 16:9. Real audio and automatic advancement while Focus hides the view still need owner observation and remain subject to the open YouTube policy gate.
+
+**Play** starts the displayed track in playlist order. **Shuffle & listen** is an explicit action in **Shape your queue**; once listening it becomes **Reshuffle queue**. Selecting a queue row plays that occurrence. The owner-requested removal of **Stop & close** leaves ordinary Play/Pause controls; closing the library/window or quitting tears down playback. A recovery error offers **Restart player**, preserving order/selection and waiting for Play. Artwork uses stored YouTube thumbnails, with a validated video-ID fallback; the demo includes small bundled thumbnails available without network access. Media playback still requires the official YouTube embed and a network connection.
+
+The macOS application icon uses the website's unchanged [favicon](../public/favicon.svg), packaged as `Resources/AppIcon.icns` for Dock and Finder. Regenerate its standard and Retina representations on a Mac with the repository's Node dependencies installed: `node macos/scripts/generate-app-icon.mjs`. Xcode copies the icon into the app bundle; the delivery script verifies the bundled bytes and records both the icon and original SVG hashes.
+
+## One grouped UI rehearsal
+
+From the repository root on this Apple Silicon Mac:
+
+```sh
+./macos/scripts/run-ui-fixture.sh
+```
+
+The script builds the current checkout in a new temporary directory and opens an **in-memory synthetic demo** with `--ui-fixture`. It prints the rehearsal directory and build log. Account access stays disabled for the fixture run, and preference changes use a fresh isolated suite. It does not select a real library, deploy anything or delete its rehearsal files. Signing is disabled for this local build; signing, Keychain entitlement and distribution behavior remain separate checks. A first run may download the pinned Swift package.
+
+Send one results block after these checks, marking anything not tried as **not tested**:
+
+1. **Interface:** Library grid, thumbnails/queue, resize down to 480 × 680, Queue/Shuffle jumps, Focus/Stage, keyboard navigation and VoiceOver if available. Check Cmd+ / Cmd− / Cmd0, including after clicking the video. Focus must show only the small thumbnail and track information; Video must restore the existing player. Library file shortcuts: Cmd+N / Cmd+O; transfer: Cmd+Shift+I / Cmd+Shift+E; playback: Cmd+Option+P toggles play/pause, Cmd+Option+Left/Right selects previous/next; Escape leaves Stage. The listening interface intentionally uses the web's dark appearance.
+2. **Listening:** use Shuffle → Shuffle & listen, then Play if required. Check audio, queue advancement, row selection, seek, volume, Focus/Video, minimize/restore and Cmd+H/restore from this UI. Closing the library/window or quitting must stop playback; the Stop & close button was removed at the owner's request. Note errors or missing advancement; do not infer audio from displayed counters. The owner positively assessed the overall UI, but did not supply detailed audio/advancement results for this revised Focus behavior.
+3. **Local transfer/persistence:** use Library files → Export library to save the demo JSON **inside the printed rehearsal directory**. Choose Library files → New library and give a new folder name inside that directory. Preview/import the JSON; check counts and any omission notice. Start a queue in this imported synthetic library, then stop playback, close/reopen that library and choose Resume queue. It must retain the exact occurrence/order/selection and wait for Play. Compare content/history after reopening. A second import into this nonempty library must be blocked.
+
+The queue and preferences are **not transferred** by JSON: create the queue after importing to test its persistence. Natural observed ends are recorded once for the exact local occurrence; seeks/manual skips do not fabricate completions. Listening seconds are recorded as zero (not measured), not inferred from track duration. Suggestions opened on YouTube have no local listening events and are excluded from export/history.
+
+In a macOS file panel, use **Cmd+Shift+G** to navigate to the printed rehearsal directory, then enter only a filename in **Save As**. Pasting a full path into the filename field can create a filename containing colon characters instead of navigating there. Confirm the selected directory before saving or creating a library.
+
+Use only these synthetic files, without account login or a real library. Keep the rehearsal files until the results are reviewed. Automated SwiftUI checks cover geometry, demo artwork, actual native Focus hiding, retained-player identity across resize/Focus/zoom and synthetic key-event routing with the WKWebView focused. They render static media fixtures, not live audio; physical keyboard/file-panel behavior and subjective acceptance remain owner-observed. A successful build is not a UI/audio pass.
+
+## Current local behavior and limits
+
+- Content/history use SwiftData with CloudKit disabled. Creation requires a new private folder; existing open requires the runtime marker, compatible structure and a cooperative exclusive lock. No library discovery, missing-store creation, repair, merge or destructive refresh runs automatically. SwiftData has no public general no-migration open guarantee; arbitrary or old real stores are not approved by the synthetic checks.
+- Queue is a versioned local JSON sidecar containing only exact occurrence IDs/order/selection. Opening a library never starts audio. A missing sidecar is distinct from an invalid one; malformed/unknown queue files are kept and reported. Queue/history commits are separate; the app does not claim an atomic transaction across them.
+- Transfer v1 preserves IDs and valid history; orphan history is counted and omitted. Nonempty destinations are blocked. Input is capped at 10 MB, 500,000 JSON values and depth 8. A nominally valid but more complex file may be rejected by the resource cap. Files are unencrypted; export never replaces an existing filename. Old overwritten duplicate occurrences cannot be reconstructed.
+- Account setup uses explicitly entered HTTPS origins and a Supabase **publishable** key, for Supabase Free only. Configuration is per run; **Load setup JSON…** and **Save public setup…** let you carry that public configuration between runs. Loading only fills the form: review it, choose **Use this configuration**, then explicitly sign in or resume. No configuration file is discovered automatically. Google PKCE uses the system authentication browser; credentials are isolated in Keychain by configuration. Sign-in does not upload or fetch playlist content. Cloud save/remove changes only IDs and is explicit. Resume/refresh are explicit; a failed mutation may already have committed and is not retried automatically.
+- Live provider/owner/RLS behavior, actual callback delivery and real Keychain behavior remain external/manual gates. Read-only inspection confirmed Google enabled, the existing owner pin and expected catalog settings; it did not test live login or policy execution. The exact native callback `com.tubeshuffle.playbacklab://auth/callback` has since been added to the allowlist and verified by read-back, preserving both earlier redirects. Site URL is now the canonical HTTPS website. No SQL migration occurred. The Vercel configuration additions below await a separate deployment.
+- Suggestions cache at most five results per playlist/UTC day and 20 entries in memory, scoped to the active account run. They open on YouTube; they are not silently inserted into a local playlist/history. Quota/network/service-paused failures preserve local contents.
+- Normal/Smart shuffle, the embedded player, native queue/transport/seeking/volume, local filtering and preferences are implemented. Rendering checks cover desktop/narrow/zoom/Focus/Stage layouts and bundled artwork. The Focus change is explicitly a thumbnail-only presentation; native visibility actually changes and WebKit/YouTube remain free to pause or throttle. Accessibility, live artwork requests, OS interaction and playback through this UI still need owner observation. There are no transcripts, stream downloads, hidden keepalives or visibility/identity spoofing.
+
+Run the historical lab explicitly with `--playback-lab`; `--local-oauth-diagnostic` and `--local-two-account-diagnostic` remain separate diagnostic paths. The sections below retain earlier evidence and procedures, not current product acceptance.
+
+## Local delivery and browser coexistence
+
+The website remains available at **https://www.tubeshuffle.online/**. The native app does not replace it or open its browser profile. Web IndexedDB/localStorage and native SwiftData/queue files are separate. There is no automatic content, queue, history or preference sync. Account links are shared only when the account service is configured and working; the cloud stores IDs, not local library contents.
+
+The 2026-11-05 anonymous public check observed **200** on the homepage and **503** on `/api/playlist-links`. That is not a full web acceptance result. The initial [Vercel audit](../docs/evidence/native-delivery/vercel-readonly-audit.json) found five missing account variables. They have since been [added to production configuration](../docs/evidence/native-delivery/configuration-apply.json), preserving existing variables and leaving preview/development unchanged. The running deployment remains at `e168bd5`; it does not acquire those values until a new deployment, and the checkout's newer storage protection has not been rolled out there. Supabase reads verified the project/key/pin and catalog settings. The native callback and canonical Site URL were subsequently [configured and read back](../docs/evidence/native-delivery/supabase-auth-config-apply.json), with all other Auth fields unchanged. No SQL migration or production deployment occurred. Live-account acceptance remains pending. Merging into `main` triggers the configured Vercel production workflow and requires separate authorization.
+
+Build a fresh, isolated Apple Silicon candidate from the repository root:
+
+```sh
+python3 -B macos/scripts/prepare-local-delivery.py
+```
+
+This runs the hosted suite and a Release build with pinned package versions, verifies unchanged native source hashes, signs only its new app copy ad hoc, verifies the signature/entitlements/arm64 architecture, and produces a ZIP, `SHA256SUMS`, logs and `build-info.json` in a unique ignored `build/tubeshuffle-delivery-*` directory. It does not install, overwrite an earlier candidate, deploy or notarize. It is a repeatable preparation procedure, not a claim of bit-for-bit deterministic Xcode output.
+
+Keep the extracted **TubeShuffle Local** folder together. **Open Demo.command** starts the isolated in-memory demo; **Open TubeShuffle.command** starts the ordinary empty entry screen. Requires macOS 14+ and Apple Silicon. The package is **not Developer ID signed or notarized**, and it is not an approved public release. No valid local Developer ID identity was found. Do not disable Gatekeeper globally.
+
+Public setup JSON has exactly these fields (replace the placeholders before loading):
+
+```json
+{
+  "format": "tubeshuffle-account-setup",
+  "version": 1,
+  "supabaseOrigin": "https://YOUR_PROJECT.supabase.co",
+  "publishableKey": "<verified project publishable key>",
+  "applicationAPIOrigin": "https://www.tubeshuffle.online"
+}
+```
+
+The parser rejects unknown/duplicate fields, invalid origins, non-publishable keys and files larger than 8 KB. Export has the same size bound and never overwrites an existing file. Access/refresh tokens, owner pins, Vercel tokens and server API keys do not belong in this file. A public key's syntax does not prove its project provenance. A [setup JSON from the verified project](../build/tubeshuffle-delivery-szvj8h5e/TubeShuffle-account-setup.json) is prepared beside the latest candidate ZIP. Load it in the ordinary app's Account form; the demo disables Account. Loading is not live acceptance: deployment, actual callback delivery and the owner sign-in test remain pending.
+
+The [latest UI candidate and evidence](../docs/evidence/native-ui-refinement/README.md) cover thumbnail Focus, zoom and the 480-point window: 241 native tests passed, two remained skipped, and Sol 6.1 scored the reviewed UI 9.0/10. The [earlier delivery/configuration evidence](../docs/evidence/native-delivery/README.md) preserves its own package, observations and remaining gates. The grouped rehearsal above remains the single place to report unverified physical keyboard, audio and file-panel behavior. Passing it does not resolve YouTube policy.
+
+# Playback Lab — historical P0 instructions
 
 This is an isolated feasibility experiment, not the native product. It uses one retained WKWebView hosting the official YouTube iframe player and a native-owned queue of six fixed public example IDs. Account sign-in is unavailable by default; a private diagnostic is described below. It has no configured cloud data or API keys, downloads, or media workaround. Video availability and embedding permissions may change. Background playback is not established or approved.
 

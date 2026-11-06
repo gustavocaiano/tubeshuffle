@@ -1,0 +1,57 @@
+{
+  "recordedAtUTC": "2026-11-05T22:40:12.852538+00:00",
+  "projectRef": "rkgbxjwmnlsmguhctguf",
+  "scope": "Two Auth settings only; no login, SQL, library access, plan/resource change or deployment.",
+  "preflight": {
+    "projectHTTPStatus": 200,
+    "authHTTPStatus": 200,
+    "projectActive": true,
+    "googleEnabled": true,
+    "siteURL": "http://localhost:3000",
+    "existingRedirectCount": 2,
+    "webCallbackListed": true,
+    "nativeCallbackListed": false,
+    "wildcardRedirects": false
+  },
+  "proposed": {
+    "siteURL": "https://www.tubeshuffle.online",
+    "appendNativeCallback": "com.tubeshuffle.playbacklab://auth/callback",
+    "preserveAllExistingRedirects": true
+  },
+  "mutationAttempted": true,
+  "result": "auth_configuration_applied_and_read_back",
+  "writeAccessPreflight": {
+    "projectHTTPStatus": 200,
+    "authHTTPStatus": 200,
+    "preparedSettingsStillMatch": true
+  },
+  "requestedFields": [
+    "site_url",
+    "uri_allow_list"
+  ],
+  "updatedAtUTC": "2026-11-05T22:41:19.013128+00:00",
+  "patchHTTPStatus": 200,
+  "verification": {
+    "authHTTPStatus": 200,
+    "siteURLMatches": true,
+    "redirectsExactlyMatchProposal": true,
+    "allPreviousRedirectsPreserved": true,
+    "nativeCallbackListed": true,
+    "redirectCount": 3,
+    "googleEnabled": true,
+    "anonymousUsersUnchanged": true,
+    "unrelatedReturnedFieldsUnchanged": true,
+    "changedFieldNames": [
+      "site_url",
+      "uri_allow_list"
+    ],
+    "unexpectedChangedFieldNames": [],
+    "loginTested": false,
+    "libraryRowsAccessed": false
+  },
+  "limits": [
+    "Read-back of Auth configuration does not prove Google/PKCE or custom-scheme delivery.",
+    "No login, playlist read/write, SQL, migration, paid resource, deployment or release.",
+    "No cross-request atomicity/CAS guarantee; no other writer was observed."
+  ]
+}

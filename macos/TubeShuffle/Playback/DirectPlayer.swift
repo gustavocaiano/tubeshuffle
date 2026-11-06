@@ -21,6 +21,7 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
 
     override init() {
         let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
         webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
         proxy.owner = self
@@ -28,16 +29,17 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
         webView.navigationDelegate = self
     }
 
-    func start() {
+    func start(videoID: String = "ScMzIvxBSi4") {
         guard !started else { return }
         started = true
-        guard Bundle.main.bundleIdentifier == "com.tubeshuffle.playbacklab",
+        guard videoID.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil,
+              Bundle.main.bundleIdentifier == "com.tubeshuffle.playbacklab",
               let base = URL(string: origin + "/") else { onEvent?(.failure); return }
         webView.loadHTMLString("""
         <!doctype html><html><head><meta name="referrer" content="strict-origin-when-cross-origin">
         <style>html,body,#container {width:100%;height:100%;margin:0} #container iframe {display:block;width:100%;height:100%;border:0}</style></head>
         <body><div id="container"></div><script>
-        let player = null, currentGeneration = 0, playerReady = false;
+        let player = null, currentGeneration = 0, playerReady = false, desiredVolume = 100;
         function emit(type,value,generation) { window.webkit.messageHandlers.events.postMessage({type:type,value:value,generation:generation}); }
         function replacePlayer(generation, videoId, autoplay) {
           if (!Number.isSafeInteger(generation) || generation <= currentGeneration) throw new Error('stale generation');
@@ -52,26 +54,35 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
           const active = () => generation === currentGeneration;
           player = new YT.Player(node.id, {width:'100%',height:'100%',videoId:videoId,
             playerVars:{origin:'\(origin)',playsinline:1},
-            events:{onReady:e=>{ if (!active()) return; playerReady = true; emit('ready',null,generation); if (autoplay) e.target.playVideo(); },
+            events:{onReady:e=>{ if (!active()) return; playerReady = true; e.target.setVolume(desiredVolume); emit('ready',null,generation); if (autoplay) e.target.playVideo(); },
               onStateChange:e=>{ if (active()) emit('state',e.data,generation); },
               onError:e=>{ if (active()) emit('error',e.data,generation); },
               onAutoplayBlocked:()=>{ if (active()) emit('autoplayBlocked',null,generation); }}});
         }
         function onYouTubeIframeAPIReady() {
           emit('iframeReady',null,null);
-          replacePlayer(1,'ScMzIvxBSi4',false);
+          replacePlayer(1,'\(videoID)',false);
         }
         function command(kind,generation,value) {
           if (generation !== currentGeneration || !playerReady || !player) throw new Error('stale or not ready');
           if (kind === 'play') player.playVideo();
           else if (kind === 'pause') player.pauseVideo();
           else if (kind === 'seek') player.seekTo(value,true);
+          else if (kind === 'volume') { desiredVolume = value; player.setVolume(value); }
           else if (kind === 'time') return player.getCurrentTime();
           else if (kind === 'duration') return player.getDuration();
           else throw new Error('unknown command');
         }
         </script><script src="https://www.youtube.com/iframe_api" onerror="emit('failure',null,null)"></script></body></html>
         """, baseURL: base)
+    }
+
+    func stop() {
+        onEvent = nil
+        webView.stopLoading()
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "events")
+        webView.navigationDelegate = nil
+        webView.loadHTMLString("<html><body></body></html>", baseURL: nil)
     }
 
     private func evaluate(_ script: String) async throws -> Any? {
@@ -89,6 +100,10 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
     func pause(generation: Int) async throws {
         guard generation == self.generation else { throw BridgeError.invalid }
         _ = try await evaluate("command('pause',\(generation))")
+    }
+    func setVolume(_ volume: Double, generation: Int) async throws {
+        guard generation == self.generation, volume.isFinite, (0...1).contains(volume) else { throw BridgeError.invalid }
+        _ = try await evaluate("command('volume',\(generation),\(volume * 100))")
     }
     func load(videoID: String, generation: Int) async throws {
         guard generation > self.generation, generation <= maximumGeneration,
