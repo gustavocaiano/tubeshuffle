@@ -31,19 +31,68 @@ final class PlayerCoordinatorTests: XCTestCase {
         }
     }
 
-    private func setup(_ bridge: Bridge) -> (PlayerCoordinator, NSWindow) {
+    private func setup(_ bridge: Bridge, publication: PlayerMediaPublication? = nil,
+                       items: [PlayerCoordinator.Item]? = nil) -> (PlayerCoordinator, NSWindow) {
         let hooks = PlayerCoordinator.TestHooks(
             load: { try await bridge.load($0, $1) },
             progress: { _ in (0, 100) }, draw: { 0 },
             onMutationWatchdogArmed: { bridge.fireWatchdog = $0 },
             onLoadFinished: { bridge.finished?.fulfill(); bridge.finished = nil }
         )
-        let coordinator = PlayerCoordinator(testHooks: hooks)
+        let coordinator = PlayerCoordinator(initialItems: items, testHooks: hooks, mediaPublication: publication)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
                               styleMask: [.titled], backing: .buffered, defer: false)
         coordinator.attach(window: window)
         coordinator.player.onEvent?(.ready(1))
         return (coordinator, window)
+    }
+
+    func testRetiredSessionCannotClearReplacementMediaOnLateCompletionTimeoutOrDeinit() async {
+        for outcome in ["success", "failure", "timeout"] {
+            var states: [PlayerMediaState] = []
+            var replacementProgress: XCTestExpectation?
+            let publication = PlayerMediaPublication { state in
+                states.append(state)
+                if state.title == "Replacement session", state.duration == 100, let ready = replacementProgress {
+                    replacementProgress = nil; ready.fulfill()
+                }
+            }
+            let bridge = Bridge()
+            var retired: (PlayerCoordinator, NSWindow)? = setup(bridge, publication: publication)
+            weak var oldCoordinator = retired?.0
+            bridge.started = expectation(description: "retired load started")
+            let started = bridge.started!
+            retired?.0.select(1)
+            await fulfillment(of: [started], timeout: 2)
+            retired?.0.stop()
+            retired = nil
+
+            let items = [PlayerCoordinator.Item(id: 0, videoID: "ScMzIvxBSi4", title: "Replacement session")]
+            let (replacement, window) = setup(Bridge(), publication: publication, items: items)
+            let ready = expectation(description: "replacement progress settled")
+            replacementProgress = ready
+            replacement.player.onEvent?(.state(1, 1))
+            await fulfillment(of: [ready], timeout: 2)
+            let expected = states.last
+            XCTAssertEqual(expected?.title, "Replacement session")
+            XCTAssertEqual(expected?.transport, true)
+            let count = states.count
+            bridge.finished = expectation(description: "retired load finished")
+            let finished = bridge.finished!
+            if outcome == "timeout" { bridge.fireWatchdog?() }
+            bridge.complete(2, success: outcome != "failure")
+            await fulfillment(of: [finished], timeout: 2)
+            // Allow the MainActor cleanup enqueued from deinit to run.
+            await Task.yield()
+            XCTAssertNil(oldCoordinator)
+            XCTAssertEqual(states.last, expected, outcome)
+            XCTAssertEqual(states.count, count, "revoked publication must not reach the sink")
+            XCTAssertTrue(replacement.canTransport)
+            replacement.stop()
+            XCTAssertNil(states.last?.title)
+            XCTAssertEqual(states.last?.transport, false)
+            withExtendedLifetime(window) {}
+        }
     }
 
     func testCurrentErrorIsNotOverwrittenByAutoplayBlocked() {
