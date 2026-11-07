@@ -27,7 +27,15 @@ final class NativeAccountModel: ObservableObject, NativePlaylistSource {
     private var suggestionsOrder: [String] = []
     private var closeObserver: NSObjectProtocol?
 
-    var canFetchPlaylists: Bool { configured && state == .signedIn && !busy }
+    var hasUsableSession: Bool { service?.hasUsableSession ?? false }
+    var canFetchPlaylists: Bool { configured && hasUsableSession && !busy }
+
+    init(service: AccountSessionCoordinator? = nil) {
+        self.service = service
+        configured = service != nil
+        state = service?.state ?? .signedOut
+        uncertain = service?.hasUncertainMutations ?? false
+    }
 
     @discardableResult
     func loadTubeShuffleSetup() -> Bool {
@@ -136,7 +144,7 @@ final class NativeAccountModel: ObservableObject, NativePlaylistSource {
     }
 
     func loadLinks() {
-        guard !busy, let service else { return }
+        guard canFetchPlaylists, let service else { return }
         let epoch = generation
         busy = true; message = nil
         operation = Task {
@@ -145,13 +153,13 @@ final class NativeAccountModel: ObservableObject, NativePlaylistSource {
             defer { state = service.state; uncertain = service.hasUncertainMutations; busy = false }
             switch result {
             case .success(let page): links = page.links; message = "Links loaded. Concurrent cloud changes may not be included. No local content was downloaded."
-            default: links = []; message = "Cloud links could not be read. Refresh the session or check the service, then retry."
+            default: links = []; message = "Cloud links could not be read. Check your connection and service access, then retry."
             }
         }
     }
 
     func saveLink(_ id: String, remove: Bool = false) {
-        guard !busy, !uncertain, let service else { return }
+        guard canFetchPlaylists, !uncertain, let service else { return }
         let epoch = generation
         busy = true; message = nil
         operation = Task {
@@ -188,7 +196,7 @@ final class NativeAccountModel: ObservableObject, NativePlaylistSource {
     }
 
     func fetchSuggestions(_ input: SuggestionsRequest) async -> DailySuggestionsDTO? {
-        guard !busy, let service else { return nil }
+        guard canFetchPlaylists, let service else { return nil }
         let day = String(NativeLibraryModel.timestamp().prefix(10))
         let key = day + ":" + input.playlistId
         if let cached = suggestionsCache[key] { return cached }
@@ -253,7 +261,7 @@ struct NativeAccountView: View {
                 } else {
                     HStack {
                         if account.busy { ProgressView().controlSize(.small); Text("Working…") }
-                        else if account.state == .signedIn { Label("Signed in", systemImage: "person.crop.circle.fill") }
+                        else if account.hasUsableSession { Label("Signed in", systemImage: "person.crop.circle.fill") }
                         else { Text("Sign in to continue") }
                         Spacer()
                         Button(account.busy ? "Cancel / clear session" : "Clear local sign-in") { account.signOut() }
@@ -264,20 +272,20 @@ struct NativeAccountView: View {
                         Button("Resume saved session") { account.authenticate(resume: true) }
                         Button("Refresh session") { account.authenticate(refresh: true) }
                     }.disabled(account.busy)
-                    if account.state == .signedIn || account.uncertain {
+                    if account.hasUsableSession || account.uncertain {
                         Divider()
                         actionLayout {
-                            Button("Read cloud links") { account.loadLinks() }.disabled(account.busy)
+                            Button("Read cloud links") { account.loadLinks() }.disabled(!account.canFetchPlaylists)
                             if let localPlaylist {
                                 Button("Save selected playlist ID") { account.saveLink(localPlaylist.youtubeId) }
-                                    .disabled(account.busy || account.uncertain || account.state != .signedIn)
+                                    .disabled(!account.canFetchPlaylists || account.uncertain)
                             }
                         }
                         List(account.links, id: \.youtubePlaylistId) { link in
                             HStack {
                                 Text(link.youtubePlaylistId).textSelection(.enabled)
                                 Spacer()
-                                Button("Remove link") { removing = link.youtubePlaylistId }.disabled(account.busy || account.uncertain)
+                                Button("Remove link") { removing = link.youtubePlaylistId }.disabled(!account.canFetchPlaylists || account.uncertain)
                             }
                         }.frame(height: 140)
                         if account.uncertain {

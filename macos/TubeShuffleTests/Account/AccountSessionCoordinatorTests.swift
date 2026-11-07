@@ -1,5 +1,6 @@
 import AppKit
 import Auth
+import Combine
 import Foundation
 import XCTest
 @testable import TubeShuffle
@@ -630,7 +631,7 @@ final class AccountSessionCoordinatorTests: XCTestCase {
 
 @MainActor
 private final class SyntheticAccountAuth: AccountAuthenticationService {
-    private var signInCount = 0
+    private(set) var signInCount = 0
     func restore() async throws -> AccountSession? { try await signIn() }
     func signIn() async throws -> AccountSession {
         signInCount += 1
@@ -647,15 +648,18 @@ private actor SyntheticAccountTransport: APITransport {
     var body = ""
     var hold = false
     var started: XCTestExpectation?
+    private var failure: URLError?
     private var pending: CheckedContinuation<(Data, URLResponse), Error>?
     private var heldRequest: URLRequest?
 
-    func configure(status: Int, body: String, hold: Bool = false, started: XCTestExpectation? = nil) {
+    func configure(status: Int, body: String, hold: Bool = false, started: XCTestExpectation? = nil, failure: URLError? = nil) {
         self.status = status; self.body = body; self.hold = hold; self.started = started
+        self.failure = failure
     }
 
     func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
         requests.append(request)
+        if let failure { throw failure }
         if hold {
             return try await withCheckedThrowingContinuation { continuation in
                 pending = continuation; heldRequest = request; started?.fulfill()
@@ -788,6 +792,100 @@ final class AccountAPIIntegrationTests: XCTestCase {
                 }
             }
         }
+    }
+}
+
+@MainActor
+final class NativeAccountModelRecoveryTests: XCTestCase {
+    private let playlistJSON = #"{"id":"PLSyntheticImport0001","title":"Synthetic","description":null,"thumbnail":null,"channelTitle":null,"videoCount":0,"videos":[]}"#
+
+    private func waitUntilIdle(_ model: NativeAccountModel) async {
+        let idle = expectation(description: "account operation finished")
+        let observation = model.$busy.filter { !$0 }.first().sink { _ in idle.fulfill() }
+        await fulfillment(of: [idle], timeout: 2)
+        withExtendedLifetime(observation) {}
+    }
+
+    func testFailedPlaylistReadsCanRetryAndReadCloudLinksWithoutReauthentication() async throws {
+        for status in [404, 429, 503, 0] {
+            let transport = SyntheticAccountTransport(), authentication = SyntheticAccountAuth()
+            let client = try APIClient(origin: URL(string: "https://example.test")!, transport: transport)
+            let service = AccountSessionCoordinator(authentication: authentication, links: APIAccountLinkService(client: client))
+            let model = NativeAccountModel(service: service)
+            model.authenticate()
+            await waitUntilIdle(model)
+            XCTAssertTrue(model.canFetchPlaylists)
+            await transport.configure(status: status, body: "{}", failure: status == 0 ? URLError(.notConnectedToInternet) : nil)
+            let failed = await model.fetchPlaylist("PLUnavailable0001")
+            XCTAssertNil(failed)
+            XCTAssertEqual(model.state, .recoverableError(.links))
+            XCTAssertTrue(model.hasUsableSession)
+            XCTAssertTrue(model.canFetchPlaylists)
+
+            await transport.configure(status: 200, body: playlistJSON)
+            let recovered = await model.fetchPlaylist("PLSyntheticImport0001")
+            XCTAssertEqual(recovered?.id, "PLSyntheticImport0001")
+            await transport.configure(status: 503, body: "{}")
+            _ = await model.fetchPlaylist("PLUnavailable0001")
+            await transport.configure(status: 200, body: #"{"links":[]}"#)
+            model.loadLinks()
+            await waitUntilIdle(model)
+            XCTAssertEqual(model.state, .signedIn)
+            let requests = await transport.requests
+            XCTAssertEqual(requests.count, 4)
+            XCTAssertEqual(requests.last?.url?.path, "/api/playlist-links")
+            XCTAssertEqual(authentication.signInCount, 1)
+        }
+    }
+
+    func testSuggestionsFailureDoesNotDisableImportsOrClearMutationUncertainty() async throws {
+        let transport = SyntheticAccountTransport(), authentication = SyntheticAccountAuth()
+        let client = try APIClient(origin: URL(string: "https://example.test")!, transport: transport)
+        let service = AccountSessionCoordinator(authentication: authentication, links: APIAccountLinkService(client: client))
+        let model = NativeAccountModel(service: service)
+        model.authenticate()
+        await waitUntilIdle(model)
+        await transport.configure(status: 503, body: "{}")
+        let suggestions = await model.fetchSuggestions(SuggestionsRequest(playlistId: "PLSyntheticImport0001", seeds: []))
+        XCTAssertNil(suggestions)
+        XCTAssertTrue(model.canFetchPlaylists)
+        model.saveLink("PLSyntheticImport0001")
+        await waitUntilIdle(model)
+        XCTAssertTrue(model.uncertain)
+        XCTAssertTrue(model.canFetchPlaylists)
+        await transport.configure(status: 200, body: playlistJSON)
+        let recovered = await model.fetchPlaylist("PLSyntheticImport0001")
+        XCTAssertNotNil(recovered)
+        model.saveLink("PLSyntheticImport0001")
+        XCTAssertTrue(model.uncertain)
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 3, "uncertain mutation must not be retried")
+        XCTAssertEqual(authentication.signInCount, 1)
+    }
+
+    func testSignedOutAndCancelledAuthenticationCannotImport() async throws {
+        let transport = SyntheticAccountTransport(), authentication = AccountSessionCoordinatorTests.Auth()
+        let client = try APIClient(origin: URL(string: "https://example.test")!, transport: transport)
+        let service = AccountSessionCoordinator(authentication: authentication, links: APIAccountLinkService(client: client))
+        let model = NativeAccountModel(service: service)
+        XCTAssertFalse(model.hasUsableSession)
+        let signedOut = await model.fetchPlaylist("PLSyntheticImport0001")
+        XCTAssertNil(signedOut)
+
+        let started = expectation(description: "authentication started")
+        authentication.called = { started.fulfill() }
+        let operation = Task { await service.signIn() }
+        await fulfillment(of: [started], timeout: 2)
+        operation.cancel()
+        authentication.finish("late-synthetic-token")
+        await operation.value
+        XCTAssertEqual(service.state, .recoverableError(.authenticationCancelled))
+        XCTAssertFalse(model.hasUsableSession)
+        XCTAssertFalse(model.canFetchPlaylists)
+        let cancelled = await model.fetchPlaylist("PLSyntheticImport0001")
+        XCTAssertNil(cancelled)
+        let requests = await transport.requests
+        XCTAssertTrue(requests.isEmpty)
     }
 }
 
@@ -957,6 +1055,35 @@ final class NativeSupabaseAccountAuthenticationTests: XCTestCase {
         }
     }
 
+    func testProductionPKCEExchangeNeverRetriesServerOrNetworkFailures() async throws {
+        for offline in [false, true] {
+            let config = try configuration(), backend = NativeAuthenticationBackend()
+            let storage = NativeCredentialStorage(configuration: config, backend: backend)
+            let window = NSWindow(), attempts = NativeExchangeAttempts()
+            let browser = TransientAuthBrowser(anchor: window) { url, _, _, completion in
+                let session = NativeAuthenticationBrowserSession()
+                session.startAction = {
+                    let callback = try? self.callback(from: url)
+                    Task { @MainActor in completion(callback, nil) }
+                }
+                return session
+            }
+            let service = try NativeSupabaseAccountAuthentication(configuration: config, browser: browser, storage: storage) { request in
+                await attempts.record(request)
+                if offline { throw URLError(.notConnectedToInternet) }
+                return (Data("{}".utf8), HTTPURLResponse(url: request.url!, statusCode: 503, httpVersion: nil, headerFields: nil)!)
+            }
+            do { _ = try await service.signIn(); XCTFail("exchange must fail") }
+            catch {}
+            let requests = await attempts.requests
+            XCTAssertEqual(requests.count, 1, "one-time PKCE code must not be replayed after a failed exchange")
+            XCTAssertEqual(requests.first?.httpMethod, "POST")
+            XCTAssertEqual(requests.first?.url?.query, "grant_type=pkce")
+            XCTAssertNil(try storage.retrieve(key: NativeCredentialStorage.sessionKey))
+            XCTAssertNil(try storage.retrieve(key: NativeCredentialStorage.verifierKey))
+        }
+    }
+
     func testRefreshFailureRemovesPriorSessionAndVerifier() async throws {
         let config = try configuration(), backend = NativeAuthenticationBackend()
         let storage = NativeCredentialStorage(configuration: config, backend: backend)
@@ -972,4 +1099,9 @@ final class NativeSupabaseAccountAuthenticationTests: XCTestCase {
         XCTAssertNil(try storage.retrieve(key: NativeCredentialStorage.sessionKey))
         XCTAssertNil(try storage.retrieve(key: NativeCredentialStorage.verifierKey))
     }
+}
+
+private actor NativeExchangeAttempts {
+    private(set) var requests: [URLRequest] = []
+    func record(_ request: URLRequest) { requests.append(request) }
 }

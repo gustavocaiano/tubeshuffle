@@ -7,44 +7,160 @@ protocol APITransport {
 }
 
 final class URLSessionAPITransport: APITransport {
-    private let session: URLSession
+    private let protocolClasses: [AnyClass]?
+    private let responseLimit: Int
 
-    // The delegate is owned by the session and must not own this transport.
-    // Construct the session eagerly so simultaneous sends share one instance.
-    init(protocolClasses: [AnyClass]? = nil) {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.httpCookieStorage = nil
-        configuration.httpShouldSetCookies = false
-        configuration.urlCredentialStorage = nil
-        configuration.urlCache = nil
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        if let protocolClasses = protocolClasses { configuration.protocolClasses = protocolClasses }
-        session = URLSession(configuration: configuration, delegate: RedirectRejectingDelegate(), delegateQueue: nil)
-    }
-
-    deinit {
-        session.finishTasksAndInvalidate()
+    init(protocolClasses: [AnyClass]? = nil, responseLimit: Int = APIClient.maximumResponseBytes) {
+        precondition(responseLimit > 0)
+        self.protocolClasses = protocolClasses
+        self.responseLimit = responseLimit
     }
 
     func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
-        try await session.data(for: request)
+        do {
+            return try await BoundedHTTPTransport(protocolClasses: protocolClasses, maximumResponseBytes: responseLimit).fetch(request)
+        } catch BoundedHTTPTransport.Failure.responseTooLarge {
+            throw APIClientError.responseTooLarge
+        }
     }
-
 }
 
-final class RedirectRejectingDelegate: NSObject, URLSessionTaskDelegate {
+/// One ephemeral session per fetch. Only response bytes retained by this delegate
+/// are bounded; Foundation may transiently deliver a larger individual chunk or
+/// decompress before delivery. The limit is an application policy, not a bound on
+/// Foundation's internal buffering, decompression, or total process memory.
+final class BoundedHTTPTransport: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    static let responseLimit = 256 * 1024
+    enum Failure: Error { case responseTooLarge, redirect, invalidResponse, network, alreadyUsed }
+
+    private let maximumResponseBytes: Int
+    private let lock = NSLock()
+    private let protocolClasses: [AnyClass]?
+    // Injectable to observe cancellation requests in delegate tests; production cancels the task directly.
+    private let cancelTask: (URLSessionDataTask) -> Void
+    private var continuation: CheckedContinuation<(Data, URLResponse), Error>?
+    private var session: URLSession?
+    private var task: URLSessionDataTask?
+    private var started = false
+    private var finished = false
+    private var response: URLResponse?
+    private var body = Data()
+
+    init(protocolClasses: [AnyClass]? = nil, maximumResponseBytes: Int = BoundedHTTPTransport.responseLimit, cancelTask: @escaping (URLSessionDataTask) -> Void = { $0.cancel() }) {
+        precondition(maximumResponseBytes > 0)
+        self.maximumResponseBytes = maximumResponseBytes
+        self.protocolClasses = protocolClasses
+        self.cancelTask = cancelTask
+    }
+
+    func fetch(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        guard claim() else { throw Failure.alreadyUsed }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                lock.lock()
+                if finished {
+                    lock.unlock()
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                self.continuation = continuation
+                let configuration = URLSessionConfiguration.ephemeral
+                configuration.urlCache = nil
+                configuration.urlCredentialStorage = nil
+                configuration.httpCookieStorage = nil
+                configuration.httpShouldSetCookies = false
+                configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+                if let protocolClasses { configuration.protocolClasses = protocolClasses }
+                let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+                var request = request
+                request.httpShouldHandleCookies = false
+                let task = session.dataTask(with: request)
+                self.session = session
+                self.task = task
+                task.resume()
+                lock.unlock()
+            }
+        } onCancel: { self.cancel() }
+    }
+
+    private func claim() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard !started else { return false }
+        started = true
+        return true
+    }
+
+    private func cancel() {
+        finish(.failure(CancellationError()))
+    }
+
+    private func finish(_ result: Result<(Data, URLResponse), Error>) {
+        lock.lock()
+        guard !finished else { lock.unlock(); return }
+        finished = true
+        let continuation = self.continuation
+        self.continuation = nil
+        let task = self.task, session = self.session
+        self.task = nil; self.session = nil
+        body = Data(); response = nil
+        lock.unlock()
+        if let task { cancelTask(task) }
+        session?.invalidateAndCancel()
+        continuation?.resume(with: result)
+    }
+
     func urlSession(_ session: URLSession, task: URLSessionTask,
-                    willPerformHTTPRedirection response: HTTPURLResponse,
-                    newRequest request: URLRequest,
+                    willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
                     completionHandler: @escaping (URLRequest?) -> Void) {
+        finish(.failure(Failure.redirect))
         completionHandler(nil)
     }
-}
 
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        guard let http = response as? HTTPURLResponse else {
+            finish(.failure(Failure.invalidResponse)); completionHandler(.cancel); return
+        }
+        guard !(300...399).contains(http.statusCode) else {
+            finish(.failure(Failure.redirect)); completionHandler(.cancel); return
+        }
+        if let length = http.value(forHTTPHeaderField: "Content-Length") {
+            let trimmed = length.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty, trimmed.utf8.allSatisfy({ (48...57).contains($0) }),
+                  let value = UInt64(trimmed), value <= UInt64(maximumResponseBytes) else {
+                finish(.failure(Failure.responseTooLarge)); completionHandler(.cancel); return
+            }
+        }
+        guard response.expectedContentLength <= Int64(maximumResponseBytes) else {
+            finish(.failure(Failure.responseTooLarge)); completionHandler(.cancel); return
+        }
+        lock.lock()
+        if !finished { self.response = response }
+        lock.unlock()
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        lock.lock()
+        let tooLarge = !finished && data.count > maximumResponseBytes - body.count
+        if !finished && !tooLarge { body.append(data) }
+        lock.unlock()
+        if tooLarge { finish(.failure(Failure.responseTooLarge)) }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if error != nil { finish(.failure(Failure.network)); return }
+        lock.lock()
+        let response = self.response, body = self.body
+        lock.unlock()
+        guard let response else { finish(.failure(Failure.invalidResponse)); return }
+        finish(.success((body, response)))
+    }
+}
 // No raw URLs, response text, tokens or underlying transport errors are exposed.
 enum APIClientError: Error, Equatable {
     case invalidOrigin, invalidCredential, invalidPathID
-    case transport, nonHTTPResponse, malformedResponse
+    case transport, nonHTTPResponse, malformedResponse, responseTooLarge
     case http(status: Int, retryAfter: Int?, kind: ServerErrorKind)
 }
 
@@ -73,6 +189,10 @@ struct SuggestionsRequest: Encodable {
 }
 
 struct APIClient {
+    // Bounds retained response data and decoding input, including error bodies.
+    // Foundation's internal buffers/decompression and total process memory are
+    // not covered by this per-response limit.
+    static let maximumResponseBytes = 10 * 1024 * 1024
     private let origin: URL
     private let transport: any APITransport
 
@@ -162,8 +282,10 @@ struct APIClient {
         do {
             let result = try await transport.send(request)
             try Task.checkCancellation()
+            guard result.0.count <= Self.maximumResponseBytes else { throw APIClientError.responseTooLarge }
             return result
         } catch is CancellationError { throw CancellationError() }
+        catch APIClientError.responseTooLarge { throw APIClientError.responseTooLarge }
         catch {
             if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
             throw APIClientError.transport

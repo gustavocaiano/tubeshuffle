@@ -112,7 +112,7 @@ final class APIClientTests: XCTestCase {
     }
 
     func testURLSessionAdapterRejectsRedirects() {
-        let delegate = RedirectRejectingDelegate()
+        let delegate = BoundedHTTPTransport()
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }
         let original = URLRequest(url: URL(string: "https://example.test/")!)
@@ -162,6 +162,72 @@ final class APIClientTests: XCTestCase {
         }
         adapter = nil
         XCTAssertNil(weakAdapter)
+    }
+
+    func testResponseBudgetIncludesAdvertisedDeliveredAndErrorBodies() async throws {
+        let transport = URLSessionAPITransport(protocolClasses: [BoundedAPIProtocol.self], responseLimit: 256)
+        for path in ["exact", "overflow", "misleading", "advertised", "error"] {
+            var request = URLRequest(url: URL(string: "https://example.invalid/\(path)")!)
+            request.timeoutInterval = 2
+            do {
+                let (data, _) = try await transport.send(request)
+                XCTAssertEqual(path, "exact", "oversized response must be rejected")
+                XCTAssertEqual(data, Data(repeating: 42, count: 256))
+            } catch {
+                XCTAssertNotEqual(path, "exact")
+                XCTAssertEqual(error as? APIClientError, .responseTooLarge, path)
+            }
+        }
+        // A custom transport must not bypass the client's decoding budget.
+        let stub = Stub { request in
+            (Data(repeating: 42, count: APIClient.maximumResponseBytes + 1),
+             HTTPURLResponse(url: request.url!, statusCode: 503, httpVersion: nil, headerFields: nil)!)
+        }
+        let client = try APIClient(origin: URL(string: "https://example.invalid")!, transport: stub)
+        do { _ = try await client.links(); XCTFail("oversized custom transport response accepted") }
+        catch { XCTAssertEqual(error as? APIClientError, .responseTooLarge) }
+    }
+
+    func testStreamingResponseCancellationStopsReceiving() async throws {
+        let started = expectation(description: "stream response started")
+        let stopped = expectation(description: "stream cancelled")
+        let host = UUID().uuidString.lowercased() + ".invalid"
+        BoundedAPIProtocol.observe(host, started: started, stopped: stopped)
+        defer { BoundedAPIProtocol.remove(host) }
+        let transport = URLSessionAPITransport(protocolClasses: [BoundedAPIProtocol.self], responseLimit: 256)
+        let request = URLRequest(url: URL(string: "https://\(host)/cancel")!)
+        let operation = Task { try await transport.send(request) }
+        await fulfillment(of: [started], timeout: 2)
+        operation.cancel()
+        do { _ = try await operation.value; XCTFail("cancelled stream returned") }
+        catch { XCTAssertTrue(error is CancellationError || (error as? URLError)?.code == .cancelled) }
+        await fulfillment(of: [stopped], timeout: 2)
+    }
+
+    func testAdvertisedOversizeCancelsOnResponseCallbackBeforeReceivingBody() async throws {
+        let started = expectation(description: "synthetic request started")
+        let stopped = expectation(description: "oversized request cancelled")
+        let host = UUID().uuidString.lowercased() + ".invalid"
+        BoundedAPIProtocol.observe(host, started: started, stopped: stopped)
+        defer { BoundedAPIProtocol.remove(host) }
+        let transport = BoundedHTTPTransport(protocolClasses: [BoundedAPIProtocol.self], maximumResponseBytes: 256)
+        let request = URLRequest(url: URL(string: "https://\(host)/cancel")!)
+        let operation = Task { try await transport.fetch(request) }
+        await fulfillment(of: [started], timeout: 2)
+        // URLProtocol on this OS withholds its response callback until body/EOF.
+        // Direct callback delivery tests immediate policy rejection, independently
+        // of that simulator limitation. No real HTTP behavior is claimed here.
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        let task = session.dataTask(with: request) // Not resumed.
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                       headerFields: ["Content-Length": "257"])!
+        transport.urlSession(session, dataTask: task, didReceive: response) { disposition in
+            XCTAssertEqual(disposition, .cancel)
+        }
+        do { _ = try await operation.value; XCTFail("oversized headers accepted") }
+        catch { XCTAssertEqual(error as? BoundedHTTPTransport.Failure, .responseTooLarge) }
+        await fulfillment(of: [stopped], timeout: 2)
     }
 
     func testUnexpectedStatusDeleteBodyAndRetryAfter() async throws {
@@ -226,4 +292,44 @@ private final class SuccessfulProtocol: URLProtocol {
         client?.urlProtocolDidFinishLoading(self)
     }
     override func stopLoading() {}
+}
+
+private final class BoundedAPIProtocol: URLProtocol {
+    private static let lock = NSLock()
+    private static var observations: [String: (XCTestExpectation, XCTestExpectation)] = [:]
+
+    static func observe(_ host: String, started: XCTestExpectation, stopped: XCTestExpectation) {
+        lock.lock(); defer { lock.unlock() }
+        observations[host] = (started, stopped)
+    }
+    static func remove(_ host: String) {
+        lock.lock(); defer { lock.unlock() }
+        observations.removeValue(forKey: host)
+    }
+    override class func canInit(with request: URLRequest) -> Bool { request.url?.host?.hasSuffix(".invalid") == true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let path = request.url!.path
+        var headers: [String: String] = [:]
+        if path == "/exact" { headers["Content-Length"] = "256" }
+        if path == "/advertised" { headers["Content-Length"] = "257" }
+        if path == "/misleading" { headers["Content-Length"] = "1" }
+        let response = HTTPURLResponse(url: request.url!, statusCode: path == "/error" ? 503 : 200,
+                                       httpVersion: "HTTP/1.1", headerFields: headers)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        if path == "/cancel" {
+            Self.lock.lock(); let observation = Self.observations[request.url!.host!]; Self.lock.unlock()
+            observation?.0.fulfill()
+            return
+        }
+        if path == "/advertised" { client?.urlProtocolDidFinishLoading(self); return }
+        client?.urlProtocol(self, didLoad: Data(repeating: 42, count: 128))
+        client?.urlProtocol(self, didLoad: Data(repeating: 42, count: 128))
+        if path != "/exact" { client?.urlProtocol(self, didLoad: Data([42])) }
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {
+        Self.lock.lock(); let observation = Self.observations[request.url!.host!]; Self.lock.unlock()
+        observation?.1.fulfill()
+    }
 }
