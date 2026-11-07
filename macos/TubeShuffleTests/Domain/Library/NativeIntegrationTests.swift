@@ -2,6 +2,18 @@ import AppKit
 import XCTest
 @testable import TubeShuffle
 
+private final class NativeCalculationBarrier: @unchecked Sendable {
+    private let started: XCTestExpectation
+    private let resume = DispatchSemaphore(value: 0)
+    init(started: XCTestExpectation) { self.started = started }
+    func waitForMainActor() {
+        XCTAssertFalse(Thread.isMainThread, "pure calculations must run outside the UI executor")
+        started.fulfill()
+        XCTAssertEqual(resume.wait(timeout: .now() + 5), .success, "MainActor heartbeat was blocked")
+    }
+    func release() { resume.signal() }
+}
+
 @MainActor
 final class NativeIntegrationTests: XCTestCase {
     func testYouTubePlaylistLinksAcceptSharedFormatsAndRejectOtherTargets() {
@@ -102,6 +114,70 @@ final class NativeIntegrationTests: XCTestCase {
         reopened = nil
     }
 
+    func testPopulatedAPIContractImportsPublicationDatesAndPreservesExistingHistory() async throws {
+        let (library, directory) = try importLibrary(seed: NativeLibraryFixture.snapshot)
+        defer { library.closeLibrary(); try? FileManager.default.removeItem(at: directory) }
+        let original = library.snapshot
+        library.recordNaturalCompletion(.init(id: 0, videoID: original.occurrences[0].youtubeId,
+            localOccurrenceID: original.occurrences[0].id), playlist: original.playlists[0].id, epoch: library.generation)
+        let before = library.snapshot
+        let dto = try populatedPlaylistDTO()
+        let source = PlaylistSource(response: dto)
+        let result = await library.importPlaylist(dto.id, account: source)
+        let imported = try XCTUnwrap(result)
+        let added = library.snapshot.occurrences.filter { $0.playlistId == imported }
+        XCTAssertEqual(added.count, 2)
+        XCTAssertEqual(Set(added.map(\.id)).count, 2)
+        XCTAssertEqual(Set(added.map(\.youtubeId)).count, 1)
+        XCTAssertEqual(added.map(\.publishedAt), ["2020-01-02T00:00:00.000Z", "2020-01-02T00:00:00.000Z"])
+        XCTAssertEqual(library.snapshot.history, before.history)
+        XCTAssertEqual(library.snapshot.occurrences.filter { $0.playlistId != imported }, before.occurrences)
+        let saved = library.snapshot
+        library.closeLibrary()
+        var reopened: NativeLocalLibraryStore? = try NativeLocalLibraryStore.openExisting(at: directory)
+        XCTAssertEqual(try reopened!.snapshot(), saved)
+        reopened = nil
+    }
+
+    func testAPIPublicationTimestampNormalizationDoesNotRelaxTransferTimestamps() throws {
+        let stamp = "2026-01-01T00:00:00.000Z"
+        for (input, expected) in [
+            ("2020-01-02T00:00:00Z", "2020-01-02T00:00:00.000Z"),
+            ("2020-01-02T00:00:00.1Z", "2020-01-02T00:00:00.100Z"),
+            ("2020-01-02T00:00:00.123456Z", "2020-01-02T00:00:00.123Z"),
+            ("2020-01-02T00:00:00+02:00", "2020-01-01T22:00:00.000Z"),
+            ("2020-01-02T00:00:00.250-03:30", "2020-01-02T03:30:00.250Z")
+        ] {
+            let dto = try populatedPlaylistDTO(publishedAt: input)
+            let result = try PlaylistAPIImport.make(requestedPlaylistID: dto.id, dto: dto, importedAt: stamp)
+            XCTAssertEqual(result.snapshot.occurrences.map(\.publishedAt), [expected, expected])
+        }
+        let missing = try populatedPlaylistDTO(publishedAt: nil)
+        XCTAssertTrue(try PlaylistAPIImport.make(requestedPlaylistID: missing.id, dto: missing, importedAt: stamp)
+            .snapshot.occurrences.allSatisfy { $0.publishedAt == nil })
+        for invalid in ["", "not-a-date", "2020-02-31T00:00:00Z", "2020-02-31T00:00:00+01:00",
+                        "2020-01-02T00:00:00", "2020-01-02T00:00:00Z\n", "2020-01-02T00:00:00-00:00"] {
+            let dto = try populatedPlaylistDTO(publishedAt: invalid)
+            XCTAssertThrowsError(try PlaylistAPIImport.make(requestedPlaylistID: dto.id, dto: dto, importedAt: stamp), invalid)
+        }
+        let dto = try populatedPlaylistDTO()
+        XCTAssertThrowsError(try PlaylistAPIImport.make(requestedPlaylistID: dto.id, dto: dto, importedAt: "2026-01-01T00:00:00Z"))
+    }
+
+    private func populatedPlaylistDTO(publishedAt: String? = "2020-01-02T00:00:00Z") throws -> YouTubePlaylistDTO {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "existing-api", withExtension: "json"))
+        let source = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        let playlist = try XCTUnwrap(source["playlist"] as? [String: Any])
+        let response = try XCTUnwrap(playlist["response"] as? [String: Any])
+        var body = try XCTUnwrap(response["body"] as? [String: Any])
+        var first = try XCTUnwrap(source["playlistPopulatedVideo"] as? [String: Any])
+        first["publishedAt"] = publishedAt
+        var second = first
+        second["position"] = 1
+        body["videos"] = [first, second]
+        return try JSONDecoder().decode(YouTubePlaylistDTO.self, from: JSONSerialization.data(withJSONObject: body))
+    }
+
     private final class PlaylistSource: NativePlaylistSource {
         var canFetchPlaylists = true
         var message: String?
@@ -114,22 +190,92 @@ final class NativeIntegrationTests: XCTestCase {
         }
     }
 
-    private func importLibrary(seed: LibrarySnapshot? = nil) throws -> (NativeLibraryModel, URL) {
+    private func importLibrary(seed: LibrarySnapshot? = nil, calculations: NativeLibraryCalculations = .init()) throws -> (NativeLibraryModel, URL) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("tubeshuffle-link-import-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         let store = try NativeLocalLibraryStore.createNew(at: directory)
         if let seed { try store.importIntoEmpty(seed) }
-        return (try NativeLibraryModel(store: store, at: directory), directory)
+        return (try NativeLibraryModel(store: store, at: directory, calculations: calculations), directory)
     }
 
-    private func playlistDTO(id: String = "PLSyntheticImport0001", declaredCount: Int = 2) throws -> YouTubePlaylistDTO {
-        let videos: [[String: Any]] = (0..<2).map { position in
+    private func playlistDTO(id: String = "PLSyntheticImport0001", declaredCount: Int = 2, count: Int = 2) throws -> YouTubePlaylistDTO {
+        let videos: [[String: Any]] = (0..<count).map { position in
             ["id": "ScMzIvxBSi4", "title": "Synthetic track \(position)", "channelTitle": "Synthetic channel",
              "thumbnail": "", "duration": 94, "position": position]
         }
         let data = try JSONSerialization.data(withJSONObject: ["id": id, "title": "Synthetic imported playlist",
             "description": NSNull(), "thumbnail": NSNull(), "channelTitle": "Synthetic channel", "videoCount": declaredCount, "videos": videos])
         return try JSONDecoder().decode(YouTubePlaylistDTO.self, from: data)
+    }
+
+    func testLargeConversionLeavesMainActorFreeAndCloseDiscardsItsResult() async throws {
+        for closeDuringCalculation in [false, true] {
+            let started = expectation(description: "background conversion started")
+            let barrier = NativeCalculationBarrier(started: started)
+            var calculations = NativeLibraryCalculations()
+            let convert = calculations.convertPlaylist
+            calculations.convertPlaylist = { id, dto, stamp in
+                barrier.waitForMainActor()
+                return try convert(id, dto, stamp)
+            }
+            let (library, directory) = try importLibrary(calculations: calculations)
+            defer { library.closeLibrary(); try? FileManager.default.removeItem(at: directory) }
+            let source = PlaylistSource(response: try playlistDTO(declaredCount: 5_000, count: 5_000))
+            let operation = Task { await library.importPlaylist("PLSyntheticImport0001", account: source) }
+            await fulfillment(of: [started], timeout: 2)
+            XCTAssertTrue(library.busy, "MainActor must be able to observe progress during calculation")
+            if closeDuringCalculation { library.openDemo() }
+            barrier.release()
+            let result = await operation.value
+            XCTAssertFalse(library.busy)
+            if closeDuringCalculation {
+                XCTAssertNil(result)
+                XCTAssertEqual(library.snapshot, NativeLibraryFixture.snapshot)
+                var reopened: NativeLocalLibraryStore? = try NativeLocalLibraryStore.openExisting(at: directory)
+                XCTAssertEqual(try reopened!.snapshot(), .empty, "late conversion must not write to the closed store")
+                reopened = nil
+            } else {
+                XCTAssertNotNil(result)
+                XCTAssertEqual(library.snapshot.occurrences.count, 5_000)
+            }
+        }
+    }
+
+    func testQueueReplacementDiscardsOldCalculationWithoutClearingNewProgress() async {
+        let original = NativeLibraryFixture.snapshot
+        let base = original.occurrences[0]
+        let items = (0..<5_000).map { index in
+            LibraryOccurrence(id: OccurrenceID("queue-background-\(index)"), playlistId: base.playlistId,
+                youtubeId: base.youtubeId, title: base.title, channelTitle: base.channelTitle, thumbnail: "",
+                duration: 100, position: index, viewCount: nil, likeCount: nil, description: nil,
+                tags: nil, categoryId: nil, publishedAt: nil)
+        }
+        let source = LibrarySnapshot(playlists: original.playlists, occurrences: items, history: [])
+        let oldStarted = expectation(description: "old Smart queue started")
+        let newStarted = expectation(description: "new queue started")
+        let oldBarrier = NativeCalculationBarrier(started: oldStarted)
+        let newBarrier = NativeCalculationBarrier(started: newStarted)
+        var calculations = NativeLibraryCalculations()
+        let build = calculations.buildQueue
+        calculations.buildQueue = { snapshot, id, mode, excluded in
+            if case .smart = mode { oldBarrier.waitForMainActor() }
+            else { newBarrier.waitForMainActor() }
+            return build(snapshot, id, mode, excluded)
+        }
+        let preparation = NativeQueuePreparation(calculations: calculations)
+        let old = Task { await preparation.prepare(snapshot: source, playlist: base.playlistId, mode: .smart, excludeWatched: false) }
+        await fulfillment(of: [oldStarted], timeout: 2)
+        XCTAssertTrue(preparation.busy)
+        let next = Task { await preparation.prepare(snapshot: source, playlist: base.playlistId, mode: .normal, excludeWatched: false) }
+        await fulfillment(of: [newStarted], timeout: 2)
+        oldBarrier.release()
+        let stale = await old.value
+        XCTAssertNil(stale)
+        XCTAssertTrue(preparation.busy, "old cleanup must not clear the new operation's progress")
+        newBarrier.release()
+        let accepted = await next.value
+        XCTAssertEqual(Set(accepted?.map(\.id) ?? []), Set(items.map(\.id)))
+        XCTAssertFalse(preparation.busy)
     }
 
     func testTransferPersistsAndReopensWithoutChangingOccurrenceHistory() throws {
