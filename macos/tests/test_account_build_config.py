@@ -9,11 +9,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class AccountBuildConfigTests(unittest.TestCase):
-    def test_plist_contains_only_callback_registration(self):
+    def test_plist_contains_only_callback_registration_and_app_icon(self):
         plist = plistlib.loads((ROOT / "TubeShuffle/Resources/Info.plist").read_bytes())
-        self.assertEqual(set(plist), {"CFBundleURLTypes"})
-        self.assertEqual(plist["CFBundleURLTypes"][0]["CFBundleURLSchemes"],
-                         ["com.tubeshuffle.playbacklab"])
+        self.assertEqual(set(plist), {"CFBundleURLTypes", "CFBundleIconFile"})
+        self.assertEqual(plist["CFBundleIconFile"], "AppIcon")
+        self.assertEqual(plist["CFBundleURLTypes"], [{
+            "CFBundleURLName": "com.tubeshuffle.playbacklab.auth",
+            "CFBundleURLSchemes": ["com.tubeshuffle.playbacklab"],
+        }])
         self.assertNotIn("$(", repr(plist))
 
     def test_project_has_no_account_config_build_phase_or_settings(self):

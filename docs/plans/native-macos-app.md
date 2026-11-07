@@ -4,6 +4,14 @@
 
 This plan includes historical planning and P0 handoff records; later evidence does not close the outstanding acceptance gates.
 
+### Extensive review before merge — 2026-11-07
+
+The owner explicitly requested security/performance/bug review, fixes in PRs and then merge. This authorizes the reviewed code merges and supersedes the earlier PR-only restriction. It does not authorize production migrations/repairs, real-library access, installer release or a YouTube policy exception. PR #11 is still open at this checkpoint.
+
+Three independent read-only reviews covered native account/transport/WebKit security, native import/UI/player correctness/performance, and web/API/storage/dependencies. They found reproducible native recovery, timestamp import, UI-blocking work and media-ownership bugs; the parent also measured expensive storage-key formatting and confirmed duplicate production PKCE exchanges. Native fixes are committed through `34ae786`, with an additional independent review pending. The six offline configuration checks pass. Fresh arm64 tests: **262 executed / 260 passed / two existing skips / zero failures**; Release and local ad-hoc package verification pass. Disposable standalone store/reopen and API-import probes pass. The 5,000-item queue-advance probe improved from 3.667 s to 0.135 s, while store work still runs on MainActor. [Findings, reproducible evidence, source hashes and limits](../evidence/pre-merge-native-2026-11-07/README.md).
+
+Web review additionally identified suggestions body/payload limits, stale-generation writes, cache-key collisions and unbounded caches, plus affected Next/Sharp dependency versions. Fixes and verification are in separate isolated tasks/PRs and are not yet claimed complete. Final integrated checks and fix-review resolution are required before merging the parent PR. All live-account, manual UI/audio/transfer, YouTube policy and distribution gates remain open; the installer manifest remains null.
+
 ### Browser download entry and installation guide — 2026-11-07
 
 After approving the simplified native UI and requesting commit/push/PR, the owner asked for the installer/link/instructions on the website. `/macos` is now linked from navigation, the homepage and footer. It presents the native preview, actual Apple Silicon/macOS 14+ requirements, ZIP setup, Library/playlist import flow, owner-only account access and explicit browser/native separation. Transfer guidance discloses unencrypted JSON, excluded queue/preferences/suggestions/credentials/media and omitted history/journal/suggestion events. No continuity or automatic synchronization is inferred.

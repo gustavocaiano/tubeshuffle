@@ -135,6 +135,7 @@ struct NativePlaylistImportView: View {
 struct NativeLibraryView: View {
     @StateObject private var library: NativeLibraryModel
     @StateObject private var account = NativeAccountModel()
+    @StateObject private var queuePreparation = NativeQueuePreparation()
     @State private var selected: PlaylistID?
     @State private var listening: NativeListeningSession?
     @State private var showingAccount = false
@@ -238,7 +239,10 @@ struct NativeLibraryView: View {
         .sheet(isPresented: $showingImport, onDismiss: continuePlaylistImport) { playlistImport }
         .sheet(isPresented: $showingShortcuts) { shortcuts }
         .sheet(isPresented: Binding(get: { library.pendingImport != nil }, set: { if !$0 { library.pendingImport = nil } })) { transferPreview }
-        .onChange(of: selected) { suggestions = []; suggestionsMessage = nil }
+        .onChange(of: selected) { queuePreparation.cancel(); suggestions = []; suggestionsMessage = nil }
+        .onChange(of: library.generation) { stopPlayback() }
+        .onChange(of: mode) { queuePreparation.cancel() }
+        .onChange(of: excludeWatched) { queuePreparation.cancel() }
         .onChange(of: library.snapshot.playlists.map(\.id)) { ids in if selected == nil { selected = ids.first } }
         .onExitCommand { if stage { stage = false } }
         .onDisappear { stopPlayback() }
@@ -347,8 +351,8 @@ struct NativeLibraryView: View {
             }.padding(4).background(.black.opacity(0.32), in: RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(NativeUIStyle.border))
             Button { scroll.scrollTo("player", anchor: .top); startQueue(playlist) } label: {
-                Label(listening == nil ? "Shuffle & listen" : "Reshuffle queue", systemImage: "shuffle").frame(maxWidth: .infinity)
-            }.buttonStyle(NativeActionStyle(prominent: true)).disabled(occurrences.isEmpty || library.busy)
+                Label(shuffleButtonTitle, systemImage: "shuffle").frame(maxWidth: .infinity)
+            }.buttonStyle(NativeActionStyle(prominent: true)).disabled(occurrences.isEmpty || library.busy || queuePreparation.busy)
             Rectangle().fill(NativeUIStyle.border).frame(height: 1)
             HStack {
                 VStack(alignment: .leading, spacing: 5) {
@@ -568,7 +572,7 @@ struct NativeLibraryView: View {
     }
 
     private func selectFirst() { selected = library.snapshot.playlists.first?.id }
-    private func stopPlayback() { listening?.coordinator.stop(); listening = nil }
+    private func stopPlayback() { queuePreparation.cancel(); listening?.coordinator.stop(); listening = nil }
     private func restartPlayback() {
         guard let listening, listening.coordinator.recoveryRequired else { return }
         let items = listening.coordinator.queue.compactMap { $0.localOccurrenceID.flatMap { listening.occurrencesByID[$0] } }
@@ -585,9 +589,20 @@ struct NativeLibraryView: View {
         } catch { library.message = "The saved queue no longer matches this library. No occurrence identities were inferred." }
     }
     private func startQueue(_ playlist: LibraryPlaylist) {
-        let items = LibraryQueueBuilder.build(snapshot: library.snapshot, playlistId: playlist.id,
-            mode: mode == 0 ? .normal : .smart, excludeWatched: excludeWatched, draw: { Double.random(in: 0..<1) })
-        beginSession(items: items, playlist: playlist, index: 0, autoplay: true)
+        let source = library.snapshot, epoch = library.generation, selectedID = selected
+        let requestedMode = mode, requestedExclusion = excludeWatched, sessionID = listening?.id
+        Task {
+            guard epoch == library.generation, selected == selectedID, listening?.id == sessionID else { return }
+            let items = await queuePreparation.prepare(snapshot: source, playlist: playlist.id,
+                mode: requestedMode == 0 ? .normal : .smart, excludeWatched: requestedExclusion)
+            guard let items, epoch == library.generation, selected == selectedID, listening?.id == sessionID,
+                  mode == requestedMode, excludeWatched == requestedExclusion else { return }
+            beginSession(items: items, playlist: playlist, index: 0, autoplay: true)
+        }
+    }
+    private var shuffleButtonTitle: String {
+        if queuePreparation.busy { return "Shuffling…" }
+        return listening == nil ? "Shuffle & listen" : "Reshuffle queue"
     }
     private func beginSession(items: [LibraryOccurrence], playlist: LibraryPlaylist, index: Int, autoplay: Bool) {
         guard !items.isEmpty else { library.message = "No tracks match this filter. Try turning Skip watched off."; return }

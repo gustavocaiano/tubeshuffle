@@ -109,6 +109,13 @@ final class AccountSessionCoordinator {
     private var uncertainMutations: [String: Set<UUID>] = [:]
     private(set) var state: AccountState = .signedOut
 
+    // A failed API read does not invalidate the authenticated session. Keep
+    // availability separate from the last operation's presentation state.
+    var hasUsableSession: Bool {
+        guard !authenticationBlocked, let session else { return false }
+        return valid(session)
+    }
+
     var hasUncertainMutations: Bool {
         guard let accountID = session?.accountID else { return false }
         // A dispatched mutation is unresolved even before cancellation's
@@ -545,7 +552,7 @@ final class NativeSupabaseAccountAuthentication: AccountAuthenticationService {
         if let client, redirect == nil { return client }
         let value = AuthClient(configuration: .init(url: configuration.authURL, headers: ["apikey": configuration.publishableKey],
             flowType: .pkce, redirectToURL: redirect ?? configuration.redirect, storageKey: NativeCredentialStorage.sessionKey,
-            localStorage: storage, logger: nil, fetch: fetch, autoRefreshToken: false))
+            localStorage: storage, logger: nil, fetch: OneShotPKCEExchange.withoutRetries(fetch), autoRefreshToken: false))
         client = value
         return value
     }

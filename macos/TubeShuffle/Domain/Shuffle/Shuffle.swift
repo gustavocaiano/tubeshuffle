@@ -42,6 +42,8 @@ enum ShuffleV1 {
         return String(String.UnicodeScalarView(scalars)).lowercased()
     }
 
+    private static let normalizedRules = rules.map { ($0.0, $0.1.map(normalize)) }
+
     private static let ecmaWhitespace = CharacterSet(charactersIn: "\u{0009}\u{000A}\u{000B}\u{000C}\u{000D}\u{0020}\u{00A0}\u{1680}\u{2000}\u{2001}\u{2002}\u{2003}\u{2004}\u{2005}\u{2006}\u{2007}\u{2008}\u{2009}\u{200A}\u{2028}\u{2029}\u{202F}\u{205F}\u{3000}\u{FEFF}")
 
     static func classify(_ input: EnergyTrackInput) -> TrackEnergyProfile {
@@ -53,12 +55,12 @@ enum ShuffleV1 {
         ]
         for (name, value, weight) in fields where !value.isEmpty {
             let normalized = normalize(value)
-            for (bucket, terms) in rules {
+            for (bucket, terms) in normalizedRules {
                 // NSString range search is literal UTF-16, unlike Swift's
                 // canonically equivalent String comparisons.
-                if let term = terms.first(where: { (normalized as NSString).range(of: normalize($0), options: .literal).location != NSNotFound }) {
+                if let term = terms.first(where: { (normalized as NSString).range(of: $0, options: .literal).location != NSNotFound }) {
                     scores[bucket, default: 0] += weight
-                    signals.append("\(name):\(bucket.rawValue):\(normalize(term))")
+                    signals.append("\(name):\(bucket.rawValue):\(term)")
                 }
             }
         }
@@ -132,27 +134,29 @@ enum ShuffleV1 {
             if next < 0 || next > 4 { direction = -direction; continue }
             current = next; cycle.append(current)
         }
+        // ArraySlice removes a consumed head without shifting the bucket.
+        var remaining = queues.mapValues { ArraySlice($0) }
         let group = tracks.count >= 24 ? 3 : tracks.count >= 10 ? 2 : 1
         var result: [Int] = []
         for position in tracks.indices {
             let desired = ladder[cycle[(position / group) % cycle.count]]
             var selected: EnergyBucket? = nil
-            if !queues[desired]!.isEmpty { selected = desired }
-            else if (desired == .steady || desired == .chill) && !queues[.unknown]!.isEmpty { selected = .unknown }
+            if !remaining[desired]!.isEmpty { selected = desired }
+            else if (desired == .steady || desired == .chill) && !remaining[.unknown]!.isEmpty { selected = .unknown }
             else {
                 let desiredIndex = ladder.firstIndex(of: desired)!
                 var distance = Int.max, count = -1
-                for (index, bucket) in ladder.enumerated() where !queues[bucket]!.isEmpty {
-                    let d = abs(index - desiredIndex), n = queues[bucket]!.count
+                for (index, bucket) in ladder.enumerated() where !remaining[bucket]!.isEmpty {
+                    let d = abs(index - desiredIndex), n = remaining[bucket]!.count
                     if d < distance || (d == distance && n > count) {
                         selected = bucket; distance = d; count = n
                     }
                 }
-                if selected == nil && !queues[.unknown]!.isEmpty { selected = .unknown }
+                if selected == nil && !remaining[.unknown]!.isEmpty { selected = .unknown }
             }
-            if let bucket = selected { result.append(queues[bucket]!.removeFirst()) }
+            if let bucket = selected { result.append(remaining[bucket]!.removeFirst()) }
         }
-        for bucket in queuesOrder { result.append(contentsOf: queues[bucket]!) }
+        for bucket in queuesOrder { result.append(contentsOf: remaining[bucket]!) }
         return result
     }
 }
