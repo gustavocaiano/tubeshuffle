@@ -26,7 +26,7 @@ def sha256(path: Path) -> str:
 
 
 def source_hashes() -> dict[str, str]:
-    suffixes = {".swift", ".plist", ".entitlements", ".pbxproj", ".resolved", ".jpg", ".icns", ".mjs", ".py", ".sh"}
+    suffixes = {".swift", ".plist", ".entitlements", ".pbxproj", ".resolved", ".jpg", ".json", ".icns", ".mjs", ".py", ".sh"}
     sources = sorted(p for p in MACOS.rglob("*")
                      if p.is_file() and p.suffix in suffixes and "__pycache__" not in p.parts)
     sources.append(ROOT / "public/favicon.svg")
@@ -64,6 +64,12 @@ def main() -> None:
     assert info["CFBundleIdentifier"] == "com.tubeshuffle.playbacklab"
     assert info["CFBundleIconFile"] == "AppIcon"
     assert sha256(app / "Contents/Resources/AppIcon.icns") == sha256(MACOS / "TubeShuffle/Resources/AppIcon.icns")
+    setup = app / "Contents/Resources/TubeShuffle-account-setup.json"
+    assert sha256(setup) == sha256(MACOS / "TubeShuffle/Resources/TubeShuffle-account-setup.json")
+    public_setup = json.loads(setup.read_text())
+    assert set(public_setup) == {"format", "version", "supabaseOrigin", "publishableKey", "applicationAPIOrigin"}
+    assert public_setup["format"] == "tubeshuffle-account-setup" and public_setup["version"] == 1
+    assert public_setup["publishableKey"].startswith("sb_publishable_")
     assert info["CFBundleURLTypes"][0]["CFBundleURLSchemes"] == ["com.tubeshuffle.playbacklab"]
     entitlement_result = subprocess.run(["codesign", "-d", "--entitlements", ":-", str(app)], capture_output=True, check=True)
     entitlements = plistlib.loads(entitlement_result.stdout)
@@ -92,10 +98,12 @@ def main() -> None:
         "Requires macOS 14 or later. Keep this folder together.\n"
         "Open Demo.command: in-memory examples, fresh preferences, account disabled.\n"
         "Open TubeShuffle.command: ordinary app; no automatic library or account login.\n"
-        "Library files creates/opens local libraries and exports/imports JSON.\n"
+        "Library contains playlists, create/open, JSON transfer and account options.\n"
         "Use only a new disposable library until the transfer/reopen check is accepted.\n"
-        "Account > Load setup JSON explicitly loads public configuration for review.\n"
-        "Use this configuration and Google sign-in are separate actions.\n\n"
+        "Library > Import YouTube playlist (Cmd+L): paste a playlist link, choose a local library,\n"
+        "then Connect > Use TubeShuffle > Sign in with Google. Import saves tracks locally.\n"
+        "Use TubeShuffle selects the bundled public service configuration; it does not sign in.\n"
+        "Advanced settings also supports explicit public setup JSON loading and manual entry.\n\n"
         "The browser remains available. Its IndexedDB and this app's SwiftData library\n"
         "are separate; there is no automatic content, queue or history synchronization.\n"
         "JSON transfer copies supported records into a fresh empty native library.\n"

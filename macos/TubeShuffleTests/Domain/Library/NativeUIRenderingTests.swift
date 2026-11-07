@@ -6,6 +6,61 @@ import XCTest
 
 @MainActor
 final class NativeUIRenderingTests: XCTestCase {
+    func testPlaylistImportAndAccountSheetsFitTheMinimumWindow() async throws {
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent("tubeshuffle-import-render-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: false)
+        let directory = output.appendingPathComponent("Disposable library", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        let local = try NativeLibraryModel(store: NativeLocalLibraryStore.createNew(at: directory), at: directory)
+        defer { local.closeLibrary() }
+        let empty = NativeLibraryModel()
+        let account = NativeAccountModel()
+        let configured = NativeAccountModel()
+        let anchor = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
+        anchor.isReleasedWhenClosed = false
+        defer { anchor.close() }
+        configured.attach(anchor)
+        XCTAssertTrue(configured.loadTubeShuffleSetup())
+        configured.configure()
+        XCTAssertTrue(configured.configured)
+        XCTAssertEqual(configured.state, .signedOut)
+        func importer(_ library: NativeLibraryModel, input: String = "", fixture: Bool = false) -> AnyView {
+            AnyView(NativePlaylistImportView(library: library, account: account, input: .constant(input), fixtureMode: fixture, width: 448,
+                createLibrary: {}, openLibrary: {}, connectAccount: {}, openApp: {}, cancel: {}, imported: { _ in }))
+        }
+        local.message = "The playlist API is unavailable. Check your account, access, quota or connection; no local playlist was changed."
+        let cases: [(String, AnyView)] = [
+            ("fixture", importer(empty, fixture: true)),
+            ("choose-library", importer(empty, input: "https://youtube.com/watch?v=ScMzIvxBSi4")),
+            ("local-account-and-error", importer(local, input: "https://www.youtube.com/playlist?list=PLSyntheticImport0001")),
+            ("account-setup", AnyView(NativeAccountView(account: account, localPlaylist: nil, demo: false, width: 448))),
+            ("account-sign-in", AnyView(NativeAccountView(account: configured, localPlaylist: nil, demo: false, width: 448)))
+        ]
+        var measurements: [[String: Any]] = []
+        for (name, root) in cases {
+            let host = NSHostingView(rootView: root.preferredColorScheme(.dark))
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 448, height: 620), styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = host
+            window.orderBack(nil)
+            try await Task.sleep(nanoseconds: 150_000_000)
+            host.layoutSubtreeIfNeeded()
+            let size = host.fittingSize
+            XCTAssertEqual(size.width, 448, accuracy: 1, name)
+            XCTAssertGreaterThan(size.height, 100, name)
+            XCTAssertLessThanOrEqual(size.height, 620, "\(name): sheet exceeds the 480 × 680 window")
+            window.setContentSize(size)
+            host.layoutSubtreeIfNeeded()
+            let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: output.appendingPathComponent(name + ".png"))
+            measurements.append(["case": name, "width": size.width, "height": size.height, "liveAccountOrNetwork": false])
+            window.close()
+        }
+        try JSONSerialization.data(withJSONObject: measurements, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("measurements.json"))
+        print("NATIVE_IMPORT_CAPTURE_DIR=\(output.path)")
+    }
+
     func testRealNativeLayoutAndArtworkAtDesktopAndCompactSizes() async throws {
         let output = FileManager.default.temporaryDirectory.appendingPathComponent("tubeshuffle-ui-render-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: false)

@@ -1,0 +1,60 @@
+{
+  "date": "2026-11-07",
+  "head": "0b72b84d5c42a13661d332260d214f1fdf89be50",
+  "workingTreeChanged": true,
+  "tests": {
+    "executed": 249,
+    "passed": 247,
+    "skipped": 2,
+    "failures": 0,
+    "skippedCases": [
+      "Test Case '-[TubeShuffleTests.CooperativeFileLockTests testProcessDeathReleasesLock]' skipped (0.001 seconds).",
+      "Test Case '-[TubeShuffleTests.LocalLibraryStoreTests testSuccessfulExistingStoreReopenRequiresSeparateProcess]' skipped (0.001 seconds)."
+    ],
+    "log": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-3qmmbdsx/tests.log"
+  },
+  "releaseBuild": "passed",
+  "adHocSignature": "verified",
+  "archiveSHA256": "a3e87a8de6954a27af7c10c9706a4e7ee1ba3d57fbd96aab8f59948bd0460ad7",
+  "zipIntegrity": "passed",
+  "sourceFiles": 89,
+  "sourcesMatchCandidate": true,
+  "publicSetupSHA256": "ac6813b24393c3628fe0134715dc03d7302aef439f115d8b71ae625788c2c472",
+  "publicSetupFieldsOnly": true,
+  "app": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-3qmmbdsx/TubeShuffle Local/TubeShuffle.app",
+  "archive": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-3qmmbdsx/TubeShuffle-local-arm64.zip",
+  "limits": [
+    "Synthetic API and disposable libraries only",
+    "No live sign-in, Keychain acceptance, authenticated API or real YouTube playlist fetch",
+    "No real library or browser profile",
+    "No production mutation, deployment or release approval",
+    "Playback, GUI transfer/reopen and YouTube policy gates are unchanged"
+  ],
+  "uiReview": {
+    "model": "gpt-6.1-sol",
+    "score": 9.0,
+    "blockingFindings": 0,
+    "link": "<t3-thread://v2/c2e84c2f-f2f2-42ee-9402-8705163d5eea/thread:delegated-task:command%3Amcp%3A576850ec-e151-415f-a9a3-5f65ba6b9aa6%3Adelegate-task%3Anative-playlist-import-ui-review-20261107-pass1>",
+    "scope": "Import/UI source and static captures; not live OAuth, audio or release approval"
+  },
+  "packagedGUISmoke": {
+    "date": "2026-11-07",
+    "app": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-3qmmbdsx/TubeShuffle Local/TubeShuffle.app",
+    "pid": 53402,
+    "endState": "Ordinary app open at empty import sheet, public configuration selected, no local library, no sign-in",
+    "passed": [
+      "Navigation and Library entry to importer",
+      "Typed link retained across cancellation/reopening and Library sheet",
+      "Missing-library gates disable Connect and Import",
+      "Explicit bundled public setup exposes separate Google sign-in"
+    ],
+    "notTested": [
+      "File-panel library selection and return",
+      "Account-sheet return within import (requires local library)",
+      "Google/PKCE and live API import",
+      "Physical Cmd+L",
+      "Audio or transfer/reopen"
+    ],
+    "helperLimitation": "Initial duplicate-label ambiguity corrected by scoping presses to active AXSheet; no app change."
+  }
+}

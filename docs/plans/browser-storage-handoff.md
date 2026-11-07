@@ -2,6 +2,10 @@
 
 Documento de continuação com checkpoints históricos. O estado atual abaixo prevalece sobre instruções antigas de investigação sem wiring.
 
+## Verificação após merge — 2026-11-06
+
+O owner integrou o PR #10 e o deployment de produção está READY no merge `2bc341c`, com árvore idêntica ao checkout `0b72b84`. A proteção integrada de armazenamento já faz parte do código publicado. Homepage/dashboard responderam 200 e a API de links respondeu 401 sem sessão; as cinco variáveis de conta estão presentes no deployment. Isto não é um teste de biblioteca/perfil real, IndexedDB de produção ou login. O agente fez apenas leituras e verificações locais; não fez deploy nem migração. O ensaio GUI nativo abriu/cancelou a exportação, sem guardar, porque a navegação por teclas sintéticas não foi observada. Transferência GUI, áudio e conta real continuam por validar. [Evidência e passagem ao owner](../evidence/native-acceptance-2026-11-06/README.md).
+
 ## Continuação integrada — 2026-11-05
 
 O checkout começou limpo em `e168bd5`, branch `t3/native-macos-app`. A pasta `.slim/deepwork/browser-storage-provisioning/` não existe neste worktree; as suas pesquisas/revisões não foram assumidas como verificadas. A divergência do alvo foi resolvida com **substituição virtual apenas do módulo-folha**, guards por realm e gates de build.

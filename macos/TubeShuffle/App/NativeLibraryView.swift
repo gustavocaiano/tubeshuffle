@@ -42,6 +42,96 @@ private enum NativeUIEnvironment {
 }
 
 @MainActor
+struct NativePlaylistImportView: View {
+    @ObservedObject var library: NativeLibraryModel
+    @ObservedObject var account: NativeAccountModel
+    @Binding var input: String
+    let fixtureMode: Bool
+    let width: CGFloat
+    let createLibrary: () -> Void
+    let openLibrary: () -> Void
+    let connectAccount: () -> Void
+    let openApp: () -> Void
+    let cancel: () -> Void
+    let imported: (PlaylistID) -> Void
+    @FocusState private var inputFocused: Bool
+
+    private var hasLocalLibrary: Bool { library.isOpen && !library.isDemo }
+    private var validLink: Bool { NativeLibraryModel.playlistID(input) != nil }
+    private var canImport: Bool { !fixtureMode && hasLocalLibrary && validLink && account.canFetchPlaylists && !library.busy }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack {
+                Image(systemName: "link").font(.title2)
+                Text("Import YouTube playlist").font(.system(size: 23, weight: .bold)).tracking(-0.5)
+            }
+            if fixtureMode {
+                Text("This demo uses sample tracks and keeps account access off. Open TubeShuffle to import your own playlists.")
+                    .foregroundStyle(NativeUIStyle.secondary)
+                Button("Open TubeShuffle", action: openApp).buttonStyle(NativeActionStyle(prominent: true))
+                    .accessibilityIdentifier("import.openApp")
+            } else {
+                Text("Paste a public playlist link. Its tracks are saved on this Mac.").foregroundStyle(NativeUIStyle.secondary)
+                TextField("https://www.youtube.com/playlist?list=…", text: $input)
+                    .textFieldStyle(.roundedBorder).focused($inputFocused)
+                    .accessibilityLabel("YouTube playlist link").accessibilityIdentifier("import.playlistURL")
+                    .disabled(library.busy).onSubmit(importPlaylist)
+                if !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !validLink {
+                    Label("Use a playlist link with list=, or a playlist ID. Single-video and channel links are not supported.", systemImage: "exclamationmark.circle")
+                        .font(.callout).foregroundStyle(.yellow).fixedSize(horizontal: false, vertical: true)
+                }
+                if !hasLocalLibrary {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Choose a local library", systemImage: "folder").font(.headline)
+                        Text("Create a library for these tracks, or open one you already use.").font(.callout).foregroundStyle(NativeUIStyle.secondary)
+                        HStack(spacing: 10) {
+                            Button("Create library…", action: createLibrary).buttonStyle(NativeActionStyle())
+                            Button("Open library…", action: openLibrary).buttonStyle(NativeActionStyle())
+                        }
+                    }.padding(14).modifier(NativeCard(radius: 16))
+                } else {
+                    Label("Save to: \(library.location)", systemImage: "folder").font(.callout).lineLimit(2)
+                }
+                if account.state != .signedIn {
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Connect your account").font(.headline)
+                            Text("Sign in to TubeShuffle to load the playlist from YouTube.").font(.callout).foregroundStyle(NativeUIStyle.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        Button("Connect", action: connectAccount).buttonStyle(NativeActionStyle())
+                            .disabled(!hasLocalLibrary || account.busy).accessibilityIdentifier("import.connect")
+                    }.padding(14).modifier(NativeCard(radius: 16))
+                }
+                if library.busy { ProgressView("Importing playlist…").controlSize(.small) }
+                if let message = library.message {
+                    Text(message).font(.callout).foregroundStyle(NativeUIStyle.secondary)
+                        .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("import.message")
+                }
+                Text("Saving the link to your account is optional and separate. Existing playlists and history are kept.")
+                    .font(.caption).foregroundStyle(NativeUIStyle.secondary)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel", action: cancel).buttonStyle(NativeActionStyle()).keyboardShortcut(.cancelAction).disabled(library.busy)
+                if !fixtureMode {
+                    Button("Import playlist", action: importPlaylist).buttonStyle(NativeActionStyle(prominent: true))
+                        .disabled(!canImport).accessibilityIdentifier("import.submit")
+                }
+            }
+        }.padding(24).frame(width: width).background(NativeUIStyle.background).foregroundStyle(.white)
+            .interactiveDismissDisabled(library.busy)
+            .onAppear { inputFocused = !fixtureMode }
+    }
+
+    private func importPlaylist() {
+        guard canImport else { return }
+        Task { if let id = await library.importPlaylist(input, account: account) { imported(id) } }
+    }
+}
+
+@MainActor
 struct NativeLibraryView: View {
     @StateObject private var library: NativeLibraryModel
     @StateObject private var account = NativeAccountModel()
@@ -50,6 +140,9 @@ struct NativeLibraryView: View {
     @State private var showingAccount = false
     @State private var showingLibrary = false
     @State private var showingImport = false
+    @State private var libraryNextAction: LibraryAction?
+    @State private var importAfterAccount = false
+    @State private var importNextStep: ImportNextStep?
     @State private var showingShortcuts = false
     @State private var playlistInput = ""
     @State private var suggestions: [SuggestedVideoDTO] = []
@@ -63,6 +156,8 @@ struct NativeLibraryView: View {
     @AppStorage private var zoom: Double
     @State private var windowWidth: CGFloat = 1280
     private var observeBounds: (([String: CGRect]) -> Void)?
+    private enum ImportNextStep { case createLibrary, openLibrary, account, ordinaryApp }
+    private enum LibraryAction { case importPlaylist, createLibrary, openLibrary, importJSON, exportJSON, closeLibrary, account }
 
     init(library: NativeLibraryModel? = nil, preferences: UserDefaults? = nil, session: NativeListeningSession? = nil,
          stage: Bool = false, observeBounds: (([String: CGRect]) -> Void)? = nil) {
@@ -103,7 +198,7 @@ struct NativeLibraryView: View {
                                 shufflePanel(playlist, scroll: scroll).frame(width: metrics.playerWidth).id("shuffle")
                                 suggestionsPanel
                             }
-                        } else { welcome(narrow: metrics.narrow) }
+                        } else { welcome }
                         if let message = library.message { notice(message) }
                         if library.busy { ProgressView("Working with your library…").tint(.white) }
                         if !stage {
@@ -136,9 +231,11 @@ struct NativeLibraryView: View {
         .background(NativeWindowAttachment { account.attach($0); library.attach($0) })
         .background(NativeZoomKeyboard(zoom: $zoom))
         .focusedSceneValue(\.nativeInterfaceZoom, zoomBinding)
-        .sheet(isPresented: $showingAccount) { NativeAccountView(account: account, localPlaylist: playlist, demo: library.isDemo || NativeUIEnvironment.isFixture, width: sheetWidth(650)) }
-        .sheet(isPresented: $showingLibrary) { libraryBrowser }
-        .sheet(isPresented: $showingImport) { playlistImport }
+        .sheet(isPresented: $showingAccount, onDismiss: {
+            if importAfterAccount { importAfterAccount = false; showingImport = true }
+        }) { NativeAccountView(account: account, localPlaylist: playlist, demo: library.isDemo || NativeUIEnvironment.isFixture, width: sheetWidth(650)) }
+        .sheet(isPresented: $showingLibrary, onDismiss: continueLibraryAction) { libraryBrowser }
+        .sheet(isPresented: $showingImport, onDismiss: continuePlaylistImport) { playlistImport }
         .sheet(isPresented: $showingShortcuts) { shortcuts }
         .sheet(isPresented: Binding(get: { library.pendingImport != nil }, set: { if !$0 { library.pendingImport = nil } })) { transferPreview }
         .onChange(of: selected) { suggestions = []; suggestionsMessage = nil }
@@ -150,35 +247,37 @@ struct NativeLibraryView: View {
 
     private func navigationBar(_ metrics: NativePlayerLayout) -> some View {
         HStack(spacing: 12) {
-            Button { showingLibrary = true } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "shuffle").font(.system(size: 15, weight: .semibold)).frame(width: 30, height: 30)
-                        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
-                    Text("TubeShuffle").font(.system(size: 15, weight: .bold))
-                }
-            }.buttonStyle(.plain).help("Open your library")
+            HStack(spacing: 8) {
+                Image(systemName: "shuffle").font(.system(size: 15, weight: .semibold)).frame(width: 30, height: 30)
+                    .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
+                Text("TubeShuffle").font(.system(size: 15, weight: .bold))
+            }
             Spacer(minLength: 8)
-            Button { showingLibrary = true } label: { navigationLabel("Library", symbol: "square.grid.2x2", narrow: metrics.narrow) }.buttonStyle(.plain).font(.system(size: 12)).help("Library")
             Menu {
-                Button("New library…") { stopPlayback(); library.createLibrary(); selectFirst() }.keyboardShortcut("n", modifiers: .command)
-                Button("Open library…") { stopPlayback(); library.openLibrary(); selectFirst() }.keyboardShortcut("o", modifiers: .command)
-                Button("Try demo library") { stopPlayback(); library.openDemo(); selectFirst() }
+                Button("Your playlists…") { showingLibrary = true }
                 Divider()
-                Button("Import JSON…") { library.previewImport() }.disabled(!library.isOpen).keyboardShortcut("i", modifiers: [.command, .shift])
-                Button("Export library…") { library.exportLibrary() }.disabled(!library.isOpen).keyboardShortcut("e", modifiers: [.command, .shift])
-                if library.isOpen { Divider(); Button("Close library") { stopPlayback(); library.closeLibrary(); selected = nil } }
-            } label: { navigationLabel("Library files", symbol: "folder", narrow: metrics.narrow) }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("Create, open, import or export a local library").disabled(library.busy)
-            Button { showingAccount = true } label: { navigationLabel("Account", symbol: "person.crop.circle", narrow: metrics.narrow) }
-                .buttonStyle(.plain).font(.system(size: 12)).help("Account").disabled(NativeUIEnvironment.isFixture)
+                libraryActions
+            } label: { Label("Library", systemImage: "square.grid.2x2").frame(minHeight: 36) }
+                .menuStyle(.borderlessButton).fixedSize().font(.system(size: 13, weight: .medium))
+                .accessibilityIdentifier("library.menu").help("Playlists, import, library files and account")
+                .nativeBounds("libraryAction")
         }.foregroundStyle(.white.opacity(0.80)).padding(.horizontal, metrics.narrow ? 12 : 28).frame(height: metrics.navigationHeight)
             .background(.black.opacity(0.45)).overlay(alignment: .bottom) { Rectangle().fill(.white.opacity(0.07)).frame(height: 1) }
             .nativeBounds("navigation")
     }
 
-    private func navigationLabel(_ title: String, symbol: String, narrow: Bool) -> some View {
-        HStack(spacing: 6) { Image(systemName: symbol); if !narrow { Text(title) } }
-            .frame(minWidth: narrow ? 30 : nil, minHeight: 32).accessibilityLabel(title)
+    @ViewBuilder private var libraryActions: some View {
+        Group {
+            Button("Import YouTube playlist…", action: presentPlaylistImport).keyboardShortcut("l", modifiers: .command)
+            Button("New library…") { performLibraryAction(.createLibrary) }.keyboardShortcut("n", modifiers: .command)
+            Button("Open library…") { performLibraryAction(.openLibrary) }.keyboardShortcut("o", modifiers: .command)
+            Divider()
+            Button("Import JSON…") { performLibraryAction(.importJSON) }.disabled(!library.isOpen).keyboardShortcut("i", modifiers: [.command, .shift])
+            Button("Export library…") { performLibraryAction(.exportJSON) }.disabled(!library.isOpen).keyboardShortcut("e", modifiers: [.command, .shift])
+            if library.isOpen { Button("Close library") { performLibraryAction(.closeLibrary) } }
+            Divider()
+            Button("Account…") { performLibraryAction(.account) }.disabled(NativeUIEnvironment.isFixture)
+        }.disabled(library.busy)
     }
 
     private func playlistHeading(_ playlist: LibraryPlaylist, metrics: NativePlayerLayout, scroll: ScrollViewProxy) -> some View {
@@ -201,11 +300,11 @@ struct NativeLibraryView: View {
             HStack(spacing: 8) {
                 if !metrics.horizontal {
                     Button { scroll.scrollTo("queue", anchor: .top) } label: { Label("Queue", systemImage: "list.bullet") }.buttonStyle(NativeActionStyle())
-            }
-            Button { scroll.scrollTo("shuffle", anchor: .bottom) } label: { Label("Shuffle", systemImage: "shuffle") }.buttonStyle(NativeActionStyle())
-            if library.savedQueue != nil, listening == nil {
-                Button("Resume queue", action: resumeQueue).buttonStyle(NativeActionStyle())
-            }
+                }
+                Button { scroll.scrollTo("shuffle", anchor: .bottom) } label: { Label("Shuffle", systemImage: "shuffle") }.buttonStyle(NativeActionStyle())
+                if library.savedQueue != nil, listening == nil {
+                    Button("Resume queue", action: resumeQueue).buttonStyle(NativeActionStyle())
+                }
             }
         }.frame(height: metrics.headingHeight).nativeBounds("heading")
     }
@@ -314,30 +413,32 @@ struct NativeLibraryView: View {
         }.padding(22).modifier(NativeCard())
     }
 
-    private func welcome(narrow: Bool) -> some View {
+    private var welcome: some View {
         VStack(alignment: .leading, spacing: 24) {
             Text(library.isOpen ? "Your library, ready for a new mix." : "Your music. A different order.").font(.system(size: 34, weight: .bold)).tracking(-1)
-            Text("Bring in a playlist, shuffle it your way, and let the next track surprise you.").font(.system(size: 15)).foregroundStyle(NativeUIStyle.secondary)
-            let actions = narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))
-            actions {
-                if library.isOpen {
-                    Button("Add playlist") { showingImport = true }.buttonStyle(NativeActionStyle(prominent: true)).disabled(library.isDemo)
-                    Button("Import JSON…") { library.previewImport() }.buttonStyle(NativeActionStyle())
-                } else {
-                    Button("Create library…") { library.createLibrary(); selectFirst() }.buttonStyle(NativeActionStyle(prominent: true))
-                    Button("Open library…") { library.openLibrary(); selectFirst() }.buttonStyle(NativeActionStyle())
-                    Button("Try the demo") { library.openDemo(); selectFirst() }.buttonStyle(NativeActionStyle())
-                }
-            }
-            Text("Playlist content, your queue and listening history stay on this Mac.").font(.system(size: 12)).foregroundStyle(NativeUIStyle.secondary)
+            Text("Open Library to add your playlists and start listening.").font(.system(size: 15)).foregroundStyle(NativeUIStyle.secondary)
+            Button("Open Library") { showingLibrary = true }.buttonStyle(NativeActionStyle(prominent: true))
         }.frame(maxWidth: .infinity, alignment: .leading).padding(32).padding(.vertical, 50).modifier(NativeCard())
+    }
+
+    private var librarySubtitle: String {
+        if library.isDemo { return "Demo · six public playback examples" }
+        if library.isOpen { return library.location }
+        return "Your playlists, saved on this Mac."
     }
 
     private var libraryBrowser: some View {
         VStack(alignment: .leading, spacing: 20) {
-            HStack { Text("Your library").font(.system(size: 26, weight: .bold)); Spacer(); Button("Done") { showingLibrary = false }.buttonStyle(NativeActionStyle()) }
-            Text(library.isDemo ? "Demo · six public playback examples" : "Local playlists. Cloud links are managed separately in Account.").font(.system(size: 12)).foregroundStyle(NativeUIStyle.secondary)
+            HStack { Text("Library").font(.system(size: 26, weight: .bold)); Spacer(); Button("Done") { showingLibrary = false }.buttonStyle(NativeActionStyle()) }
+            Text(librarySubtitle).font(.system(size: 12)).foregroundStyle(NativeUIStyle.secondary)
             ScrollView {
+                if library.snapshot.playlists.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "music.note.list").font(.system(size: 30)).foregroundStyle(NativeUIStyle.secondary)
+                        Text("No playlists yet").font(.system(size: 18, weight: .semibold))
+                        Text("Import a YouTube playlist to start your library.").font(.callout).foregroundStyle(NativeUIStyle.secondary)
+                    }.frame(maxWidth: .infinity).padding(.vertical, 56)
+                }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 230))], spacing: 16) {
                     ForEach(library.snapshot.playlists, id: \.id) { item in
                         let tracks = library.snapshot.occurrences.filter { $0.playlistId == item.id }
@@ -354,13 +455,11 @@ struct NativeLibraryView: View {
                     }
                 }
             }.frame(minHeight: 220, maxHeight: 380)
-            let actions = windowWidth < 650 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10)) : AnyLayout(HStackLayout(spacing: 10))
-            actions {
-                Button("New library…") { showingLibrary = false; stopPlayback(); library.createLibrary(); selectFirst() }.buttonStyle(NativeActionStyle())
-                Button("Open library…") { showingLibrary = false; stopPlayback(); library.openLibrary(); selectFirst() }.buttonStyle(NativeActionStyle())
-                if library.isOpen {
-                    Button("Add playlist") { showingLibrary = false; showingImport = true }.buttonStyle(NativeActionStyle(prominent: true)).disabled(library.isDemo)
-                }
+            HStack(spacing: 12) {
+                Button("Import YouTube playlist", action: presentPlaylistImport).buttonStyle(NativeActionStyle(prominent: true))
+                    .accessibilityIdentifier("library.importYouTube").disabled(library.busy)
+                Spacer(minLength: 0)
+                Menu("Options") { libraryActions }.menuStyle(.borderlessButton).fixedSize()
             }
         }.padding(28).frame(width: sheetWidth(640)).background(NativeUIStyle.background).foregroundStyle(.white)
     }
@@ -368,7 +467,7 @@ struct NativeLibraryView: View {
     private var shortcuts: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Shortcuts & media keys").font(.title2.bold())
-            ForEach([("Play / pause", "⌘⌥P"), ("Previous / next", "⌘⌥← / →"), ("Zoom in / out", "⌘+ / ⌘−"), ("Actual size", "⌘0"), ("Leave Stage", "Esc"), ("New / open library", "⌘N / ⌘O"), ("Import / export JSON", "⌘⇧I / ⌘⇧E")], id: \.0) { label, keys in
+            ForEach([("Play / pause", "⌘⌥P"), ("Previous / next", "⌘⌥← / →"), ("Zoom in / out", "⌘+ / ⌘−"), ("Actual size", "⌘0"), ("Leave Stage", "Esc"), ("Import YouTube playlist", "⌘L"), ("New / open library", "⌘N / ⌘O"), ("Import / export JSON", "⌘⇧I / ⌘⇧E")], id: \.0) { label, keys in
                 HStack { Text(label); Spacer(); Text(keys).foregroundStyle(NativeUIStyle.secondary).monospaced() }
             }
             Text("System media keys use the same player controls. Playback must be ready first.").font(.caption).foregroundStyle(NativeUIStyle.secondary)
@@ -386,13 +485,69 @@ struct NativeLibraryView: View {
     }
 
     private var playlistImport: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Add a YouTube playlist").font(.title2.bold())
-            Text("Requires the configured account and playlist API. Content is saved locally; the cloud link is saved only when you choose that action in Account.")
-                .foregroundStyle(.secondary)
-            TextField("Public playlist URL or ID", text: $playlistInput).textFieldStyle(.roundedBorder)
-            HStack { Spacer(); Button("Cancel") { showingImport = false }; Button("Add locally") { library.importPlaylist(playlistInput, account: account); showingImport = false }.buttonStyle(.borderedProminent) }
-        }.padding(24).frame(width: sheetWidth(530))
+        NativePlaylistImportView(library: library, account: account, input: $playlistInput,
+            fixtureMode: NativeUIEnvironment.isFixture, width: sheetWidth(540),
+            createLibrary: { leaveImport(for: .createLibrary) }, openLibrary: { leaveImport(for: .openLibrary) },
+            connectAccount: { leaveImport(for: .account) }, openApp: { leaveImport(for: .ordinaryApp) },
+            cancel: { showingImport = false }, imported: { id in
+                stopPlayback(); selected = id; playlistInput = ""; showingImport = false
+            })
+    }
+
+    private func presentPlaylistImport() {
+        performLibraryAction(.importPlaylist)
+    }
+
+    private func performLibraryAction(_ action: LibraryAction) {
+        guard !library.busy else { return }
+        if showingLibrary { libraryNextAction = action; showingLibrary = false }
+        else { applyLibraryAction(action) }
+    }
+
+    private func continueLibraryAction() {
+        guard let action = libraryNextAction else { return }
+        libraryNextAction = nil
+        applyLibraryAction(action)
+    }
+
+    private func applyLibraryAction(_ action: LibraryAction) {
+        guard !library.busy else { return }
+        switch action {
+        case .importPlaylist: library.message = nil; showingImport = true
+        case .createLibrary: stopPlayback(); library.createLibrary(); selectFirst()
+        case .openLibrary: stopPlayback(); library.openLibrary(); selectFirst()
+        case .importJSON: library.previewImport()
+        case .exportJSON: library.exportLibrary()
+        case .closeLibrary: stopPlayback(); library.closeLibrary(); selected = nil
+        case .account: showingAccount = true
+        }
+    }
+
+    private func leaveImport(for step: ImportNextStep) {
+        importNextStep = step
+        showingImport = false
+    }
+
+    private func continuePlaylistImport() {
+        let step = importNextStep
+        importNextStep = nil
+        switch step {
+        case .createLibrary:
+            stopPlayback(); library.createLibrary(); selectFirst(); showingImport = true
+        case .openLibrary:
+            stopPlayback(); library.openLibrary(); selectFirst(); showingImport = true
+        case .account:
+            importAfterAccount = true; showingAccount = true
+        case .ordinaryApp:
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.createsNewApplicationInstance = true
+            configuration.arguments = []
+            Task {
+                do { _ = try await NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) }
+                catch { library.message = "The regular app could not be opened. Launch Open TubeShuffle.command from the delivery folder." }
+            }
+        case nil: break
+        }
     }
 
     @ViewBuilder private var transferPreview: some View {

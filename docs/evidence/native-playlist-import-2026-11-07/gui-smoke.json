@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-07",
+  "app": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-3qmmbdsx/TubeShuffle Local/TubeShuffle.app",
+  "pid": 53402,
+  "endState": "Ordinary app open at empty import sheet, public configuration selected, no local library, no sign-in",
+  "passed": [
+    "Navigation and Library entry to importer",
+    "Typed link retained across cancellation/reopening and Library sheet",
+    "Missing-library gates disable Connect and Import",
+    "Explicit bundled public setup exposes separate Google sign-in"
+  ],
+  "notTested": [
+    "File-panel library selection and return",
+    "Account-sheet return within import (requires local library)",
+    "Google/PKCE and live API import",
+    "Physical Cmd+L",
+    "Audio or transfer/reopen"
+  ],
+  "helperLimitation": "Initial duplicate-label ambiguity corrected by scoping presses to active AXSheet; no app change."
+}

@@ -1,0 +1,162 @@
+{
+  "recordedAtUTC": "2026-11-06T16:08:08.991261+00:00",
+  "scope": "Read-only post-merge verification; no login, library access or remote mutation.",
+  "vercel": {
+    "project": "tubeshuffle",
+    "id": "dpl_2TzTbFWPc4GXB9A7C9RNDX5iLUQA",
+    "state": "READY",
+    "target": "production",
+    "url": "tubeshuffle-3qcaf4b64-gustavocaianos-projects.vercel.app",
+    "commit": "2bc341c0cfdb5ad593df9ed9fed17be039e2d5cc",
+    "branch": "main",
+    "aliases": [
+      "tubeshuffle.vercel.app",
+      "www.tubeshuffle.online",
+      "tubeshuffle.online",
+      "tubeshuffle-gustavocaianos-projects.vercel.app",
+      "tubeshuffle-git-main-gustavocaianos-projects.vercel.app"
+    ],
+    "requiredEnvironmentKeysPresent": {
+      "NEXT_PUBLIC_SUPABASE_URL": true,
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": true,
+      "OWNER_USER_ID": true,
+      "APP_ORIGIN": true,
+      "CSRF_HMAC_SECRET": true
+    },
+    "observedEnvironmentShape": "list"
+  },
+  "anonymousHTTP": [
+    {
+      "path": "/",
+      "status": 200,
+      "finalURL": "https://www.tubeshuffle.online/",
+      "contentType": "text/html; charset=utf-8",
+      "bodySHA256": "1b77f8ed479f0e6a39bfd3e10eed125184dcd2013459f5d546bdb03adb5ff8ee"
+    },
+    {
+      "path": "/dashboard",
+      "status": 200,
+      "finalURL": "https://www.tubeshuffle.online/dashboard",
+      "contentType": "text/html; charset=utf-8",
+      "bodySHA256": "989418384b67159b594fc98329e96afbfb2184ec1aa5288b861ce4f27038545d"
+    },
+    {
+      "path": "/api/playlist-links",
+      "status": 401,
+      "finalURL": "https://www.tubeshuffle.online/api/playlist-links",
+      "contentType": "application/json",
+      "bodySHA256": "eb35625dab7f3c5e9363f4b9822f6aec83f5a0031eda7039467a224849036e10",
+      "error": "Structured response not retained"
+    }
+  ],
+  "candidateSourceCheck": {
+    "manifest": "docs/evidence/native-ui-refinement/app-icon-build-info.json",
+    "matched": 88,
+    "mismatches": [],
+    "testsRerun": false
+  },
+  "localHead": "0b72b84d5c42a13661d332260d214f1fdf89be50",
+  "localTree": "f58aeff4c7ea03c3da6bba22044805f6c0e2fa44",
+  "pullRequest": {
+    "url": "https://github.com/gustavocaiano/tubeshuffle/pull/10",
+    "state": "MERGED",
+    "head": "0b72b84d5c42a13661d332260d214f1fdf89be50",
+    "mergedAt": "2026-11-06T15:54:23Z",
+    "mergedBy": "gustavocaiano",
+    "mergeCommit": "2bc341c0cfdb5ad593df9ed9fed17be039e2d5cc",
+    "mergeTree": "f58aeff4c7ea03c3da6bba22044805f6c0e2fa44",
+    "matchesLocalTree": true,
+    "headChecks": [
+      {
+        "__typename": "StatusContext",
+        "context": "Vercel",
+        "startedAt": "2026-11-05T23:37:21Z",
+        "state": "SUCCESS",
+        "targetUrl": "https://vercel.com/gustavocaianos-projects/tubeshuffle/9FYrwt8Ebk4brt5W8uuRTtw8vVHy"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-05T23:37:22Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://vercel.com/github",
+        "name": "Vercel Preview Comments",
+        "startedAt": "2026-11-05T23:37:22Z",
+        "status": "COMPLETED",
+        "workflowName": ""
+      }
+    ],
+    "mergeStatuses": [
+      {
+        "context": "Vercel",
+        "state": "success",
+        "targetURL": "https://vercel.com/gustavocaianos-projects/tubeshuffle/2TzTbFWPc4GXB9A7C9RNDX5iLUQA"
+      }
+    ],
+    "reviewScope": "No inline findings or formal approvals were returned. The earlier automated review covers 051bb26, not the latest native changes. Sol 6.1 UI review is separately recorded."
+  },
+  "candidate": {
+    "archive": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-szvj8h5e/TubeShuffle-local-arm64.zip",
+    "archiveSHA256": "d1d55d760058285e11f15c0dcc61c616fe67f665d33016992b6fba4f96f8bbd0",
+    "archiveHashMatches": true,
+    "zipIntegrity": "passed",
+    "publicSetup": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-szvj8h5e/TubeShuffle-account-setup.json",
+    "publicSetupHashMatches": true,
+    "appCopySignature": "verified with codesign --verify --deep --strict before launch",
+    "priorNativeSuite": {
+      "executed": 243,
+      "passed": 241,
+      "skipped": 2,
+      "failures": 0,
+      "evidence": "../native-ui-refinement/app-icon.json"
+    },
+    "testsRerun": false,
+    "reason": "All 88 recorded source inputs match the tested candidate; no implementation changed."
+  },
+  "supabaseAuth": {
+    "recordedAtUTC": "2026-11-06T16:04:22.919620+00:00",
+    "method": "GET",
+    "scope": "Auth configuration only; no login, users, database queries or mutation",
+    "httpStatus": 200,
+    "siteURL": "https://www.tubeshuffle.online",
+    "nativeCallbackAllowed": true,
+    "googleEnabled": true
+  },
+  "gui": {
+    "exportPanelOpened": true,
+    "omissionNoticeObserved": "0 orphan history events; queue/preferences/suggestions/credentials/media excluded",
+    "automaticGoToFolderObserved": false,
+    "attempts": [
+      "CGEvent HID tap",
+      "CGEvent to own PID",
+      "expanded panel + own PID"
+    ],
+    "exportCancelledBeforeWrite": true,
+    "savedFiles": [],
+    "createImportReopenGUI": "not validated",
+    "reason": "Synthetic keyboard posting reported success but no Go to Folder sheet appeared. No save was attempted while destination remained Documents.",
+    "keyboardShortcutAcceptance": "not inferred from automation command success",
+    "fixtureAppLeftOpen": true,
+    "process": {
+      "pid": 31557,
+      "app": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-acceptance-qfz6tvok/rehearsal/TubeShuffle.app"
+    }
+  },
+  "ownerRehearsalDirectory": "/tmp/tubeshuffle-final-kqdl_21i",
+  "agentActions": {
+    "merged": false,
+    "pushed": false,
+    "deployed": false,
+    "remoteMutations": false,
+    "login": false,
+    "realLibraryOrProfileAccess": false,
+    "playbackStarted": false,
+    "existingInstancesPreserved": true
+  },
+  "pending": [
+    "Physical keyboard/layout and VoiceOver",
+    "Audible Focus/Video, natural advancement and minimized/Cmd+H restoration",
+    "GUI export/create/import/saved-queue/reopen",
+    "Live Google/PKCE/API/Keychain and access-control validation",
+    "YouTube policy and distribution approval"
+  ]
+}

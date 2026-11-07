@@ -26,6 +26,23 @@ private struct SyntheticAPIAccountLinkService: AccountLinkService {
 
 @MainActor
 final class AccountSessionCoordinatorTests: XCTestCase {
+    func testBundledTubeShuffleSetupRequiresExplicitLoadingAndDoesNotSignIn() async throws {
+        let model = NativeAccountModel()
+        XCTAssertEqual(model.apiURL, "")
+        XCTAssertFalse(model.configured)
+        XCTAssertFalse(model.canFetchPlaylists)
+        XCTAssertTrue(model.loadTubeShuffleSetup())
+        XCTAssertEqual(model.apiURL, "https://www.tubeshuffle.online")
+        XCTAssertEqual(model.supabaseURL, "https://rkgbxjwmnlsmguhctguf.supabase.co")
+        XCTAssertTrue(model.publishableKey.hasPrefix("sb_publishable_"))
+        XCTAssertFalse(model.configured)
+        XCTAssertEqual(model.state, .signedOut)
+        XCTAssertFalse(model.busy)
+        let result = await model.fetchPlaylist("PLSyntheticImport0001")
+        XCTAssertNil(result)
+        XCTAssertFalse(model.canFetchPlaylists)
+    }
+
     func testPublicSetupRoundTripDoesNotConfigureOrStartAccount() throws {
         let configuration = try NativeAccountConfiguration(supabaseOrigin: URL(string: "https://example.supabase.co")!,
             publishableKey: "sb_publishable_abcdefghijklmnopqrstuv", applicationAPIOrigin: URL(string: "https://example.test")!)

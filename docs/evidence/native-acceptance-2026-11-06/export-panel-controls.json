@@ -1,0 +1,137 @@
+[
+  {
+    "description": "",
+    "enabled": "",
+    "identifier": "",
+    "index": "0",
+    "role": "AXApplication",
+    "title": "TubeShuffle",
+    "value": ""
+  },
+  {
+    "description": "",
+    "enabled": "",
+    "identifier": "save-panel",
+    "index": "1",
+    "role": "AXWindow",
+    "title": "Export local library",
+    "value": ""
+  },
+  {
+    "description": "",
+    "enabled": "",
+    "identifier": "",
+    "index": "2",
+    "role": "AXSplitGroup",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "enabled": "0",
+    "identifier": "",
+    "index": "3",
+    "role": "AXSplitter",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "enabled": "1",
+    "identifier": "whereLabel",
+    "index": "4",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Where:"
+  },
+  {
+    "description": "",
+    "enabled": "1",
+    "identifier": "where popup",
+    "index": "5",
+    "role": "AXPopUpButton",
+    "title": "Where:",
+    "value": "Documents"
+  },
+  {
+    "description": "show more options",
+    "enabled": "1",
+    "identifier": "NS_OPEN_SAVE_DISCLOSURE_TRIANGLE",
+    "index": "6",
+    "role": "AXDisclosureTriangle",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "enabled": "1",
+    "identifier": "_messageTextField",
+    "index": "7",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Unencrypted JSON. 0 orphan history events omitted. Queue, preferences, suggestions, credentials and media are excluded. Choose a new filename."
+  },
+  {
+    "description": "",
+    "enabled": "1",
+    "identifier": "nameFieldLabel",
+    "index": "8",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Save As:"
+  },
+  {
+    "description": "",
+    "enabled": "1",
+    "identifier": "saveAsNameTextField",
+    "index": "9",
+    "role": "AXTextField",
+    "title": "",
+    "value": "tubeshuffle-library.json"
+  },
+  {
+    "description": "",
+    "enabled": "1",
+    "identifier": "tagsLabel",
+    "index": "10",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Tags:"
+  },
+  {
+    "description": "tag editor",
+    "enabled": "1",
+    "identifier": "_NS:8",
+    "index": "11",
+    "role": "AXTextField",
+    "title": "",
+    "value": ""
+  },
+  {
+    "description": "",
+    "enabled": "1",
+    "identifier": "CancelButton",
+    "index": "12",
+    "role": "AXButton",
+    "title": "Cancel",
+    "value": ""
+  },
+  {
+    "description": "",
+    "enabled": "1",
+    "identifier": "OKButton",
+    "index": "13",
+    "role": "AXButton",
+    "title": "Save",
+    "value": ""
+  },
+  {
+    "description": "",
+    "enabled": "1",
+    "identifier": "",
+    "index": "14",
+    "role": "AXStaticText",
+    "title": "",
+    "value": "Export local library"
+  }
+]

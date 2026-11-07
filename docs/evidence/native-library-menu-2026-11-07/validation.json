@@ -1,0 +1,56 @@
+{
+  "date": "2026-11-07",
+  "head": "0b72b84d5c42a13661d332260d214f1fdf89be50",
+  "workingTreeChanged": true,
+  "tests": {
+    "executed": 249,
+    "passed": 247,
+    "skipped": 2,
+    "failures": 0,
+    "log": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-018phs9g/tests.log"
+  },
+  "releaseBuild": "passed",
+  "adHocSignature": "verified",
+  "zipIntegrity": "passed",
+  "archiveSHA256": "b0b2a86b68d8189b433740a53243e0e488cfc313597e03d4d0ba3e5da0ccdb86",
+  "sourceFiles": 89,
+  "sourcesMatchCandidate": true,
+  "app": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-018phs9g/TubeShuffle Local/TubeShuffle.app",
+  "archive": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-018phs9g/TubeShuffle-local-arm64.zip",
+  "scope": "UI navigation simplification only; no real libraries, login, deployment or playback acceptance",
+  "uiReview": {
+    "model": "gpt-6.1-sol",
+    "score": 9.0,
+    "blockingFindings": 0,
+    "link": "<t3-thread://v2/c2e84c2f-f2f2-42ee-9402-8705163d5eea/thread:delegated-task:command%3Amcp%3Af4799630-a645-44c5-93d1-459a6a5b8a30%3Adelegate-task%3Anative-library-menu-review-20261107-pass1>",
+    "scope": "Source and captures; no exact pixel-parity or live-service claim"
+  },
+  "gui": {
+    "date": "2026-11-07",
+    "app": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-018phs9g/TubeShuffle Local/TubeShuffle.app",
+    "pid": 58501,
+    "ordinaryLaunch": true,
+    "passed": [
+      "Library is the only management entry in the top bar",
+      "No Try demo button/menu item",
+      "Library menu contains playlist/file/account actions",
+      "Grid import action opens importer after dismissal",
+      "Root Library menu opens Account",
+      "Grid Options opens Account after dismissal, with one active sheet",
+      "Resize requests accepted; actual narrow-window captures saved"
+    ],
+    "endState": "New ordinary app open, no library selected or account configured/signed in",
+    "notTested": [
+      "Physical keyboard shortcuts",
+      "OS file-panel selection or data transfer",
+      "Live account/API/audio behavior"
+    ],
+    "captures": "Only the exact new app process windows were captured; no desktop/other app capture"
+  },
+  "inlinePreview": {
+    "width": 728,
+    "contentHeight": 976,
+    "consoleMessages": [],
+    "html": "preview.html"
+  }
+}

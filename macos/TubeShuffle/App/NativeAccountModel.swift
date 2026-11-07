@@ -2,7 +2,14 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class NativeAccountModel: ObservableObject {
+protocol NativePlaylistSource: AnyObject {
+    var canFetchPlaylists: Bool { get }
+    var message: String? { get }
+    func fetchPlaylist(_ id: String) async -> YouTubePlaylistDTO?
+}
+
+@MainActor
+final class NativeAccountModel: ObservableObject, NativePlaylistSource {
     @Published var supabaseURL = ""
     @Published var publishableKey = ""
     @Published var apiURL = ""
@@ -19,6 +26,23 @@ final class NativeAccountModel: ObservableObject {
     private var suggestionsCache: [String: DailySuggestionsDTO] = [:]
     private var suggestionsOrder: [String] = []
     private var closeObserver: NSObjectProtocol?
+
+    var canFetchPlaylists: Bool { configured && state == .signedIn && !busy }
+
+    @discardableResult
+    func loadTubeShuffleSetup() -> Bool {
+        guard !configured, !busy else { return false }
+        do {
+            guard let url = Bundle.main.url(forResource: "TubeShuffle-account-setup", withExtension: "json") else {
+                throw NativeAccountSetupDocument.Failure.invalidDocument
+            }
+            try applySetup(Data(contentsOf: url))
+            return true
+        } catch {
+            message = "TubeShuffle setup could not be loaded. You can load a public setup file in Advanced settings."
+            return false
+        }
+    }
 
     func attach(_ window: NSWindow) {
         guard self.window !== window else { return }
@@ -152,7 +176,7 @@ final class NativeAccountModel: ObservableObject {
     }
 
     func fetchPlaylist(_ id: String) async -> YouTubePlaylistDTO? {
-        guard !busy, let service else { message = "Configure and sign in to use the playlist API."; return nil }
+        guard canFetchPlaylists, let service else { message = "Connect your TubeShuffle account before importing a playlist."; return nil }
         let epoch = generation
         busy = true; message = nil
         let result = await service.playlist(id: id)
@@ -192,6 +216,7 @@ struct NativeAccountView: View {
     var width: CGFloat = 650
     @Environment(\.dismiss) private var dismiss
     @State private var removing: String?
+    @State private var advanced = false
     private var actionLayout: AnyLayout {
         width < 600 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout())
     }
@@ -205,48 +230,60 @@ struct NativeAccountView: View {
                 if demo {
                     Label("Account access is disabled in the demo library.", systemImage: "person.crop.circle.badge.xmark")
                 } else if !account.configured {
-                    Button("Load setup JSON…") { account.loadSetup() }
-                    TextField("Supabase URL · https://project.supabase.co", text: $account.supabaseURL)
-                    TextField("Supabase publishable key · sb_publishable_…", text: $account.publishableKey)
-                    TextField("Application API origin · https://…", text: $account.apiURL)
-                    Text("Use the existing configured services. This app does not provision a project or change callback settings. Configuration is kept for this run; credentials use a separate Keychain namespace for each configuration.")
+                    Text("Connect your TubeShuffle account to import public YouTube playlists.")
+                    Button("Use TubeShuffle") {
+                        if account.loadTubeShuffleSetup() { account.configure() }
+                    }.buttonStyle(NativeActionStyle(prominent: true)).accessibilityIdentifier("account.useTubeShuffle")
+                    Text("Uses tubeshuffle.online. Google sign-in is a separate step; nothing is uploaded automatically.")
                         .font(.callout).foregroundStyle(.secondary)
-                    actionLayout {
-                        Button("Use this configuration") { account.configure() }
-                        Button("Save public setup…") { account.saveSetup() }
+                    DisclosureGroup("Advanced settings", isExpanded: $advanced) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Button("Load setup JSON…") { account.loadSetup() }
+                            TextField("Supabase URL · https://project.supabase.co", text: $account.supabaseURL)
+                            TextField("Supabase publishable key · sb_publishable_…", text: $account.publishableKey)
+                            TextField("Application API origin · https://…", text: $account.apiURL)
+                            Text("Choose another service or load a public setup file. Configuration is kept for this run; sign-in remains explicit.")
+                                .font(.callout).foregroundStyle(.secondary)
+                            actionLayout {
+                                Button("Use this configuration") { account.configure() }
+                                Button("Save public setup…") { account.saveSetup() }
+                            }
+                        }.padding(.top, 12)
                     }
                 } else {
                     HStack {
                         if account.busy { ProgressView().controlSize(.small); Text("Working…") }
                         else if account.state == .signedIn { Label("Signed in", systemImage: "person.crop.circle.fill") }
-                        else { Text("Session unavailable") }
+                        else { Text("Sign in to continue") }
                         Spacer()
                         Button(account.busy ? "Cancel / clear session" : "Clear local sign-in") { account.signOut() }
                             .disabled(account.state == .invalidating)
                     }
                     actionLayout {
-                        Button("Sign in with Google") { account.authenticate() }
+                        Button("Sign in with Google") { account.authenticate() }.buttonStyle(NativeActionStyle(prominent: true))
                         Button("Resume saved session") { account.authenticate(resume: true) }
                         Button("Refresh session") { account.authenticate(refresh: true) }
                     }.disabled(account.busy)
-                    Divider()
-                    actionLayout {
-                        Button("Read cloud links") { account.loadLinks() }.disabled(account.busy)
-                        if let localPlaylist {
-                            Button("Save selected playlist ID") { account.saveLink(localPlaylist.youtubeId) }
-                                .disabled(account.busy || account.uncertain || account.state != .signedIn)
+                    if account.state == .signedIn || account.uncertain {
+                        Divider()
+                        actionLayout {
+                            Button("Read cloud links") { account.loadLinks() }.disabled(account.busy)
+                            if let localPlaylist {
+                                Button("Save selected playlist ID") { account.saveLink(localPlaylist.youtubeId) }
+                                    .disabled(account.busy || account.uncertain || account.state != .signedIn)
+                            }
                         }
-                    }
-                    List(account.links, id: \.youtubePlaylistId) { link in
-                        HStack {
-                            Text(link.youtubePlaylistId).textSelection(.enabled)
-                            Spacer()
-                            Button("Remove link") { removing = link.youtubePlaylistId }.disabled(account.busy || account.uncertain)
+                        List(account.links, id: \.youtubePlaylistId) { link in
+                            HStack {
+                                Text(link.youtubePlaylistId).textSelection(.enabled)
+                                Spacer()
+                                Button("Remove link") { removing = link.youtubePlaylistId }.disabled(account.busy || account.uncertain)
+                            }
+                        }.frame(height: 140)
+                        if account.uncertain {
+                            Text("A previous cloud change has an uncertain outcome. Reading links does not undo it.")
+                            Button("I checked the links; allow another change") { account.acknowledgeUncertainty() }.disabled(account.busy)
                         }
-                    }.frame(height: 140)
-                    if account.uncertain {
-                        Text("A previous cloud change has an uncertain outcome. Reading links does not undo it.")
-                        Button("I checked the links; allow another change") { account.acknowledgeUncertainty() }.disabled(account.busy)
                     }
                 }
                 if let message = account.message { Text(message).font(.callout).foregroundStyle(.secondary).textSelection(.enabled) }
@@ -254,6 +291,8 @@ struct NativeAccountView: View {
             }
             .padding(24).frame(maxWidth: .infinity, alignment: .leading)
         }.frame(width: width, height: demo ? 260 : 590)
+        .background(NativeUIStyle.background).foregroundStyle(.white).tint(.white)
+        .buttonStyle(NativeActionStyle())
         .textFieldStyle(.roundedBorder)
         .confirmationDialog("Remove only this cloud link?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } })) {
             Button("Remove link", role: .destructive) { if let id = removing { account.saveLink(id, remove: true) }; removing = nil }

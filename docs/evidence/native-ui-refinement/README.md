@@ -1,5 +1,11 @@
 # Native UI refinements — 2026-11-05
 
+The latest local package is the [simplified Library UI candidate](../native-library-menu-2026-11-07/README.md). It moves management controls into Library and removes the Try demo entries; the evidence below remains attributed to its earlier candidate.
+
+The [November 7 playlist-import candidate](../native-playlist-import-2026-11-07/README.md) supersedes the local package below: guided YouTube link import, explicit bundled public setup, 247 passed / two skipped, and fresh Sol 6.1 UI review 9.0/10. This document retains its earlier evidence.
+
+**2026-11-06 follow-up:** these changes are now committed as `0b72b84` and merged in `2bc341c`; production and the unchanged local candidate were verified. [Current acceptance evidence and owner handoff](../native-acceptance-2026-11-06/README.md). References below to local/unpublished changes describe the original refinement checkpoint.
+
 Implemented the owner's latest UI feedback on top of `413a226`, preserving the earlier candidate and existing changes. **Local evaluation is ready; integrated acceptance and release remain open.**
 
 The owner said the interface was good overall, requested zoom/narrower windows/removal of Stop & close, then explicitly clarified: **“thumbnail só . o focus não deve ter vídeo . e a thumbnail deve ficar pequena”**. This feedback supersedes the earlier visible-video Focus design. It does not supply the missing detailed audio, keyboard or transfer results.

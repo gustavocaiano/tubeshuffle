@@ -18,6 +18,14 @@ final class NativeLibraryModel: ObservableObject {
     private weak var window: NSWindow?
     private var closeObserver: NSObjectProtocol?
 
+    init() {}
+
+    // An already-open store can be supplied without invoking a file panel.
+    // Its caller is responsible for URL access; no library is discovered here.
+    init(store: NativeLocalLibraryStore, at url: URL) throws {
+        try install(store, at: url, scoped: false)
+    }
+
     func attach(_ window: NSWindow) {
         guard self.window !== window else { return }
         if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
@@ -140,24 +148,29 @@ final class NativeLibraryModel: ObservableObject {
         }
     }
 
-    func importPlaylist(_ input: String, account: NativeAccountModel) {
-        guard isOpen, !isDemo, !busy else { return }
-        guard let id = Self.playlistID(input) else { message = "Enter a public YouTube playlist URL or ID."; return }
+    func importPlaylist(_ input: String, account: any NativePlaylistSource) async -> PlaylistID? {
+        guard isOpen, !isDemo, !busy else { return nil }
+        guard let id = Self.playlistID(input) else { message = "Paste a public YouTube playlist link containing list=, or a playlist ID."; return nil }
+        guard !snapshot.playlists.contains(where: { $0.youtubeId == id }) else {
+            message = "This playlist is already in your library. Its tracks and history have been kept."
+            return nil
+        }
+        guard account.canFetchPlaylists else { message = "Connect your TubeShuffle account before importing a playlist."; return nil }
         let epoch = generation
         busy = true; message = nil
-        Task {
-            defer { busy = false }
-            let response = await account.fetchPlaylist(id)
-            guard generation == epoch, let store else { return }
-            guard let dto = response else { message = account.message; return }
-            do {
-                let preview = try PlaylistAPIImport.make(requestedPlaylistID: id, dto: dto, importedAt: Self.timestamp())
-                guard let playlist = preview.snapshot.playlists.first else { return }
-                try store.addNewPlaylist(playlist, occurrences: preview.snapshot.occurrences)
-                snapshot = try store.snapshot()
-                message = preview.warnings.isEmpty ? "Playlist added locally. Saving its cloud link is a separate action." : "Playlist added locally, but the reported count differs from the received items. This may be a partial playlist; no missing items were invented."
-            } catch { message = "The playlist could not be added safely. Existing playlists and history were preserved. Refreshing or replacing a playlist is not supported." }
-        }
+        defer { busy = false }
+        let response = await account.fetchPlaylist(id)
+        guard generation == epoch, let store else { return nil }
+        guard let dto = response else { message = account.message ?? "The playlist could not be loaded. Check your connection and try again."; return nil }
+        do {
+            let preview = try PlaylistAPIImport.make(requestedPlaylistID: id, dto: dto, importedAt: Self.timestamp())
+            guard let playlist = preview.snapshot.playlists.first else { return nil }
+            try store.addNewPlaylist(playlist, occurrences: preview.snapshot.occurrences)
+            snapshot = try store.snapshot()
+            message = preview.warnings.isEmpty ? "Playlist added locally. Saving its cloud link is a separate action." : "Playlist added locally, but the reported count differs from the received items. This may be a partial playlist; no missing items were invented."
+            return playlist.id
+        } catch { message = "The playlist could not be added safely. Existing playlists and history were preserved. Refreshing or replacing a playlist is not supported." }
+        return nil
     }
 
     func recordNaturalCompletion(_ item: PlayerCoordinator.Item, playlist: PlaylistID, epoch: UUID) {
@@ -192,15 +205,21 @@ final class NativeLibraryModel: ObservableObject {
 
     static func playlistID(_ input: String) -> String? {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.utf8.count <= 2_048 else { return nil }
         var value = text
-        if text.contains("://") {
-            guard let url = URLComponents(string: text), url.scheme == "https",
-                  ["youtube.com", "www.youtube.com", "m.youtube.com"].contains(url.host),
-                  url.user == nil, url.password == nil,
-                  let id = url.queryItems?.first(where: { $0.name == "list" })?.value else { return nil }
+        let hosts = ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"]
+        let bareURL = hosts.contains { text.lowercased().hasPrefix($0 + "/") }
+        if text.contains("://") || bareURL {
+            guard let url = URLComponents(string: bareURL ? "https://" + text : text), url.scheme?.lowercased() == "https",
+                  let host = url.host?.lowercased(), hosts.contains(host),
+                  url.user == nil, url.password == nil, url.port == nil || url.port == 443,
+                  let ids = url.queryItems?.filter({ $0.name == "list" }), ids.count == 1,
+                  let id = ids.first?.value else { return nil }
             value = id
         }
-        return value.range(of: "^[A-Za-z0-9_-]{10,80}$", options: .regularExpression) == nil ? nil : value
+        guard let match = value.range(of: "^[A-Za-z0-9_-]{10,80}$", options: .regularExpression),
+              match == value.startIndex..<value.endIndex else { return nil }
+        return value
     }
 }
 

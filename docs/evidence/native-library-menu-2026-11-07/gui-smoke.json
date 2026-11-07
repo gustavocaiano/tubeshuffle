@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-07",
+  "app": "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-018phs9g/TubeShuffle Local/TubeShuffle.app",
+  "pid": 58501,
+  "ordinaryLaunch": true,
+  "passed": [
+    "Library is the only management entry in the top bar",
+    "No Try demo button/menu item",
+    "Library menu contains playlist/file/account actions",
+    "Grid import action opens importer after dismissal",
+    "Root Library menu opens Account",
+    "Grid Options opens Account after dismissal, with one active sheet",
+    "Resize requests accepted; actual narrow-window captures saved"
+  ],
+  "endState": "New ordinary app open, no library selected or account configured/signed in",
+  "notTested": [
+    "Physical keyboard shortcuts",
+    "OS file-panel selection or data transfer",
+    "Live account/API/audio behavior"
+  ],
+  "captures": "Only the exact new app process windows were captured; no desktop/other app capture"
+}
