@@ -1,0 +1,20 @@
+{
+  "base": "e9bf84b87def0ec2251473dd988cbab061b7fa1a",
+  "implementationHead": "26959c795906866a310b30be847cffbebe52dc2d",
+  "sha256": {
+    "src/app/api/youtube/suggestions/route.ts": "62f826bd27e39bbda67387ba71aa0dc6c0938142f5b350366e8c6bc65ffe5a5b",
+    "src/components/playlist/DailySuggestions.tsx": "b9bea64cceb0e22925aca33b921de9b82eadb06d78089cd32b6f7f6b16a75a6b",
+    "src/lib/server/bounded-body.ts": "4bcc806391b3f8de003bfde48e79fcef58f0e39ead70bc1c10e08eaa32a112e0",
+    "src/lib/server/playlist-links.ts": "9d031f8aeac046451b7972bd485de0ece5bb61d13b09626599f6947ceefc95e7",
+    "src/lib/storage/index.ts": "3ee565d58d7a051499be7bdad18964047cd592dd0ea62d86052052f89f19c469",
+    "src/lib/suggestions/daily-suggestions-cache.ts": "716e81b7e151b1f6e1ad8f55375a2cde517ecef0d4d442ab950c06e9fac63f1b",
+    "src/lib/suggestions/daily-suggestions-client.ts": "b18560e79fa9317e5ced585e2c6a171a341b0acebafa48899c6370e4d237989b",
+    "src/lib/suggestions/input-policy.ts": "af291394a088e26d5c1efe44a09b227470339b798fc5e73574e0481505426201",
+    "src/lib/suggestions/server-state.ts": "3f7492d22828947625c387333f517a2c8a3ccbb22506a7198d98105f33c2cc0e",
+    "tests/support/suggestions-idb.ts": "d3932416fbdb04647090363ea9c6ff9658db836833242092f8697f7d8965e443",
+    "tests/unit/daily-suggestions.test.tsx": "ebeecdd7dfa5cac41aa1a0e67a83d04bcaa52366e862403ed7eae6ab6c397d5a",
+    "tests/unit/p2-quota-guard.test.ts": "2515d5ea595e72cf0b8422356ece9c2a0763a25e46f8f1076040a85a7142701c",
+    "tests/unit/suggestions-route.test.ts": "a8df6aa3c35c573383c5703367e0df19f1e9cbec14a683d0ca824ecf59498670",
+    "tests/unit/suggestions-server-state.test.ts": "d78fed27a3fb44d1977c0bf6e9fc827e6d932baca54eccab822c21c87d19536f"
+  }
+}
