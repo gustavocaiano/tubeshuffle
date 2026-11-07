@@ -1,8 +1,8 @@
 # Native review and fixes before PR #11 merge — 2026-11-07
 
-The owner explicitly requested an extensive security/performance/bug review, fixes in PRs, then merge. That supersedes the earlier PR-only merge restriction. It does not authorize migrations, live-library testing, installer publication or a YouTube policy exception. PR #11 remains unmerged at this checkpoint. Web suggestions and dependency corrections are being implemented in separate checkouts/PRs.
+The owner explicitly requested an extensive security/performance/bug review, fixes in PRs, then merge. That supersedes the earlier PR-only merge restriction. It does not authorize migrations, live-library testing, installer publication or a YouTube policy exception. Native fixes were independently accepted and merged through [PR #12](https://github.com/gustavocaiano/tubeshuffle/pull/12). The web and dependency fixes are also integrated into the app branch; see the [combined validation and merge checkpoint](../pre-merge-integrated-2026-11-07/README.md).
 
-Review baseline: `e9bf84b87def0ec2251473dd988cbab061b7fa1a` against `2bc341c0cfdb5ad593df9ed9fed17be039e2d5cc`. Native fixes: `451aa16`, `9eee2c5`, `f7b3972`, `34ae786`; validated source commit `34ae786c02332c653d69110e70bb526145907f65`. A new independent review of these fixes is pending; passing tests alone is not merge approval.
+Review baseline: `e9bf84b87def0ec2251473dd988cbab061b7fa1a` against `2bc341c0cfdb5ad593df9ed9fed17be039e2d5cc`. Native fixes: `451aa16`, `9eee2c5`, `f7b3972`, `34ae786`; validated source commit `34ae786c02332c653d69110e70bb526145907f65`. The independent fix review returned **Accept**, with no concrete blocking finding. Its additional probes covered publication dates, old/new Smart shuffle parity, Unicode keys, transport bounds/cancellation, background queue ownership and the pure media-publication gate. [Retained probe results](independent-review-results.txt). The reviewer did not rerun the full hosted suite, Release build, physical media controls or the parent's performance measurements; those results retain their separate attribution.
 
 ## Findings and corrections
 

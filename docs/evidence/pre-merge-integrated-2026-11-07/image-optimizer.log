@@ -1,0 +1,31 @@
+✓ Running next.config.ts took 16ms
+▶ built Next image optimizer with local synthetic assets
+  ✔ png decodes, resizes and converts to WebP (28.712625ms)
+  ✔ jpeg decodes, resizes and converts to WebP (4.879625ms)
+  ✔ webp decodes, resizes and converts to WebP (3.907875ms)
+  ✔ avif decodes, resizes and converts to WebP (4.448375ms)
+  ✔ optimized image cache and conditional request (6.565ms)
+⨯ The requested resource "/__dependency-image-0fPIBU/plain.svg" has type "image/svg+xml" but dangerouslyAllowSVG is disabled. Consider adding the "unoptimized" property to the <Image>.
+  ✔ rejects plain.svg (2.781292ms)
+⨯ The requested resource "/__dependency-image-0fPIBU/mislabelled.png" has type "image/svg+xml" but dangerouslyAllowSVG is disabled. Consider adding the "unoptimized" property to the <Image>.
+  ✔ rejects mislabelled.png (2.742625ms)
+⨯ The requested resource "/__dependency-image-0fPIBU/comment-avif.png" has type "image/svg+xml" but dangerouslyAllowSVG is disabled. Consider adding the "unoptimized" property to the <Image>.
+  ✔ rejects comment-avif.png (3.479583ms)
+⨯ The requested resource "/__dependency-image-0fPIBU/comment-heic.png" has type "image/svg+xml" but dangerouslyAllowSVG is disabled. Consider adding the "unoptimized" property to the <Image>.
+  ✔ rejects comment-heic.png (3.084667ms)
+⨯ The requested resource isn't a valid image for /__dependency-image-0fPIBU/padded.png received null
+  ✔ rejects padded.png (2.712083ms)
+⨯ The requested resource "/__dependency-image-0fPIBU/xml.png" has type "image/svg+xml" but dangerouslyAllowSVG is disabled. Consider adding the "unoptimized" property to the <Image>.
+  ✔ rejects xml.png (2.31825ms)
+⨯ The requested resource isn't a valid image for /__dependency-image-0fPIBU/invalid.png received null
+  ✔ rejects invalid.png (1.022542ms)
+  ✔ rejects unapproved remote source before fetching (1.359125ms)
+✔ built Next image optimizer with local synthetic assets (201.6505ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 542.683584

@@ -121,6 +121,13 @@
     "build/pre-merge-review-Vlf5xt/native-store-probe.log": "4d35672c888b391c7d057bb44ff9686624c42af0b4f9aa9f79b4704d2c26d8f2",
     "build/pre-merge-review-Vlf5xt/playlist-import-probe.log": "07e492c0c5bbd90d1aa6be5f397cf882017e512d76d4a49a965a305ccf272bd4"
   },
-  "independentFixReview": "pending",
+  "independentFixReview": {
+    "decision": "Accept; no concrete blocking finding",
+    "reviewedBase": "e9bf84b87def0ec2251473dd988cbab061b7fa1a",
+    "reviewedHead": "34ae786c02332c653d69110e70bb526145907f65",
+    "resultFile": "independent-review-results.txt",
+    "resultSHA256": "4b2f098863a66bff2d9e6cdf174647432f34b43831b27bd1e6550f05d8353d0f",
+    "limits": "Independent source review and synthetic probes; full hosted/Release and performance results are separately attributed to parent validation."
+  },
   "releaseApproved": false
 }

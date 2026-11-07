@@ -1,0 +1,162 @@
+{
+  "atUTC": "2026-11-07T15:26:29.960378+00:00",
+  "codeCommit": "1dae52481e7d49e2c371b5ee819663867ada80bd",
+  "results": {
+    "unit": {
+      "exit": 0,
+      "seconds": 5.737,
+      "command": [
+        "npm",
+        "test"
+      ]
+    },
+    "lint": {
+      "exit": 0,
+      "seconds": 4.454,
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ]
+    },
+    "integration": {
+      "exit": 0,
+      "seconds": 5.722,
+      "command": [
+        "node",
+        "--test",
+        "tests/integration/p2-http.test.mjs"
+      ]
+    },
+    "audit-production": {
+      "exit": 0,
+      "seconds": 0.634,
+      "command": [
+        "npm",
+        "audit",
+        "--omit=dev",
+        "--json"
+      ]
+    },
+    "build": {
+      "exit": 0,
+      "seconds": 7.357,
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ]
+    },
+    "typecheck": {
+      "exit": 0,
+      "seconds": 1.968,
+      "command": [
+        "node",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit"
+      ]
+    },
+    "image-optimizer": {
+      "exit": 0,
+      "seconds": 0.583,
+      "command": [
+        "node",
+        "--test",
+        "docs/evidence/pre-merge-dependencies-2026-11-07/image-optimizer-smoke.mjs"
+      ]
+    }
+  },
+  "environment": {
+    "os": "27.0.1",
+    "arch": "arm64",
+    "node": "v26.5.0",
+    "npm": "12.0.2"
+  },
+  "install": {
+    "command": [
+      "npm",
+      "ci",
+      "--no-audit",
+      "--no-fund"
+    ],
+    "exit": 0,
+    "packages": 812,
+    "lifecyclePolicy": "Existing npm 12 allowScripts policy unchanged; four lifecycle scripts blocked."
+  },
+  "counts": {
+    "web": {
+      "passed": 536,
+      "skipped": 2,
+      "failed": 0
+    },
+    "http": {
+      "passed": 6,
+      "failed": 0
+    },
+    "optimizer": {
+      "scenarios": 13,
+      "nodeTestsIncludingParent": 14,
+      "failed": 0
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 2
+    },
+    "productionAudit": {
+      "findings": 0
+    },
+    "fullAuditFromDependencyReview": {
+      "findings": 30,
+      "allDevOnly": true,
+      "rerunInParent": false
+    }
+  },
+  "validatedGitObjects": {
+    "src": "fd63b75fb4626ce680b67dad3d87e6f8292e0e4c",
+    "tests": "32b49f8f5925d6b1c9ae8bfca71e87d902f4573c",
+    "shared": "1baaf1ca16c7bfa5ecd07a44fc1097f40786d165",
+    "package.json": "a85fb37ea5366538a2bd5717e7e5e0244a4978c7",
+    "package-lock.json": "738c3859ba47dd63eeb5b782bf70db2c678d9c48",
+    "next.config.ts": "e4874382a2f165ab40e0486d79a9190eb2fdba29",
+    "tsconfig.json": "32ddeb1f39030680da02a66ce31f41e32329dd2b",
+    "vitest.config.ts": "a49d23cb1e3407c1c357070e8bc3c9c0f7b3ee8f",
+    "eslint.config.mjs": "b7153678ffe32b033ee26257c469605fb8fd49e8"
+  },
+  "nativeRecheck": {
+    "codeCommit": "1dae52481e7d49e2c371b5ee819663867ada80bd",
+    "nativeInputFilesChecked": 89,
+    "nativeInputMismatches": [],
+    "nativeTestedSourceCommit": "34ae786c02332c653d69110e70bb526145907f65",
+    "archiveSHA256": "4ca5c9e816ce20d07be4872a6cc6c3c200626f3b30a4ab4f7f25de8ee6c34adf",
+    "archiveMatches": true
+  },
+  "logSHA256": {
+    "image-optimizer.log": "2766a4db4d7050cc55b1e24a1d9d6e11746b184525777aa5412d60622b92449b",
+    "lint.log": "f7e8795b08a30cf4701542b5c6913ba3a43daf95154b04d800544ccd597f73ef",
+    "typecheck.log": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "integration.log": "02dd360ddaac292202b770d55e83efd1c8f583b6ea5dcb15e105e12cff5d9774",
+    "audit-production.log": "2d462b45fe8a15fd2794ab5e98b39c4b9893d84bff2bade8d0ccb51a6aa7cc19",
+    "unit.log": "f73a6d675fd4b7b9b73857e389f904fb1fb039b122b513608307976c1cd68901",
+    "install.log": "7d01791642d3c2146d895dde4950bbb0762181b64318b09f4b82eaad33d7eb97",
+    "build.log": "79cfb406befd1dd1c2a34ed3de4884d658bd0415e2ea6c62ca7085a36cce9df6"
+  },
+  "fixPRs": [
+    {
+      "number": 12,
+      "reviewedHead": "4c208e5f34fe6cbd9673f0020cddb39984e9949a",
+      "merge": "8539a323a1fcf927a37fc3ed7a3f338e4fd67b57"
+    },
+    {
+      "number": 13,
+      "reviewedHead": "b86e25254791ee7c17e486e14f6071bc8280a476",
+      "merge": "9576d07c600a0afc83bd44c3d1e1f850a0a44143"
+    },
+    {
+      "number": 14,
+      "reviewedHead": "e2cd15ec39d271afef31d45b4f32a8a0548d63be",
+      "merge": "1dae52481e7d49e2c371b5ee819663867ada80bd"
+    }
+  ],
+  "releaseApproved": false,
+  "parentMergeStateAtRecording": "not yet merged; final documentation-head checks pending"
+}
