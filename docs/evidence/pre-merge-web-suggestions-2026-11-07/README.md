@@ -7,7 +7,7 @@ Tested implementation commits:
 - `b867b7ba770913fdd2c70b7fb8b2af5ea59351d8` — bounded requests, shared input policy, full fingerprints, bounded server state and route tests.
 - `26959c795906866a310b30be847cffbebe52dc2d` — generation/cancellation ownership, browser payload/cache wiring and component/storage tests.
 
-The evidence commit adds only this report, measurements, source hashes and check logs. Native sources, the shared native plan, dependency manifests and lockfile are unchanged.
+The evidence commits add only this report, measurements, source hashes and check logs. Native sources, the shared native plan, dependency manifests and lockfile are unchanged.
 
 ## Findings resolved
 
@@ -29,6 +29,8 @@ All requests and data in these checks are synthetic. Tests import the actual sou
 | `npm run lint` | Passed; existing unused `_id` warning in `playlist-store.ts:76` | [lint.log](lint.log) |
 | `npm run build` | Passed; Next.js 16.2.9 production build | [build.log](build.log) |
 | `git diff --check` | Passed | Recorded at commit preparation |
+
+Captured logs initially tripped the whitespace check; trailing whitespace and terminal blank lines were normalized without changing their results. The final diff check passes.
 
 Node was `v26.5.0`; dependencies were installed from the existing lockfile using `npm ci --ignore-scripts --no-audit --no-fund`. The Node webstorage flag avoids the host's experimental storage implementation in Vitest. No dependency patch or audit clearance is claimed.
 
