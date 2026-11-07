@@ -1,0 +1,93 @@
+✓ Running next.config.ts took 18ms
+▶ built Next image optimizer with local synthetic assets
+  ✔ png decodes, resizes and converts to WebP (32.909792ms)
+  ✔ jpeg decodes, resizes and converts to WebP (6.60375ms)
+  ✔ webp decodes, resizes and converts to WebP (4.013959ms)
+  ✔ avif decodes, resizes and converts to WebP (5.567833ms)
+  ✖ optimized image cache and conditional request (8.268792ms)
+⨯ The requested resource "/__dependency-image-iSQ1pv/plain.svg" has type "image/svg+xml" but dangerouslyAllowSVG is disabled. Consider adding the "unoptimized" property to the <Image>.
+  ✔ rejects plain.svg (2.986542ms)
+⨯ The requested resource "/__dependency-image-iSQ1pv/mislabelled.png" has type "image/svg+xml" but dangerouslyAllowSVG is disabled. Consider adding the "unoptimized" property to the <Image>.
+  ✔ rejects mislabelled.png (2.786875ms)
+⨯ The requested resource "/__dependency-image-iSQ1pv/comment-avif.png" has type "image/svg+xml" but dangerouslyAllowSVG is disabled. Consider adding the "unoptimized" property to the <Image>.
+  ✔ rejects comment-avif.png (3.160292ms)
+⨯ The requested resource "/__dependency-image-iSQ1pv/comment-heic.png" has type "image/svg+xml" but dangerouslyAllowSVG is disabled. Consider adding the "unoptimized" property to the <Image>.
+  ✔ rejects comment-heic.png (3.79225ms)
+⨯ The requested resource isn't a valid image for /__dependency-image-iSQ1pv/padded.png received null
+  ✖ rejects padded.png (4.094541ms)
+⨯ The requested resource "/__dependency-image-iSQ1pv/xml.png" has type "image/svg+xml" but dangerouslyAllowSVG is disabled. Consider adding the "unoptimized" property to the <Image>.
+  ✔ rejects xml.png (3.595625ms)
+⨯ The requested resource isn't a valid image for /__dependency-image-iSQ1pv/invalid.png received null
+  ✖ rejects invalid.png (1.431458ms)
+  ✔ rejects unapproved remote source before fetching (2.794792ms)
+✖ built Next image optimizer with local synthetic assets (236.897917ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 10
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 347.163291
+
+✖ failing tests:
+
+test at docs/evidence/pre-merge-dependencies-2026-11-07/image-optimizer-smoke.mjs:87:11
+✖ optimized image cache and conditional request (8.268792ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  200 !== 304
+
+      at TestContext.<anonymous> (file://<checkout>/docs/evidence/pre-merge-dependencies-2026-11-07/image-optimizer-smoke.mjs:97:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (file://<checkout>/docs/evidence/pre-merge-dependencies-2026-11-07/image-optimizer-smoke.mjs:87:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 200,
+    expected: 304,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at docs/evidence/pre-merge-dependencies-2026-11-07/image-optimizer-smoke.mjs:100:13
+✖ rejects padded.png (4.094541ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /not allowed|not a valid image/. Input:
+
+  "The requested resource isn't a valid image."
+
+      at TestContext.<anonymous> (file://<checkout>/docs/evidence/pre-merge-dependencies-2026-11-07/image-optimizer-smoke.mjs:103:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (file://<checkout>/docs/evidence/pre-merge-dependencies-2026-11-07/image-optimizer-smoke.mjs:100:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "The requested resource isn't a valid image.",
+    expected: /not allowed|not a valid image/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at docs/evidence/pre-merge-dependencies-2026-11-07/image-optimizer-smoke.mjs:100:13
+✖ rejects invalid.png (1.431458ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /not allowed|not a valid image/. Input:
+
+  "The requested resource isn't a valid image."
+
+      at TestContext.<anonymous> (file://<checkout>/docs/evidence/pre-merge-dependencies-2026-11-07/image-optimizer-smoke.mjs:103:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (file://<checkout>/docs/evidence/pre-merge-dependencies-2026-11-07/image-optimizer-smoke.mjs:100:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "The requested resource isn't a valid image.",
+    expected: /not allowed|not a valid image/,
+    operator: 'match',
+    diff: 'simple'
+  }

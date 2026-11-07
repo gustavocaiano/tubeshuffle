@@ -1,0 +1,36 @@
+npm notice run tubeshuffle@0.1.0 test
+npm notice run vitest run
+
+ RUN  v3.2.6 <checkout>
+
+(node:3725) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ tests/unit/p1-transfer-vectors.test.ts (30 tests) 8ms
+ ✓ tests/unit/playback-completion.test.ts (44 tests) 5ms
+ ✓ tests/unit/playback-attempts.test.ts (65 tests) 13ms
+ ✓ tests/unit/transfer-merge-plan.test.ts (31 tests) 15ms
+ ✓ tests/unit/youtube-queue.test.ts (28 tests) 17ms
+ ✓ tests/unit/p2-links.test.ts (22 tests) 41ms
+ ✓ tests/unit/p2-auth.test.ts (13 tests) 25ms
+ ✓ tests/unit/shuffle-service.test.ts (12 tests) 6ms
+ ✓ tests/unit/playback.test.tsx (15 tests) 282ms
+ ✓ tests/unit/p1-existing-api.test.ts (12 tests) 126ms
+ ✓ tests/unit/p1-owner-vectors.test.ts (26 tests) 8ms
+ ✓ tests/unit/p1-contracts.test.ts (11 tests) 40ms
+ ✓ tests/unit/transfer-export.test.ts (14 tests | 2 skipped) 658ms
+   ✓ transfer exporter > counts escaped Unicode bytes exactly over the limit  315ms
+ ✓ tests/unit/p4a-account.test.tsx (21 tests) 732ms
+ ✓ tests/unit/query-read-errors.test.tsx (6 tests) 217ms
+ ✓ tests/unit/session-pkce.test.ts (5 tests) 29ms
+ ✓ tests/unit/utils.test.ts (17 tests) 2ms
+ ✓ tests/unit/macos-release.test.ts (16 tests) 3ms
+ ✓ tests/unit/p2-quota-guard.test.ts (3 tests) 31ms
+ ✓ tests/unit/p1-shuffle-vectors.test.ts (50 tests) 8ms
+ ✓ tests/unit/browser-storage-notice.test.tsx (4 tests) 124ms
+ ✓ tests/unit/playlist-shuffle-race.test.tsx (26 tests) 1033ms
+ ✓ tests/unit/dashboard-read-safety.test.tsx (8 tests) 669ms
+
+ Test Files  23 passed (23)
+      Tests  477 passed | 2 skipped (479)
+   Start at  15:09:49
+   Duration  2.70s (transform 1.32s, setup 0ms, collect 4.45s, tests 4.09s, environment 9.00s, prepare 1.20s)
