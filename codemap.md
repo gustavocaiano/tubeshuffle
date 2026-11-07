@@ -25,6 +25,7 @@ TubeShuffle is a local-first YouTube playlist shuffler built with Next.js App Ro
 | Surface | Current functionality |
 | --- | --- |
 | `/` | Dark ambient landing page with hero player mock, anti-SaaS value props, bento features, shuffle explanation, and FAQ. |
+| `/macos` | Native app preview, release-gated ZIP download, requirements, installation and explicit browser-to-Mac transfer guidance. |
 | `/dashboard` | Dark ambient playlist library for saved IndexedDB playlists; supports fresh import, delete and open; destructive refresh/re-import is blocked. |
 | `/playlist/:id` | Dark ambient player shell that loads one local playlist, auto-shuffles on first visit, plays embedded YouTube videos, shows a viewport-height queue, supports keyboard/media controls, Focus/No Artwork/Stage preferences, shuffle modes, and exclude-watched filtering. |
 | `GET /api/youtube/playlist?playlistId=...` | Fetches playlist metadata/items/details from YouTube, filters unavailable videos, and returns `YouTubePlaylistData`. |
@@ -73,6 +74,7 @@ Primary state stores:
 ## Notable Current Constraints
 
 - Web owner-authentication and playlist-link APIs now exist under `src/lib/server/` and `src/app/api/`, with SQL/RLS definitions in `supabase/`. Cloud scope is playlist IDs only; production validation/deployment is not implied.
+- The macOS website entry reads a reviewed `src/config/macos-release.json` manifest through `src/lib/macos-release.ts`. Its default `null` keeps downloads unavailable; no local ad-hoc candidate is published or selected automatically. Distribution authorization and signed/notarized artifact checks remain separate.
 - `macos/` contains the integrated SwiftUI local library, account/API services, transfer preview, SwiftData persistence, local queue sidecar and official-iframe WKWebView player. `App/NativeLibraryView.swift` owns the web-style listening screen and native sheets; `NativePlayerComponents.swift` owns the bounded player/thumbnail queue. Focus shows only a small thumbnail and genuinely hides the retained WKWebView. `NativeUIStyle.swift` holds shared layout/artwork, 80–125% interface zoom commands and window-scoped keyboard handling; the window supports 480-point width. Demo mode uses synthetic data and bundled thumbnails; `NativeUIRenderingTests` captures actual native layouts and checks keyboard/lifecycle behavior with static media fixtures. The old Playback Lab is explicit. Owner/live-service/release acceptance remains open; see `docs/plans/native-macos-app.md`.
 - Browser provisioning is integrated through `browser-session.ts`: schema preflight, existing-only startup, explicit one-shot creation, generation-owned transactions and UI subscription. `tests/browser/storage-startup/` exercises shared startup code with build-only fixture targets and guarded disposable contexts; see `docs/plans/browser-storage-phase2.md`.
 - Shuffle UI/types expose `RANDOM`/Normal and `SMART`; Smart is now a metadata-inferred energy-flow shuffle rather than artist/channel spacing.

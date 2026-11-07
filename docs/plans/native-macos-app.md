@@ -4,6 +4,14 @@
 
 This plan includes historical planning and P0 handoff records; later evidence does not close the outstanding acceptance gates.
 
+### Browser download entry and installation guide — 2026-11-07
+
+After approving the simplified native UI and requesting commit/push/PR, the owner asked for the installer/link/instructions on the website. `/macos` is now linked from navigation, the homepage and footer. It presents the native preview, actual Apple Silicon/macOS 14+ requirements, ZIP setup, Library/playlist import flow, owner-only account access and explicit browser/native separation. Transfer guidance discloses unencrypted JSON, excluded queue/preferences/suggestions/credentials/media and omitted history/journal/suggestion events. No continuity or automatic synchronization is inferred.
+
+No public GitHub release exists. The reviewed manifest `src/config/macos-release.json` therefore remains `null`, keeping Download for Mac disabled with an honest availability message and a working browser alternative. A future approved versioned ZIP enables the download, release notes and checksum through the manifest; malformed metadata stays unavailable. The [distribution handoff](../../macos/README.md#website-download-and-release-handoff) requires artifact review, Developer ID/notarization, acceptance evidence and separate publication/rollout authorization. The local ad-hoc candidate was not uploaded or presented as a public release.
+
+Web validation: **477 tests passed / 2 existing skips / 0 failures**; TypeScript, production build and lint passed (one pre-existing unused `_id` warning). The initial typecheck/build exposed ignored native dependency examples under `build/`; adding that directory to TypeScript exclusions fixed the web validation scope. Loopback Incognito checks covered 1280/768/480/320 px, keyboard focus, setup anchor, FAQ, homepage → Mac page → dashboard, disabled download and no IndexedDB/localStorage creation. No actual public download/OS installation, live account or native playback was exercised. [Evidence and remaining limits](../evidence/macos-web-handoff-2026-11-07/README.md).
+
 ### Library menu simplification — 2026-11-07
 
 The owner requested a simpler interface, with management options inside **Library** and no **Try the demo** entry. The top bar now has only the brand and Library menu. Playlist import, create/open, JSON transfer, close and Account are grouped there; **Your playlists…** opens the grid, whose Options menu keeps those same actions within Library. The welcome screen exposes only **Open Library**. Public demo buttons are removed; the explicit synthetic rehearsal launcher remains for safe testing. Actions selected inside the grid dismiss it before opening another sheet/file panel. Playback controls and data/auth boundaries are unchanged.

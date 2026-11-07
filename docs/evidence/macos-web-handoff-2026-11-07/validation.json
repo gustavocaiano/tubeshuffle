@@ -1,0 +1,53 @@
+{
+  "date": "2026-11-07",
+  "baseCommit": "d4199a5f9b83dc6d534932241fb93c9980a78e54",
+  "scope": "Website Mac download availability and installation guidance; no public release",
+  "checks": {
+    "webTests": {
+      "command": "NODE_OPTIONS=--no-experimental-webstorage npm test",
+      "files": 23,
+      "passed": 477,
+      "skipped": 2,
+      "failed": 0,
+      "log": "tests.log"
+    },
+    "typecheck": {
+      "command": "npx tsc --noEmit",
+      "exitCode": 0,
+      "log": "typecheck.log"
+    },
+    "build": {
+      "command": "NEXT_TELEMETRY_DISABLED=1 npm run build",
+      "exitCode": 0,
+      "log": "build-final.log",
+      "afterFinalCopyChanges": true
+    },
+    "lint": {
+      "command": "npm run lint",
+      "errors": 0,
+      "existingWarnings": 1,
+      "log": "lint.log"
+    },
+    "browser": "browser-results.json",
+    "nativeSourceMatch": "native-input-check.json"
+  },
+  "sourceSHA256": {
+    "src/app/macos/page.tsx": "5d94ba7728fa0db05731b5ac15b64f11b572e83ebfdb940fe6c2a531cbc39aa8",
+    "src/app/page.tsx": "6461bddb1f835afd197a929a50c748c77ab441e2e14172e7a7a01ebe598862d2",
+    "src/app/sitemap.ts": "71976959ac644209db196eba3bac7bd04ef62c2241b2d81a45530ae5fc8c7e2a",
+    "src/components/layouts/Navbar.tsx": "b93bbd7e5bcb7f380326d6a4542cc8b9e43dd20ba47afb2883ac02b53104b7c7",
+    "src/components/layouts/Footer.tsx": "28527d81828e3291f8cc9d0341adc0aed2009d442fdd487c3bb7f4fc233c0db3",
+    "src/lib/macos-release.ts": "ddfa07c26e603065ead7948721f6afc84e9aac9eaebbfd075be40908e78bf4ab",
+    "src/config/macos-release.json": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+    "src/assets/macos-preview.png": "37ae6ee5657fd070c4e8bb1a4406be62089058d941e6ac6e51affed8151cd342",
+    "tests/unit/macos-release.test.ts": "4cb2680e712a82689d0b77405f4f8382bf97becc4d3ff108117f11151886058f",
+    "tsconfig.json": "63bb1851172f4a17f1060f2cceb128aa0a684379a42fdacefe68db8864c6a813"
+  },
+  "publicReleaseManifest": null,
+  "limitations": [
+    "No public artifact published or downloaded",
+    "No release signing/notarization or policy approval",
+    "No real library/profile or account login",
+    "Native suite not rerun: 89 native inputs unchanged"
+  ]
+}

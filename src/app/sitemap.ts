@@ -10,5 +10,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 1,
     },
+    {
+      url: `${baseUrl.replace(/\/$/, "")}/macos`,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
   ];
 }

@@ -70,6 +70,35 @@ This runs the hosted suite and a Release build with pinned package versions, ver
 
 Keep the extracted **TubeShuffle Local** folder together. **Open Demo.command** starts the isolated in-memory demo; **Open TubeShuffle.command** starts the ordinary empty entry screen. Requires macOS 14+ and Apple Silicon. The package is **not Developer ID signed or notarized**, and it is not an approved public release. No valid local Developer ID identity was found. Do not disable Gatekeeper globally.
 
+### Website download and release handoff
+
+The web app's `/macos` page is linked from its navigation, homepage and footer. It describes requirements, ZIP installation, Library setup, owner-account restrictions and explicit JSON transfer. The browser continues to work independently. No real library or account is accessed by the page. The preview image is copied, unchanged, from the synthetic native UI capture in `docs/evidence/native-library-menu-2026-11-07/captures/paused-1280x860.png`.
+
+`src/config/macos-release.json` is deliberately `null`. The page therefore says that the public download is unavailable, disables its download button and keeps a working browser link. No local candidate, download URL or public release approval is implied. No runtime lookup of GitHub's “latest” release occurs.
+
+To enable a public download **after separate distribution approval**:
+
+1. Close the required acceptance and YouTube policy gates. Obtain the owner's explicit authorization to publish the reviewed artifact. Source/PR approval alone is not release authorization.
+2. Produce an Apple Silicon ZIP containing the app and its instructions. Sign the app with a valid Developer ID, notarize/staple it, and validate a fresh downloaded copy on a disposable Mac library, including Gatekeeper, launch, account and transfer behavior. The existing ad-hoc delivery script does **not** do this.
+3. Publish the approved ZIP as an asset of a versioned release in `gustavocaiano/tubeshuffle`, with release notes, source commit, requirements and checksum. Download the exact asset again and verify its SHA-256. This upload is a separately authorized action.
+4. Replace the manifest with those actual values in a reviewed change, for example:
+
+   ```json
+   {
+     "version": "0.1.0",
+     "tag": "macos-v0.1.0",
+     "fileName": "TubeShuffle-0.1.0-macos-arm64.zip",
+     "sha256": "<64 lowercase hexadecimal characters from the published ZIP>"
+   }
+   ```
+
+   This example is intentionally not a valid release manifest. Use the actual version/tag/checksum, not the local ad-hoc candidate's values. The resolver derives URLs only under this repository's GitHub releases; incomplete metadata, mutable `latest` tags, mismatched versions, path traversal and non-arm64/non-ZIP filenames stay unavailable. Parsing the manifest validates its shape, **not** the artifact's signature, availability or release approval. Those require the preceding evidence.
+5. Run the web checks and verify download, notes and checksum against the published asset before separately authorized web rollout. Recheck page instructions if package layout or account access changes. Set the manifest back to `null` in a reviewed change to withdraw the website link; that does not delete an existing release asset.
+
+No environment secret or Supabase plan change is needed for this download surface.
+
+### Public account setup
+
 Public setup JSON has exactly these fields (replace the placeholders before loading):
 
 ```json
@@ -98,7 +127,7 @@ For the owner-authorized shorter P0 runs on 2026-10-28, the existing fixture was
 
 ## Build on the owner's Mac
 
-1. Check `xcodebuild -version`, `swift --version`, and the installed SDK; This project targets macOS 13 or later; actual host/Xcode compatibility and signing must be checked locally.
+1. Check `xcodebuild -version`, `swift --version`, and the installed SDK; this project targets macOS 14 or later; actual host/Xcode compatibility and signing must be checked locally.
 2. Open `TubeShuffle.xcodeproj`, select the shared **TubeShuffle** scheme and an appropriate signing team if needed. The sandbox enables outgoing network connections. Run, or from the repository root:
 
    ```sh

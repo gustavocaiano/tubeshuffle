@@ -26,6 +26,7 @@ Routes:
 | Route | File | Purpose |
 | --- | --- | --- |
 | `/` | `page.tsx` | Dark ambient marketing page with hero player mock, local-first positioning, feature bento, and FAQ. |
+| `/macos` | `macos/page.tsx` | Static native preview, download availability, ZIP setup and browser transfer guide. Reads only the reviewed public release manifest. |
 | `/dashboard` | `dashboard/page.tsx` | Dark ambient local playlist manager. |
 | `/playlist/:id` | `playlist/[id]/page.tsx` | Dark ambient playlist player for local playlist UUID. |
 | `GET /api/youtube/playlist` | `api/youtube/playlist/route.ts` | YouTube Data API proxy. |

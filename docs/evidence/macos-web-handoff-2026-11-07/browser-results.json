@@ -1,0 +1,174 @@
+{
+  "date": "2026-11-07",
+  "scope": "Loopback production Next.js build; separate Incognito browser tab; no library/account/audio interaction",
+  "url": "http://localhost:3107/macos",
+  "releaseManifest": null,
+  "finalCopyChecks": [
+    {
+      "databases": [],
+      "hasVisibleTransferGuide": true,
+      "localStorageKeys": [],
+      "ownerRestrictionFirst": true,
+      "scrollWidth": 1272,
+      "width": 1280
+    },
+    {
+      "databases": [],
+      "hasVisibleTransferGuide": true,
+      "localStorageKeys": [],
+      "ownerRestrictionFirst": true,
+      "scrollWidth": 312,
+      "width": 320
+    }
+  ],
+  "dashboardNavigation": {
+    "creationPrompt": true,
+    "databases": [],
+    "localStorageKeys": [],
+    "macOSLink": "macOS",
+    "path": "/dashboard"
+  },
+  "unavailableDownload": {
+    "disabled": true,
+    "publicReleaseLinks": []
+  },
+  "viewports": [
+    {
+      "nav": [
+        {
+          "height": 32,
+          "text": "TubeShuffle",
+          "width": 140.015625
+        },
+        {
+          "height": 44,
+          "text": "macOS",
+          "width": 89.6015625
+        },
+        {
+          "height": 44,
+          "text": "Dashboard",
+          "width": 113.2734375
+        }
+      ],
+      "overflows": [],
+      "scrollWidth": 760,
+      "width": 768
+    },
+    {
+      "nav": [
+        {
+          "height": 32,
+          "text": "TubeShuffle",
+          "width": 140.015625
+        },
+        {
+          "height": 44,
+          "text": "macOS",
+          "width": 67.6015625
+        },
+        {
+          "height": 44,
+          "text": "Dashboard",
+          "width": 44
+        }
+      ],
+      "overflows": [],
+      "scrollWidth": 472,
+      "width": 480
+    },
+    {
+      "nav": [
+        {
+          "height": 32,
+          "text": "TubeShuffle",
+          "width": 140.015625
+        },
+        {
+          "height": 44,
+          "text": "macOS",
+          "width": 67.6015625
+        },
+        {
+          "height": 44,
+          "text": "Dashboard",
+          "width": 44
+        }
+      ],
+      "overflows": [],
+      "scrollWidth": 312,
+      "width": 320
+    }
+  ],
+  "keyboard": [
+    {
+      "focusVisible": true,
+      "href": "/",
+      "text": "TubeShuffle"
+    },
+    {
+      "focusVisible": true,
+      "href": "/macos",
+      "text": "macOS"
+    },
+    {
+      "focusVisible": true,
+      "href": "/dashboard",
+      "text": "Dashboard"
+    },
+    {
+      "focusVisible": true,
+      "href": "/dashboard",
+      "text": "Open in browser "
+    }
+  ],
+  "installationAnchor": {
+    "hash": "#installation",
+    "headerBottom": 65,
+    "headingTop": 159.75
+  },
+  "transferFAQ": {
+    "expanded": [
+      "Can I bring my browser library to the Mac app?"
+    ],
+    "transferNotice": "Export your library as JSON from the browser dashboard. In the Mac app, create a new, empty library, choose Library \u2192 Import JSON\u2026, and review the preview before confirming. This copies playlists and supported history while leaving the browser library intact. Queue, preferences, suggestions, credentials and media are excluded. Orphan history events are omitted and counted in the export notice; completion journal records and suggestion listening events are also outside the transfer. The JSON is unencrypted. Keep the original export and library."
+  },
+  "storageAfterPage": {
+    "indexedDB": [],
+    "localStorageKeys": []
+  },
+  "homepage": {
+    "macLinks": [
+      {
+        "label": "macOS",
+        "visible": true
+      },
+      {
+        "label": "Meet TubeShuffle for macOS",
+        "visible": true
+      },
+      {
+        "label": "Mac app & installation",
+        "visible": true
+      }
+    ],
+    "path": "/",
+    "scrollWidth": 312,
+    "width": 320
+  },
+  "homepageLink": {
+    "path": "/macos",
+    "title": "TubeShuffle for macOS | TubeShuffle"
+  },
+  "expectedLocalDiagnostic": "Vercel Web Analytics script /_vercel/insights/script.js returns 404 on the local production server; no page application exception observed.",
+  "captures": [
+    "desktop.png",
+    "mobile-320.png",
+    "installation.png"
+  ],
+  "limits": [
+    "No public binary or download was published/tested",
+    "Available-release URL construction is tested with synthetic metadata only",
+    "No login, real library, OS install, Gatekeeper, native playback or YouTube policy acceptance"
+  ]
+}
