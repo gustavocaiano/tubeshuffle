@@ -1,8 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { noStore } from "@/lib/server/owner-guard";
 
+import { readBoundedBody } from "./bounded-body";
+
 export const idPattern = /^[A-Za-z0-9_-]{10,80}$/;
-const limit = 4096;
 export const errorResponse = (status: number, code: string) => noStore(Response.json({ error: { code, message: code } }, { status }));
 export const invalid = () => errorResponse(400, "invalid_request");
 export const internal = () => errorResponse(500, "internal_error");
@@ -22,24 +23,8 @@ export function hasQuery(request: Request): boolean {
   return request.url.split("#", 1)[0].includes("?");
 }
 
-export async function bodyBytes(request: Request): Promise<Uint8Array | null> {
-  if (!request.body) return new Uint8Array();
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > limit) { void reader.cancel().catch(() => {}); return null; }
-      chunks.push(value);
-    }
-    const result = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.length; }
-    return result;
-  } finally { reader.releaseLock(); }
+export function bodyBytes(request: Request): Promise<Uint8Array | null> {
+  return readBoundedBody(request, 4096);
 }
 
 export function jsonMediaType(value: string | null): boolean {

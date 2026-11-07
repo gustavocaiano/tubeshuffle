@@ -1,0 +1,15 @@
+▶ real HTTP routes with isolated simulated provider and SDK
+  ✔ reject cookie claim iss (102.685792ms)
+  ✔ reject cookie claim aud (16.15975ms)
+  ✔ reject cookie claim sub (14.357458ms)
+  ✔ reject cookie claim session_id (9.042084ms)
+  ✔ non-403 upstream errors do not expose synthetic secrets (18.304125ms)
+✔ real HTTP routes with isolated simulated provider and SDK (4677.463666ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4761.027709

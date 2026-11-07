@@ -1,0 +1,29 @@
+[
+  {
+    "name": "ascii",
+    "rawBytes": 316107,
+    "clientBytes": 84827,
+    "seedsRetained": 40,
+    "exclusionsRetained": 5000,
+    "refreshBytes": 84935,
+    "refreshExclusionsRetained": 5005
+  },
+  {
+    "name": "unicode",
+    "rawBytes": 2243787,
+    "clientBytes": 100027,
+    "seedsRetained": 40,
+    "exclusionsRetained": 5000,
+    "refreshBytes": 100135,
+    "refreshExclusionsRetained": 5005
+  },
+  {
+    "name": "escaped",
+    "rawBytes": 2966667,
+    "clientBytes": 102399,
+    "seedsRetained": 33,
+    "exclusionsRetained": 5000,
+    "refreshBytes": 101543,
+    "refreshExclusionsRetained": 5005
+  }
+]

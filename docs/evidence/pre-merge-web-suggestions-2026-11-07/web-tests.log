@@ -1,0 +1,44 @@
+npm notice run tubeshuffle@0.1.0 test
+npm notice run vitest run
+
+ RUN  v3.2.6 /Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-85c046fe
+
+(node:99811) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ tests/unit/playback-completion.test.ts (44 tests) 9ms
+ ✓ tests/unit/playback-attempts.test.ts (65 tests) 10ms
+ ✓ tests/unit/youtube-queue.test.ts (28 tests) 25ms
+ ✓ tests/unit/p2-links.test.ts (22 tests) 41ms
+ ✓ tests/unit/p2-auth.test.ts (13 tests) 18ms
+ ✓ tests/unit/p1-transfer-vectors.test.ts (30 tests) 13ms
+ ✓ tests/unit/playback.test.tsx (15 tests) 288ms
+ ✓ tests/unit/suggestions-route.test.ts (44 tests) 940ms
+ ✓ tests/unit/transfer-merge-plan.test.ts (31 tests) 46ms
+ ✓ tests/unit/transfer-export.test.ts (14 tests | 2 skipped) 861ms
+   ✓ transfer exporter > bounds and orders many diagnostics, counts omissions, and respects precedence  377ms
+   ✓ transfer exporter > counts escaped Unicode bytes exactly over the limit  307ms
+ ✓ tests/unit/p4a-account.test.tsx (21 tests) 821ms
+ ✓ tests/unit/shuffle-service.test.ts (12 tests) 9ms
+ ✓ tests/unit/p1-existing-api.test.ts (12 tests) 183ms
+ ✓ tests/unit/utils.test.ts (17 tests) 5ms
+ ✓ tests/unit/p1-contracts.test.ts (11 tests) 101ms
+ ✓ tests/unit/p1-owner-vectors.test.ts (26 tests) 4ms
+ ✓ tests/unit/p2-quota-guard.test.ts (3 tests) 63ms
+ ✓ tests/unit/p1-shuffle-vectors.test.ts (50 tests) 8ms
+ ✓ tests/unit/playlist-shuffle-race.test.tsx (26 tests) 1373ms
+ ✓ tests/unit/suggestions-server-state.test.ts (3 tests) 106ms
+ ✓ tests/unit/query-read-errors.test.tsx (6 tests) 223ms
+ ✓ tests/unit/session-pkce.test.ts (5 tests) 19ms
+ ✓ tests/unit/browser-storage-notice.test.tsx (4 tests) 98ms
+ ✓ tests/unit/macos-release.test.ts (16 tests) 2ms
+ ✓ tests/unit/dashboard-read-safety.test.tsx (8 tests) 853ms
+ ✓ tests/unit/daily-suggestions.test.tsx (12 tests) 4205ms
+   ✓ keeps missing storage absent and does not query, create schema or contact a service  426ms
+   ✓ does not persist or publish a deferred refresh, or mark it used, into a new generation  345ms
+   ✓ writes a successful refresh once and preserves its used marker on remount  353ms
+   ✓ serializes the component's 5000 video IDs and large Unicode seed metadata within 100 KiB  1840ms
+
+ Test Files  26 passed (26)
+      Tests  536 passed | 2 skipped (538)
+   Start at  15:05:55
+   Duration  5.11s (transform 1.66s, setup 0ms, collect 5.13s, tests 10.32s, environment 11.82s, prepare 1.35s)
