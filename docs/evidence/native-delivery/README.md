@@ -1,5 +1,11 @@
 # Local delivery — 2026-11-05
 
+The latest local package is the [simplified Library UI candidate](../native-library-menu-2026-11-07/README.md). It moves management controls into Library and removes the Try demo entries; the evidence below remains attributed to its earlier candidate.
+
+The [November 7 playlist-import candidate](../native-playlist-import-2026-11-07/README.md) supersedes the local package below: guided YouTube link import, explicit bundled public setup, 247 passed / two skipped, and fresh Sol 6.1 UI review 9.0/10. This document retains its earlier evidence.
+
+**Superseding checkpoint, 2026-11-06:** the owner merged PR #10; production is now READY at `2bc341c`, the five account variables are present, and the anonymous API returns 401. The earlier pending-merge/deployment observations below are historical. [Current verification and remaining owner checks](../native-acceptance-2026-11-06/README.md).
+
 **Historical delivery checkpoint; production delivery is not complete.** The setup-document and packaging additions are committed at `9b8536f`, after the `051bb26` integration. The source hashes below matched that candidate before the subsequent UI refinements. The browser and native app coexist. Five missing Vercel production variables are saved for a future deployment; the running deployment is unchanged. Supabase Site URL and native callback are now configured and read back. No real library was accessed. Live account and owner UI acceptance remain pending.
 
 **Latest local candidate:** [thumbnail-only Focus, zoom, narrower windows and the web favicon as app icon](../native-ui-refinement/README.md), built from the local changes on `413a226`. Its fresh suite has **241 passed / 2 skipped / 0 failures**, all 88 recorded source hashes match, and the refinement's Sol 6.1 visual review scored **9.0/10**. The icon was subsequently verified through the build and macOS icon services; no additional peer rating is claimed for that asset. Use that candidate for the revised UI rehearsal. The package, counts and Stop & close observations below are preserved as earlier evidence, not validation of the current UI.

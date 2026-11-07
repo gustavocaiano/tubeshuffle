@@ -363,6 +363,13 @@ export default function HomePage() {
                   </Button>
                 </a>
               </div>
+              <Link
+                href="/macos"
+                className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-white/70 underline decoration-white/30 underline-offset-4 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+              >
+                Meet TubeShuffle for macOS
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </Link>
               <p className="mt-4 text-sm text-white/45">
                 Free. No login. Built for long sessions.
               </p>

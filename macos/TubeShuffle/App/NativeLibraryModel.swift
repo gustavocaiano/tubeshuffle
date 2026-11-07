@@ -17,6 +17,18 @@ final class NativeLibraryModel: ObservableObject {
     private var scopedURL: URL?
     private weak var window: NSWindow?
     private var closeObserver: NSObjectProtocol?
+    private let calculations: NativeLibraryCalculations
+    private var activeOperation: UUID?
+    private var cancelCalculation: (() -> Void)?
+
+    init(calculations: NativeLibraryCalculations = .init()) { self.calculations = calculations }
+
+    // An already-open store can be supplied without invoking a file panel.
+    // Its caller is responsible for URL access; no library is discovered here.
+    convenience init(store: NativeLocalLibraryStore, at url: URL, calculations: NativeLibraryCalculations = .init()) throws {
+        self.init(calculations: calculations)
+        try install(store, at: url, scoped: false)
+    }
 
     func attach(_ window: NSWindow) {
         guard self.window !== window else { return }
@@ -75,6 +87,7 @@ final class NativeLibraryModel: ObservableObject {
     }
 
     func closeLibrary() {
+        cancelCalculation?(); cancelCalculation = nil; activeOperation = nil; busy = false
         generation = UUID(); pendingImport = nil; savedQueue = nil; store = nil
         if let scopedURL { scopedURL.stopAccessingSecurityScopedResource() }
         scopedURL = nil; snapshot = .empty; isOpen = false; isDemo = false; location = ""; message = nil
@@ -93,16 +106,16 @@ final class NativeLibraryModel: ObservableObject {
         panel.allowedContentTypes = [.json]; panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let epoch = generation
-        busy = true; message = nil
+        let operation = beginOperation()
         Task {
-            defer { busy = false }
+            defer { finishOperation(operation) }
             do {
                 let data = try NativeTransferFiles.read(url)
-                let source = try await Task.detached(priority: .userInitiated) { try TransferV1.decode(data) }.value
-                guard generation == epoch else { return }
+                let source = try await calculate { try TransferV1.decode(data) }
+                guard generation == epoch, activeOperation == operation, !Task.isCancelled else { return }
                 pendingImport = TransferV1.prepareFreshImport(source, destination: snapshot)
             } catch {
-                guard generation == epoch else { return }
+                guard generation == epoch, activeOperation == operation, !Task.isCancelled else { return }
                 message = "This file could not be imported. It must be a valid v1 transfer within the 10 MB, 500,000-value and nesting limits. No library records were written."
             }
         }
@@ -122,13 +135,13 @@ final class NativeLibraryModel: ObservableObject {
     func exportLibrary() {
         guard isOpen, !busy else { return }
         let source = snapshot, epoch = generation
-        busy = true; message = nil
+        let operation = beginOperation()
         Task {
-            defer { busy = false }
+            defer { finishOperation(operation) }
             do {
                 let stamp = Self.timestamp()
-                let result = try await Task.detached(priority: .userInitiated) { try TransferV1.encode(snapshot: source, exportedAt: stamp) }.value
-                guard generation == epoch else { return }
+                let result = try await calculate { try TransferV1.encode(snapshot: source, exportedAt: stamp) }
+                guard generation == epoch, activeOperation == operation, !Task.isCancelled else { return }
                 let panel = NSSavePanel()
                 panel.title = "Export local library"
                 panel.allowedContentTypes = [.json]; panel.nameFieldStringValue = "tubeshuffle-library.json"
@@ -136,28 +149,63 @@ final class NativeLibraryModel: ObservableObject {
                 guard panel.runModal() == .OK, let url = panel.url else { return }
                 try NativeTransferFiles.writeNew(result.data, at: url)
                 message = "Export saved. \(result.omittedOrphans.count) orphan history events were omitted."
-            } catch { message = "Export could not be completed. Existing files were not replaced. If a new partial file remains, keep it and choose a new filename." }
+            } catch {
+                guard generation == epoch, activeOperation == operation, !Task.isCancelled else { return }
+                message = "Export could not be completed. Existing files were not replaced. If a new partial file remains, keep it and choose a new filename."
+            }
         }
     }
 
-    func importPlaylist(_ input: String, account: NativeAccountModel) {
-        guard isOpen, !isDemo, !busy else { return }
-        guard let id = Self.playlistID(input) else { message = "Enter a public YouTube playlist URL or ID."; return }
-        let epoch = generation
-        busy = true; message = nil
-        Task {
-            defer { busy = false }
-            let response = await account.fetchPlaylist(id)
-            guard generation == epoch, let store else { return }
-            guard let dto = response else { message = account.message; return }
-            do {
-                let preview = try PlaylistAPIImport.make(requestedPlaylistID: id, dto: dto, importedAt: Self.timestamp())
-                guard let playlist = preview.snapshot.playlists.first else { return }
-                try store.addNewPlaylist(playlist, occurrences: preview.snapshot.occurrences)
-                snapshot = try store.snapshot()
-                message = preview.warnings.isEmpty ? "Playlist added locally. Saving its cloud link is a separate action." : "Playlist added locally, but the reported count differs from the received items. This may be a partial playlist; no missing items were invented."
-            } catch { message = "The playlist could not be added safely. Existing playlists and history were preserved. Refreshing or replacing a playlist is not supported." }
+    func importPlaylist(_ input: String, account: any NativePlaylistSource) async -> PlaylistID? {
+        guard isOpen, !isDemo, !busy else { return nil }
+        guard let id = Self.playlistID(input) else { message = "Paste a public YouTube playlist link containing list=, or a playlist ID."; return nil }
+        guard !snapshot.playlists.contains(where: { $0.youtubeId == id }) else {
+            message = "This playlist is already in your library. Its tracks and history have been kept."
+            return nil
         }
+        guard account.canFetchPlaylists else { message = "Connect your TubeShuffle account before importing a playlist."; return nil }
+        let epoch = generation
+        let operation = beginOperation()
+        defer { finishOperation(operation) }
+        let response = await account.fetchPlaylist(id)
+        guard generation == epoch, activeOperation == operation, !Task.isCancelled, store != nil else { return nil }
+        guard let dto = response else { message = account.message ?? "The playlist could not be loaded. Check your connection and try again."; return nil }
+        do {
+            let stamp = Self.timestamp(), convert = calculations.convertPlaylist
+            let preview = try await calculate { try convert(id, dto, stamp) }
+            guard generation == epoch, activeOperation == operation, !Task.isCancelled, let store else { return nil }
+            guard let playlist = preview.snapshot.playlists.first else { return nil }
+            try store.addNewPlaylist(playlist, occurrences: preview.snapshot.occurrences)
+            snapshot = try store.snapshot()
+            message = preview.warnings.isEmpty ? "Playlist added locally. Saving its cloud link is a separate action." : "Playlist added locally, but the reported count differs from the received items. This may be a partial playlist; no missing items were invented."
+            return playlist.id
+        } catch {
+            guard generation == epoch, activeOperation == operation, !Task.isCancelled else { return nil }
+            message = "The playlist could not be added safely. Existing playlists and history were preserved. Refreshing or replacing a playlist is not supported."
+        }
+        return nil
+    }
+
+    private func beginOperation() -> UUID {
+        let token = UUID()
+        activeOperation = token; busy = true; message = nil
+        return token
+    }
+
+    private func finishOperation(_ token: UUID) {
+        guard activeOperation == token else { return }
+        activeOperation = nil; cancelCalculation = nil; busy = false
+    }
+
+    private func calculate<T>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        let task = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let value = try work()
+            try Task.checkCancellation()
+            return value
+        }
+        cancelCalculation = { task.cancel() }
+        return try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
     }
 
     func recordNaturalCompletion(_ item: PlayerCoordinator.Item, playlist: PlaylistID, epoch: UUID) {
@@ -192,15 +240,63 @@ final class NativeLibraryModel: ObservableObject {
 
     static func playlistID(_ input: String) -> String? {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.utf8.count <= 2_048 else { return nil }
         var value = text
-        if text.contains("://") {
-            guard let url = URLComponents(string: text), url.scheme == "https",
-                  ["youtube.com", "www.youtube.com", "m.youtube.com"].contains(url.host),
-                  url.user == nil, url.password == nil,
-                  let id = url.queryItems?.first(where: { $0.name == "list" })?.value else { return nil }
+        let hosts = ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"]
+        let bareURL = hosts.contains { text.lowercased().hasPrefix($0 + "/") }
+        if text.contains("://") || bareURL {
+            guard let url = URLComponents(string: bareURL ? "https://" + text : text), url.scheme?.lowercased() == "https",
+                  let host = url.host?.lowercased(), hosts.contains(host),
+                  url.user == nil, url.password == nil, url.port == nil || url.port == 443,
+                  let ids = url.queryItems?.filter({ $0.name == "list" }), ids.count == 1,
+                  let id = ids.first?.value else { return nil }
             value = id
         }
-        return value.range(of: "^[A-Za-z0-9_-]{10,80}$", options: .regularExpression) == nil ? nil : value
+        guard let match = value.range(of: "^[A-Za-z0-9_-]{10,80}$", options: .regularExpression),
+              match == value.startIndex..<value.endIndex else { return nil }
+        return value
+    }
+}
+
+// Immutable inputs cross the executor boundary; stores and UI stay on MainActor.
+struct NativeLibraryCalculations {
+    var convertPlaylist: @Sendable (String, YouTubePlaylistDTO, String) throws -> PlaylistAPIImport.Result = {
+        try PlaylistAPIImport.make(requestedPlaylistID: $0, dto: $1, importedAt: $2)
+    }
+    var buildQueue: @Sendable (LibrarySnapshot, PlaylistID, LibraryQueueBuilder.Mode, Bool) -> [LibraryOccurrence] = {
+        LibraryQueueBuilder.build(snapshot: $0, playlistId: $1, mode: $2, excludeWatched: $3, draw: { Double.random(in: 0..<1) })
+    }
+}
+
+@MainActor
+final class NativeQueuePreparation: ObservableObject {
+    @Published private(set) var busy = false
+    private let calculations: NativeLibraryCalculations
+    private var operation: UUID?
+    private var worker: Task<[LibraryOccurrence], Never>?
+
+    init(calculations: NativeLibraryCalculations = .init()) { self.calculations = calculations }
+
+    func cancel() {
+        operation = nil; worker?.cancel(); worker = nil; busy = false
+    }
+
+    func prepare(snapshot: LibrarySnapshot, playlist: PlaylistID, mode: LibraryQueueBuilder.Mode,
+                 excludeWatched: Bool) async -> [LibraryOccurrence]? {
+        cancel()
+        let token = UUID(), build = calculations.buildQueue
+        operation = token; busy = true
+        let task = Task.detached(priority: .userInitiated) {
+            guard !Task.isCancelled else { return [LibraryOccurrence]() }
+            return build(snapshot, playlist, mode, excludeWatched)
+        }
+        worker = task
+        defer {
+            if operation == token { operation = nil; worker = nil; busy = false }
+        }
+        let items = await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
+        guard operation == token, !Task.isCancelled, !task.isCancelled else { return nil }
+        return items
     }
 }
 

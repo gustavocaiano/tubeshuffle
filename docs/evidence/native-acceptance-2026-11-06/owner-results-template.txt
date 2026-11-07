@@ -1,0 +1,22 @@
+TubeShuffle — ensaio final com dados descartáveis
+
+App: /Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-acceptance-qfz6tvok/rehearsal/TubeShuffle.app
+Pasta para todos os ficheiros de teste: /tmp/tubeshuffle-final-kqdl_21i
+
+Sem login nem bibliotecas reais neste ensaio.
+No painel de ficheiros usa Cmd+Shift+G para ir à pasta acima.
+Em Save As escreve apenas demo.json; confirma o destino antes de Save.
+Cria uma biblioteca com nome novo dentro dessa pasta, importa demo.json,
+cria uma fila, pausa, fecha/reabre a biblioteca e escolhe Resume queue.
+A fila deve manter ordem/seleção e aguardar Play. O JSON não transfere a fila.
+
+Devolve um único bloco; marca o que não fizeres como por validar:
+1. UI — thumbnails/layout, Cmd+/Cmd−/Cmd0, janela estreita, Focus só com thumbnail:
+2. Reprodução — áudio/avanço natural; Focus/Video; minimizar/Cmd+H/restaurar; fechar para o áudio:
+3. Transferência — exportar/importar; contagens/avisos; fechar/reabrir; ordem/seleção da fila; Resume sem autoplay:
+Erros observados:
+
+A automação abriu/cancelou Export, mas não conseguiu navegar para a pasta
+através de teclas sintéticas. Não guardou nenhum ficheiro em Documents.
+O login Google é uma etapa posterior; a configuração pública já está preparada.
+Credenciais nunca devem ser incluídas no bloco de resultados.

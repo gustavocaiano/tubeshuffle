@@ -1,0 +1,32 @@
+[
+  {
+    "case" : "fixture",
+    "height" : 233,
+    "liveAccountOrNetwork" : false,
+    "width" : 448
+  },
+  {
+    "case" : "choose-library",
+    "height" : 527,
+    "liveAccountOrNetwork" : false,
+    "width" : 448
+  },
+  {
+    "case" : "local-account-and-error",
+    "height" : 427,
+    "liveAccountOrNetwork" : false,
+    "width" : 448
+  },
+  {
+    "case" : "account-setup",
+    "height" : 590,
+    "liveAccountOrNetwork" : false,
+    "width" : 448
+  },
+  {
+    "case" : "account-sign-in",
+    "height" : 590,
+    "liveAccountOrNetwork" : false,
+    "width" : 448
+  }
+]

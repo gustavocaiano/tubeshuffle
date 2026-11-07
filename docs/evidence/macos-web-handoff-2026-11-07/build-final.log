@@ -1,0 +1,40 @@
+npm notice run tubeshuffle@0.1.0 build
+npm notice run next build
+▲ Next.js 16.2.9 (Turbopack)
+
+  Creating an optimized production build ...
+(node:71716) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✓ Compiled successfully in 2.2s
+  Running TypeScript ...
+  Finished TypeScript in 2.3s ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/14) ...
+  Generating static pages using 11 workers (3/14)
+  Generating static pages using 11 workers (6/14)
+  Generating static pages using 11 workers (10/14)
+✓ Generating static pages using 11 workers (14/14) in 112ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/auth/csrf
+├ ƒ /api/auth/logout
+├ ƒ /api/auth/start
+├ ƒ /api/playlist-links
+├ ƒ /api/playlist-links/[playlistId]
+├ ƒ /api/youtube/playlist
+├ ƒ /api/youtube/suggestions
+├ ƒ /auth/callback
+├ ƒ /dashboard
+├ ○ /macos
+├ ƒ /playlist/[id]
+├ ○ /robots.txt
+└ ○ /sitemap.xml
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

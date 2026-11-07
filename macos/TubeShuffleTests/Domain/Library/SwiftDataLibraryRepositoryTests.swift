@@ -7,6 +7,25 @@ import XCTest
 final class SwiftDataLibraryRepositoryTests: XCTestCase {
     private let schema = Schema([StoredPlaylist.self, StoredOccurrence.self, StoredHistoryEvent.self])
 
+    func testStorageKeysRetainTheExistingExactUTF8HexFormat() {
+        let vectors = [
+            ("", ""),
+            ("A-z_09", "412d7a5f3039"),
+            ("\u{e9}", "c3a9"),
+            ("e\u{301}", "65cc81"),
+            ("🎵", "f09f8eb5"),
+            ("\u{10ffff}", "f48fbfbf"),
+            ("\u{0}", "00")
+        ]
+        for (value, existingKey) in vectors {
+            XCTAssertEqual(LibraryStorageKey.encode(value), existingKey)
+        }
+        XCTAssertNotEqual(LibraryStorageKey.encode("\u{e9}"), LibraryStorageKey.encode("e\u{301}"))
+        XCTAssertTrue(LibraryStorageKey.valid("c3a9", original: "\u{e9}"))
+        XCTAssertFalse(LibraryStorageKey.valid("c3a9", original: "e\u{301}"))
+        XCTAssertFalse(LibraryStorageKey.valid("00", original: "\u{0}"))
+    }
+
     private func memory() throws -> ModelContainer {
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])

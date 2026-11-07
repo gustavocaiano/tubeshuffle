@@ -1,0 +1,10 @@
+{"earlierAttempt": "Fresh ordinary app opened import sheet; import and account actions were disabled until choosing a local library. Synthetic link was entered and cancelled. Library sheet opened. AX helper stopped on an ambiguous Import label also present under the modal; it now scopes presses to the active sheet."}
+{"action": ["press", "Import YouTube playlist"], "exit": 0, "result": "result=0", "error": ""}
+{"assertion": "Library sheet transitions to import; synthetic link retained; missing library blocks connect/import", "passed": true}
+{"action": ["press", "Cancel"], "exit": 0, "result": "result=0", "error": ""}
+{"action": ["press", "Account, Account"], "exit": 0, "result": "result=0", "error": ""}
+{"action": ["press-id", "account.useTubeShuffle"], "exit": 0, "result": "result=0", "error": ""}
+{"assertion": "Explicit bundled setup enables separate Google sign-in button; no authentication action pressed", "passed": true}
+{"action": ["press", "Done"], "exit": 0, "result": "result=0", "error": ""}
+{"action": ["press-id", "library.importYouTube"], "exit": 0, "result": "result=0", "error": ""}
+{"action": ["set-id", "import.playlistURL", ""], "exit": 0, "result": "result=0", "error": ""}

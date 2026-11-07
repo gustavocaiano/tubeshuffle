@@ -13,34 +13,20 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { classifyEnergyTrack } from "@/lib/shuffle/energy-classifier";
-import {
-  getDailySuggestionsResuggestUsed,
-  getDailySuggestionsCache,
-  getLocalDateKey,
-  setDailySuggestionsResuggestUsed,
-  setDailySuggestionsCache,
-} from "@/lib/suggestions/daily-suggestions-cache";
+import { getLocalDateKey } from "@/lib/suggestions/daily-suggestions-cache";
 import { cn, formatDuration } from "@/lib/utils";
 import { usePlayerStore, type VideoItem } from "@/stores/player-store";
-import type { DailySuggestionsResult, LocalVideo, SuggestedVideo } from "@/types/playlist";
-import { getCsrf, responseError, safeAccountMessage } from "@/lib/services/account-client";
+import type { LocalVideo, SuggestedVideo } from "@/types/playlist";
+import { safeAccountMessage } from "@/lib/services/account-client";
+import { useBrowserStorage } from "@/hooks/use-browser-storage";
+import { fetchDailySuggestions, assertSuggestionsOperation } from "@/lib/suggestions/daily-suggestions-client";
+import { serializeSuggestionsInput, MAX_SUGGESTION_SEEDS, type SuggestionSeed } from "@/lib/suggestions/input-policy";
 
 interface DailySuggestionsProps {
   playlistId: string;
   playlistTitle: string;
   videos: LocalVideo[];
 }
-
-type DailySuggestionsQueryResult = DailySuggestionsResult & {
-  source: "cache" | "network";
-};
-
-type SuggestionSeed = Pick<
-  LocalVideo,
-  "title" | "channelTitle" | "description" | "tags" | "categoryId" | "duration"
->;
-
-const MAX_SEEDS = 40;
 
 function selectSeeds(videos: LocalVideo[]): SuggestionSeed[] {
   const ranked = videos
@@ -68,13 +54,13 @@ function selectSeeds(videos: LocalVideo[]): SuggestionSeed[] {
   }
 
   for (const entry of ranked) {
-    if (selected.length >= MAX_SEEDS) break;
+    if (selected.length >= MAX_SUGGESTION_SEEDS) break;
     if (!selected.some((video) => video.id === entry.video.id)) {
       selected.push(entry.video);
     }
   }
 
-  return selected.slice(0, MAX_SEEDS).map((video) => ({
+  return selected.slice(0, MAX_SUGGESTION_SEEDS).map((video) => ({
     title: video.title,
     channelTitle: video.channelTitle,
     description: video.description,
@@ -103,64 +89,21 @@ function buildFallbackSearchUrl(playlistTitle: string, videos: LocalVideo[]): st
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
 }
 
-async function fetchDailySuggestions(
-  playlistId: string,
-  playlistTitle: string,
-  videos: LocalVideo[],
-  dateKey: string,
-  options: {
-    forceRefresh?: boolean;
-    previousSuggestions?: SuggestedVideo[];
-  } = {}
-): Promise<DailySuggestionsQueryResult> {
-  const cached = options.forceRefresh ? null : await getDailySuggestionsCache(playlistId, dateKey);
-  if (!options.forceRefresh && cached && cached.suggestions.length >= 5) {
-    return { ...cached, source: "cache" };
-  }
-
-  const excludedSuggestionIds = options.previousSuggestions?.map((suggestion) => suggestion.youtubeId) ?? [];
-
-  const csrfToken = await getCsrf();
-  const response = await fetch("/api/youtube/suggestions", {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      "x-csrf-token": csrfToken,
-    },
-    body: JSON.stringify({
-      playlistId,
-      playlistTitle,
-      dateKey,
-      seeds: selectSeeds(videos),
-      excludeVideoIds: [...videos.map((video) => video.youtubeId), ...excludedSuggestionIds],
-      refreshToken: options.forceRefresh ? `${dateKey}:${Date.now()}` : undefined,
-    }),
-  });
-
-  if (!response.ok) throw await responseError(response);
-  const payload = (await response.json()) as DailySuggestionsResult;
-
-  const result = payload as DailySuggestionsResult;
-  await setDailySuggestionsCache(result);
-  return { ...result, source: "network" };
-}
-
 export function DailySuggestions({
   playlistId,
   playlistTitle,
   videos,
 }: DailySuggestionsProps) {
-  const [shouldLoad, setShouldLoad] = useState(false);
+  const storage = useBrowserStorage();
   const [dateKey, setDateKey] = useState(() => getLocalDateKey());
-  const [resuggestUsed, setResuggestUsed] = useState(false);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const fallbackUrl = useMemo(
-    () => buildFallbackSearchUrl(playlistTitle, videos),
-    [playlistTitle, videos]
-  );
-  const { playNowItem, playNextItem } = usePlayerStore();
-  const queryClient = useQueryClient();
+  const request = useMemo(() => {
+    try {
+      return { body: serializeSuggestionsInput({
+        playlistId, playlistTitle, dateKey, seeds: selectSeeds(videos),
+        excludeVideoIds: videos.map(video => video.youtubeId),
+      }) };
+    } catch (error) { return { error }; }
+  }, [playlistId, playlistTitle, dateKey, videos]);
 
   useEffect(() => {
     const refreshDateKey = () => setDateKey(getLocalDateKey());
@@ -179,16 +122,29 @@ export function DailySuggestions({
     };
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    void getDailySuggestionsResuggestUsed(playlistId, dateKey).then((used) => {
-      if (active) setResuggestUsed(used);
-    });
+  if (storage.phase !== "ready") return null;
+  return <DailySuggestionsSession
+    key={JSON.stringify([storage.generation, dateKey, playlistId, request.body])}
+    playlistId={playlistId} playlistTitle={playlistTitle} videos={videos}
+    dateKey={dateKey} generation={storage.generation} request={request}
+  />;
+}
 
-    return () => {
-      active = false;
-    };
-  }, [playlistId, dateKey]);
+function DailySuggestionsSession({
+  playlistId, playlistTitle, videos, dateKey, generation, request,
+}: DailySuggestionsProps & { dateKey: string; generation: number; request: { body?: string; error?: unknown } }) {
+  const [shouldLoad, setShouldLoad] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const refreshControllers = useRef(new Set<AbortController>());
+  const fallbackUrl = useMemo(() => buildFallbackSearchUrl(playlistTitle, videos), [playlistTitle, videos]);
+  const { playNowItem, playNextItem } = usePlayerStore();
+  const queryClient = useQueryClient();
+  const queryKey = ["dailySuggestions", playlistId, dateKey, generation, request.body];
+
+  useEffect(() => {
+    const controllers = refreshControllers.current;
+    return () => { for (const controller of controllers) controller.abort(); };
+  }, []);
 
   useEffect(() => {
     if (shouldLoad || !sentinelRef.current) return;
@@ -208,28 +164,30 @@ export function DailySuggestions({
   }, [shouldLoad]);
 
   const suggestionsQuery = useQuery({
-    queryKey: ["dailySuggestions", playlistId, dateKey],
-    queryFn: () => fetchDailySuggestions(playlistId, playlistTitle, videos, dateKey),
+    queryKey,
+    queryFn: ({ signal }) => {
+      if (!request.body) throw request.error;
+      return fetchDailySuggestions({ body: request.body, generation, signal });
+    },
     enabled: shouldLoad && videos.length > 0,
     retry: false,
     staleTime: 60 * 60 * 1000,
   });
 
-  const resuggestMutation = useMutation({
-    mutationFn: () =>
-      fetchDailySuggestions(playlistId, playlistTitle, videos, dateKey, {
-        forceRefresh: true,
-        previousSuggestions: suggestions,
-      }),
-    onSuccess: async (result) => {
-      await setDailySuggestionsResuggestUsed(playlistId, dateKey);
-      setResuggestUsed(true);
-      queryClient.setQueryData(["dailySuggestions", playlistId, dateKey], result);
-    },
-  });
-
   const suggestions = suggestionsQuery.data?.suggestions ?? [];
-  const canResuggest = suggestions.length > 0 && !resuggestUsed;
+  const resuggestUsed = suggestionsQuery.data?.resuggestUsed;
+  const resuggestMutation = useMutation({
+    mutationFn: (controller: AbortController) => {
+      if (!request.body) throw request.error;
+      return fetchDailySuggestions({ body: request.body, generation, signal: controller.signal, previousSuggestions: suggestions });
+    },
+    onSuccess: (result, controller) => {
+      assertSuggestionsOperation({ generation, signal: controller.signal });
+      queryClient.setQueryData(queryKey, result);
+    },
+    onSettled: (_result, _error, controller) => { refreshControllers.current.delete(controller); },
+  });
+  const canResuggest = suggestions.length > 0 && resuggestUsed === false;
 
   return (
     <section ref={sentinelRef} className="relative mt-8 overflow-hidden rounded-[2rem] border border-white/10 bg-[#10100e]/80 p-5 text-white shadow-2xl shadow-black/30 backdrop-blur-xl md:p-6">
@@ -244,7 +202,11 @@ export function DailySuggestions({
             <Button
               type="button"
               variant="outline"
-              onClick={() => resuggestMutation.mutate()}
+              onClick={() => {
+                const controller = new AbortController();
+                refreshControllers.current.add(controller);
+                resuggestMutation.mutate(controller);
+              }}
               disabled={!canResuggest || resuggestMutation.isPending}
               className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
             >

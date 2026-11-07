@@ -1,0 +1,21 @@
+{"action": ["press-id", "library.menu"], "exit": 0, "result": "result=0", "error": ""}
+{"assertion": "Library menu groups management actions and has no demo entry", "passed": true, "items": ["Your playlists\u2026", "", "Import YouTube playlist\u2026", "New library\u2026", "Open library\u2026", "", "Import JSON\u2026", "Export library\u2026", "", "Account\u2026"]}
+{"action": ["press", "Your playlists\u2026"], "exit": 0, "result": "result=0", "error": ""}
+{"action": ["capture", "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-018phs9g/captures/library-empty.png"], "exit": 0, "result": "capture exit=0", "error": ""}
+{"action": ["press-id", "library.importYouTube"], "exit": 0, "result": "result=0", "error": ""}
+{"assertion": "Library grid dismisses and opens the playlist importer", "passed": true}
+{"action": ["press", "Cancel"], "exit": 0, "result": "result=0", "error": ""}
+{"action": ["menu", "Account\u2026"], "exit": 0, "result": "0", "error": ""}
+{"assertion": "Account is reachable from the Library menu without starting account services", "passed": true}
+{"action": ["press", "Done"], "exit": 0, "result": "result=0", "error": ""}
+{"action": ["resize", "480", "680"], "exit": 0, "result": "result=0", "error": ""}
+{"action": ["capture", "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-018phs9g/captures/welcome-480.png"], "exit": 0, "result": "capture exit=0", "error": ""}
+{"action": ["press", "Open Library"], "exit": 0, "result": "result=0", "error": ""}
+{"action": ["capture", "/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-310b873b/build/tubeshuffle-delivery-018phs9g/captures/library-empty-480.png"], "exit": 0, "result": "capture exit=0", "error": ""}
+{"action": ["press", "Options"], "exit": 0, "result": "result=0", "error": ""}
+{"assertion": "Library grid Options contains management actions at narrow width", "passed": true, "items": ["Import YouTube playlist\u2026", "New library\u2026", "Open library\u2026", "", "Import JSON\u2026", "Export library\u2026", "", "Account\u2026"]}
+{"action": ["press", "Account\u2026"], "exit": 0, "result": "result=0", "error": ""}
+{"assertion": "Library Options dismisses the grid before presenting Account; one active sheet", "passed": true}
+{"action": ["press", "Done"], "exit": 0, "result": "result=0", "error": ""}
+{"action": ["resize", "1100", "800"], "exit": 0, "result": "result=0", "error": ""}
+{"action": ["restore"], "exit": 0, "result": "true", "error": ""}

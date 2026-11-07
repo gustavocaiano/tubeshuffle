@@ -4,7 +4,17 @@ import SwiftData
 // Keys are ASCII encodings of exact UTF-8, not Swift String identity comparisons.
 enum LibraryStorageKey {
     static func encode(_ value: String) -> String {
-        value.utf8.map { String(format: "%02x", $0) }.joined()
+        // Keep the existing lowercase UTF-8 hex format byte-for-byte. Formatting
+        // each byte through Foundation made sorting a 5,000-item snapshot block
+        // the main actor for seconds on every saved queue transition.
+        let digits = Array("0123456789abcdef".utf8)
+        var bytes = [UInt8]()
+        bytes.reserveCapacity(value.utf8.count * 2)
+        for byte in value.utf8 {
+            bytes.append(digits[Int(byte >> 4)])
+            bytes.append(digits[Int(byte & 0x0f)])
+        }
+        return String(decoding: bytes, as: UTF8.self)
     }
 
     static func valid(_ key: String, original: String) -> Bool {

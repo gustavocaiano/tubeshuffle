@@ -1,0 +1,7 @@
+npm notice run tubeshuffle@0.1.0 lint
+npm notice run eslint
+
+/Users/gustavocaiano/.t3/worktrees/tubeshuffle/t3-85c046fe/src/stores/playlist-store.ts
+  76:22  warning  '_id' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)

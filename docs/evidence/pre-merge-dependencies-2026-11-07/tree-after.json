@@ -1,0 +1,161 @@
+{
+  "version": "0.1.0",
+  "name": "tubeshuffle",
+  "dependencies": {
+    "@tailwindcss/postcss": {
+      "version": "4.1.18",
+      "resolved": "https://registry.npmjs.org/@tailwindcss/postcss/-/postcss-4.1.18.tgz",
+      "overridden": false,
+      "dependencies": {
+        "@tailwindcss/node": {
+          "version": "4.1.18",
+          "resolved": "https://registry.npmjs.org/@tailwindcss/node/-/node-4.1.18.tgz",
+          "overridden": false,
+          "dependencies": {
+            "source-map-js": {
+              "version": "1.2.2",
+              "resolved": "https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.2.tgz",
+              "overridden": false
+            }
+          }
+        },
+        "postcss": {
+          "version": "8.5.23",
+          "resolved": "https://registry.npmjs.org/postcss/-/postcss-8.5.23.tgz",
+          "overridden": true,
+          "dependencies": {
+            "nanoid": {
+              "version": "3.3.20",
+              "resolved": "https://registry.npmjs.org/nanoid/-/nanoid-3.3.20.tgz",
+              "overridden": false
+            },
+            "source-map-js": {
+              "version": "1.2.2"
+            }
+          }
+        }
+      }
+    },
+    "@vercel/analytics": {
+      "version": "2.0.1",
+      "resolved": "https://registry.npmjs.org/@vercel/analytics/-/analytics-2.0.1.tgz",
+      "overridden": false,
+      "dependencies": {
+        "next": {
+          "version": "16.4.5"
+        }
+      }
+    },
+    "eslint-config-next": {
+      "version": "16.4.5",
+      "resolved": "https://registry.npmjs.org/eslint-config-next/-/eslint-config-next-16.4.5.tgz",
+      "overridden": false
+    },
+    "jsdom": {
+      "version": "27.0.1",
+      "resolved": "https://registry.npmjs.org/jsdom/-/jsdom-27.0.1.tgz",
+      "overridden": false,
+      "dependencies": {
+        "@asamuzakjp/dom-selector": {
+          "version": "6.7.8",
+          "resolved": "https://registry.npmjs.org/@asamuzakjp/dom-selector/-/dom-selector-6.7.8.tgz",
+          "overridden": false,
+          "dependencies": {
+            "css-tree": {
+              "version": "3.1.0",
+              "resolved": "https://registry.npmjs.org/css-tree/-/css-tree-3.1.0.tgz",
+              "overridden": false,
+              "dependencies": {
+                "source-map-js": {
+                  "version": "1.2.2"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "next": {
+      "version": "16.4.5",
+      "resolved": "https://registry.npmjs.org/next/-/next-16.4.5.tgz",
+      "overridden": false,
+      "dependencies": {
+        "baseline-browser-mapping": {
+          "version": "2.11.35",
+          "resolved": "https://registry.npmjs.org/baseline-browser-mapping/-/baseline-browser-mapping-2.11.35.tgz",
+          "overridden": false
+        },
+        "postcss": {
+          "version": "8.5.23"
+        },
+        "sharp": {
+          "version": "0.35.5",
+          "resolved": "https://registry.npmjs.org/sharp/-/sharp-0.35.5.tgz",
+          "overridden": false
+        }
+      }
+    },
+    "shadcn": {
+      "version": "3.8.4",
+      "resolved": "https://registry.npmjs.org/shadcn/-/shadcn-3.8.4.tgz",
+      "overridden": false,
+      "dependencies": {
+        "browserslist": {
+          "version": "4.28.1",
+          "resolved": "https://registry.npmjs.org/browserslist/-/browserslist-4.28.1.tgz",
+          "overridden": false,
+          "dependencies": {
+            "baseline-browser-mapping": {
+              "version": "2.11.35"
+            }
+          }
+        },
+        "postcss": {
+          "version": "8.5.23"
+        }
+      }
+    },
+    "vitest": {
+      "version": "3.2.6",
+      "resolved": "https://registry.npmjs.org/vitest/-/vitest-3.2.6.tgz",
+      "overridden": false,
+      "dependencies": {
+        "@vitest/mocker": {
+          "version": "3.2.6",
+          "resolved": "https://registry.npmjs.org/@vitest/mocker/-/mocker-3.2.6.tgz",
+          "overridden": false,
+          "dependencies": {
+            "vite": {
+              "version": "7.3.5"
+            }
+          }
+        },
+        "tinypool": {
+          "version": "1.1.1",
+          "resolved": "https://registry.npmjs.org/tinypool/-/tinypool-1.1.1.tgz",
+          "overridden": false
+        },
+        "vite-node": {
+          "version": "3.2.4",
+          "resolved": "https://registry.npmjs.org/vite-node/-/vite-node-3.2.4.tgz",
+          "overridden": false,
+          "dependencies": {
+            "vite": {
+              "version": "7.3.5"
+            }
+          }
+        },
+        "vite": {
+          "version": "7.3.5",
+          "resolved": "https://registry.npmjs.org/vite/-/vite-7.3.5.tgz",
+          "overridden": false,
+          "dependencies": {
+            "postcss": {
+              "version": "8.5.23"
+            }
+          }
+        }
+      }
+    }
+  }
+}

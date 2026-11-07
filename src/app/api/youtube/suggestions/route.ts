@@ -2,46 +2,14 @@ import { NextResponse } from "next/server";
 import { classifyEnergyTrack, type EnergyBucket } from "@/lib/shuffle/energy-classifier";
 import { parseIsoDuration } from "@/lib/utils";
 import type { DailySuggestionsResult, SuggestedVideo } from "@/types/playlist";
+import { readBoundedBody } from "@/lib/server/bounded-body";
+import { MAX_SUGGESTION_REQUEST_BYTES, normalizeSuggestionsInput, SuggestionsInputError, type SuggestionSeed, type SuggestionsInput as ValidatedSuggestionsRequest } from "@/lib/suggestions/input-policy";
+import { suggestionFingerprint, SuggestionsServerState } from "@/lib/suggestions/server-state";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
-const MAX_SEEDS = 40;
-const MAX_EXCLUDED_IDS = 5_000;
-const MAX_REQUEST_BYTES = 128_000;
 const TARGET_SUGGESTIONS = 5;
 const SEARCH_RESULTS_PER_QUERY = 25;
 const MAX_SEARCH_QUERIES = 4;
-const SUGGESTION_ALGORITHM_VERSION = 2;
-const MEMORY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
-const RATE_LIMIT_MAX_REQUESTS = 30;
-
-type SuggestionSeed = {
-  title: string;
-  channelTitle: string;
-  description?: string;
-  tags?: string[];
-  categoryId?: string;
-  duration?: number;
-};
-
-type SuggestionsRequest = {
-  playlistId?: string;
-  playlistTitle?: string;
-  dateKey?: string;
-  seeds?: SuggestionSeed[];
-  excludeVideoIds?: string[];
-  refreshToken?: string;
-};
-
-type ValidatedSuggestionsRequest = {
-  playlistId: string;
-  playlistTitle?: string;
-  dateKey: string;
-  seeds: SuggestionSeed[];
-  excludeVideoIds: string[];
-  refreshToken?: string;
-};
-
 class ApiError extends Error {
   constructor(readonly status: number, message: string) {
     super(message);
@@ -69,8 +37,7 @@ type VideoDetails = {
   publishedAt?: string;
 };
 
-const memoryCache = new Map<string, { expiresAt: number; result: DailySuggestionsResult }>();
-const rateLimits = new Map<string, { windowStart: number; count: number }>();
+const serverState = new SuggestionsServerState();
 
 function jsonError(status: number, message: string) {
   return NextResponse.json({ error: message }, { status });
@@ -142,108 +109,9 @@ function uniqueUsefulTerms(values: string[], limit: number): string[] {
   return terms;
 }
 
-function getLocalDateFallback(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function compactHash(value: unknown): string {
-  const input = JSON.stringify(value);
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    hash = (hash * 31 + input.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash).toString(36);
-}
-
-function getCacheKey(body: ValidatedSuggestionsRequest): string {
-  const seedFingerprint = body.seeds.map((seed) => [seed.title, seed.channelTitle, seed.tags]);
-  const excludeFingerprint = [body.excludeVideoIds.length, body.excludeVideoIds[0], body.excludeVideoIds.at(-1)];
-  return `${SUGGESTION_ALGORITHM_VERSION}:${body.playlistId}:${body.dateKey}:${compactHash([
-    seedFingerprint,
-    excludeFingerprint,
-    body.refreshToken,
-  ])}`;
-}
-
 function getClientKey(request: Request): string {
   const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   return forwardedFor || request.headers.get("x-real-ip") || "unknown";
-}
-
-function assertRateLimit(clientKey: string): void {
-  const now = Date.now();
-  const current = rateLimits.get(clientKey);
-
-  if (!current || now - current.windowStart > RATE_LIMIT_WINDOW_MS) {
-    rateLimits.set(clientKey, { windowStart: now, count: 1 });
-    return;
-  }
-
-  if (current.count >= RATE_LIMIT_MAX_REQUESTS) {
-    throw new ApiError(429, "Daily suggestions are temporarily rate limited");
-  }
-
-  current.count += 1;
-}
-
-function validateBody(body: unknown): ValidatedSuggestionsRequest {
-  if (!isRecord(body)) {
-    throw new ApiError(400, "Invalid suggestions request body");
-  }
-
-  const input = body as SuggestionsRequest;
-  const playlistId = typeof input.playlistId === "string" ? input.playlistId.trim() : "";
-  if (!playlistId || playlistId.length > 120) {
-    throw new ApiError(400, "Missing or invalid playlist id");
-  }
-
-  const seeds = Array.isArray(input.seeds)
-    ? input.seeds
-        .filter(
-          (seed) =>
-            isRecord(seed) &&
-            typeof seed.title === "string" &&
-            typeof seed.channelTitle === "string"
-        )
-        .slice(0, MAX_SEEDS)
-    : [];
-  if (seeds.length === 0) {
-    throw new ApiError(400, "At least one suggestion seed is required");
-  }
-
-  return {
-    playlistId,
-    dateKey:
-      typeof input.dateKey === "string" && input.dateKey.trim()
-        ? input.dateKey.trim()
-        : getLocalDateFallback(),
-    playlistTitle:
-      typeof input.playlistTitle === "string" ? input.playlistTitle.slice(0, 160) : undefined,
-    seeds: seeds.map((seed) => ({
-      title: seed.title.slice(0, 180),
-      channelTitle: seed.channelTitle.slice(0, 120),
-      description: typeof seed.description === "string" ? seed.description.slice(0, 600) : undefined,
-      tags: Array.isArray(seed.tags)
-        ? seed.tags
-            .filter((tag): tag is string => typeof tag === "string")
-            .slice(0, 12)
-            .map((tag) => tag.slice(0, 60))
-        : undefined,
-      categoryId: typeof seed.categoryId === "string" ? seed.categoryId.slice(0, 20) : undefined,
-      duration: typeof seed.duration === "number" ? seed.duration : undefined,
-    })),
-    excludeVideoIds: Array.isArray(input.excludeVideoIds)
-      ? input.excludeVideoIds
-          .filter((id): id is string => typeof id === "string")
-          .slice(0, MAX_EXCLUDED_IDS)
-      : [],
-    refreshToken:
-      typeof input.refreshToken === "string" ? input.refreshToken.slice(0, 80) : undefined,
-  };
 }
 
 function energyLabel(bucket: EnergyBucket): string {
@@ -490,25 +358,27 @@ async function handlePost(request: Request) {
     }
 
     const contentLength = Number.parseInt(request.headers.get("content-length") ?? "0", 10);
-    if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) {
+    if (Number.isFinite(contentLength) && contentLength > MAX_SUGGESTION_REQUEST_BYTES) {
       return jsonError(413, "Suggestions request is too large");
     }
 
     let rawBody: unknown;
     try {
-      rawBody = await request.json();
+      const bytes = await readBoundedBody(request, MAX_SUGGESTION_REQUEST_BYTES);
+      if (!bytes) return jsonError(413, "Suggestions request is too large");
+      rawBody = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
     } catch {
       return jsonError(400, "Invalid JSON request body");
     }
 
-    const body = validateBody(rawBody);
-    const cacheKey = getCacheKey(body);
-    const cached = memoryCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      return NextResponse.json(cached.result, { status: 200 });
-    }
+    const body = normalizeSuggestionsInput(rawBody);
+    const cacheKey = suggestionFingerprint(body);
+    const cached = serverState.getCached(cacheKey);
+    if (cached) return NextResponse.json(cached, { status: 200 });
 
-    assertRateLimit(getClientKey(request));
+    if (!serverState.admitRequest(getClientKey(request))) {
+      throw new ApiError(429, "Daily suggestions are temporarily rate limited");
+    }
 
     const excludedIds = new Set(body.excludeVideoIds ?? []);
     const queries = buildSearchQueries(body.playlistTitle, body.seeds ?? []);
@@ -581,13 +451,11 @@ async function handlePost(request: Request) {
       suggestions,
     };
 
-    memoryCache.set(cacheKey, {
-      expiresAt: Date.now() + MEMORY_CACHE_TTL_MS,
-      result,
-    });
+    serverState.cacheResult(cacheKey, result);
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
+    if (error instanceof SuggestionsInputError) return jsonError(400, error.message);
     if (error instanceof ApiError) {
       return jsonError(error.status, error.message);
     }

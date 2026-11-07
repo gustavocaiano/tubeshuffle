@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+.tabs { display:flex; gap:8px; margin-bottom:14px; }
+button { padding:9px 15px; border:1px solid var(--border); border-radius:var(--radius); background:var(--secondary); color:var(--foreground); font:500 13px var(--font-sans); cursor:pointer; }
+button[aria-selected="true"] { background:var(--foreground); color:var(--background); }
+button:focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
+figure { margin:0; } figure[hidden] { display:none; }
+img { display:block; width:100%; height:auto; border-radius:var(--radius); }
+figcaption { margin-top:10px; color:var(--muted-foreground); font:12px var(--font-sans); }
+</style></head><body>
+<div class="tabs" role="tablist" aria-label="Vistas da aplicação">
+<button id="initial-tab" role="tab" aria-selected="true" aria-controls="initial" onclick="showPanel('initial')">Ecrã inicial</button>
+<button id="library-tab" role="tab" aria-selected="false" aria-controls="library" onclick="showPanel('library')">Library</button>
+</div>
+<figure id="initial" role="tabpanel" aria-labelledby="initial-tab"><img src="captures/welcome.png" alt="Aplicação TubeShuffle com apenas Library no topo, sem Try the demo nem opções de importação sempre visíveis"><figcaption>Captura da app atualizada, sem biblioteca selecionada nem login.</figcaption></figure>
+<figure id="library" role="tabpanel" aria-labelledby="library-tab" hidden><img src="captures/library-empty.png" alt="Library reúne as playlists, o botão de importar e o menu Options"><figcaption>As ações de biblioteca e conta ficam dentro de Library.</figcaption></figure>
+<script>
+function showPanel(id) {
+  for (const name of ['initial','library']) {
+    document.getElementById(name).hidden = name !== id;
+    document.getElementById(name+'-tab').setAttribute('aria-selected',String(name === id));
+  }
+}
+</script></body></html>

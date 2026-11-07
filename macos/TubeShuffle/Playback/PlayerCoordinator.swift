@@ -4,6 +4,66 @@ import Foundation
 import MediaPlayer
 import WebKit
 
+struct PlayerMediaState: Equatable {
+    var title: String? = nil
+    var artist: String? = nil
+    var elapsed: Double? = nil
+    var duration: Double? = nil
+    var playing = false
+    var transport = false
+    var next = false
+    var seek = false
+}
+
+// System media state is shared by all listening sessions. A revoked session
+// cannot publish or clear its successor, including from late async cleanup.
+@MainActor
+final class PlayerMediaPublication {
+    private var owner: UUID?
+    private var revoke: (() -> Void)?
+    private let sink: (PlayerMediaState) -> Void
+
+    init(sink: @escaping (PlayerMediaState) -> Void) { self.sink = sink }
+    func isOwner(_ token: UUID) -> Bool { owner == token }
+    func claim(_ token: UUID, onRevoke: @escaping () -> Void) {
+        revoke?()
+        owner = token; revoke = onRevoke
+        sink(PlayerMediaState())
+    }
+    func publish(_ state: PlayerMediaState, owner token: UUID) {
+        guard owner == token else { return }
+        sink(state)
+    }
+    func release(_ token: UUID) {
+        guard owner == token else { return }
+        revoke?(); revoke = nil; owner = nil
+        sink(PlayerMediaState())
+    }
+
+    static let system = PlayerMediaPublication { state in
+        let center = MPRemoteCommandCenter.shared()
+        center.playCommand.isEnabled = state.transport
+        center.pauseCommand.isEnabled = state.transport
+        center.togglePlayPauseCommand.isEnabled = state.transport
+        center.nextTrackCommand.isEnabled = state.next
+        center.changePlaybackPositionCommand.isEnabled = state.seek
+        let nowPlaying = MPNowPlayingInfoCenter.default()
+        guard let title = state.title else {
+            nowPlaying.nowPlayingInfo = nil; nowPlaying.playbackState = .stopped
+            return
+        }
+        var info: [String: Any] = [MPMediaItemPropertyTitle: title]
+        if let artist = state.artist { info[MPMediaItemPropertyArtist] = artist }
+        if !state.playing { info[MPNowPlayingInfoPropertyPlaybackRate] = 0.0 }
+        if let duration = state.duration, let elapsed = state.elapsed {
+            info[MPMediaItemPropertyPlaybackDuration] = duration
+            info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = elapsed
+        }
+        nowPlaying.nowPlayingInfo = info
+        nowPlaying.playbackState = state.playing ? .playing : .paused
+    }
+}
+
 @MainActor
 final class PlayerCoordinator: ObservableObject {
     struct Item: Identifiable {
@@ -88,15 +148,23 @@ final class PlayerCoordinator: ObservableObject {
         var volume: (@MainActor (Double, Int) async throws -> Void)? = nil
     }
     private let testHooks: TestHooks?
+    private let mediaPublication: PlayerMediaPublication?
+    private let mediaOwner = UUID()
     var onNaturalCompletion: ((Item) -> Void)?
     var onQueueChanged: (([Item], Int) -> Void)?
     private var lastCompletedGeneration: Int?
 
-    init(initialItems: [Item]? = nil, initialIndex: Int = 0, testHooks: TestHooks? = nil) {
+    init(initialItems: [Item]? = nil, initialIndex: Int = 0, testHooks: TestHooks? = nil,
+         mediaPublication: PlayerMediaPublication? = nil) {
         self.testHooks = testHooks
+        self.mediaPublication = mediaPublication ?? (testHooks == nil ? .system : nil)
         if let initialItems {
             precondition(!initialItems.isEmpty && Set(initialItems.map(\.id)).count == initialItems.count)
             playbackQueue = PlaybackQueue(items: initialItems, state: QueueState(count: initialItems.count, initialIndex: initialIndex))
+        }
+        let eligibility = remoteEligibility
+        self.mediaPublication?.claim(mediaOwner) {
+            eligibility.update(transport: false, next: false, seek: false, window: 0, occurrence: 0)
         }
         if testHooks == nil {
             setupRemoteCommands()
@@ -311,9 +379,9 @@ final class PlayerCoordinator: ObservableObject {
     // that completes without a ready callback requires a restart instead of
     // leaving controls enabled against an unverified instance.
     private func readinessWatchdog(_ token: Int, generation: Int) -> Task<Void, Never> {
-        Task {
+        Task { [weak self] in
             do { try await Task.sleep(nanoseconds: 15_000_000_000) } catch { return }
-            guard windowOpen, !recoveryRequired else { return }
+            guard let self, windowOpen, !recoveryRequired else { return }
             if readinessGate.timeout(token) { failOccurrence("player generation \(generation) readiness timed out") }
         }
     }
@@ -582,33 +650,18 @@ final class PlayerCoordinator: ObservableObject {
     }
 
     private func publishNowPlaying() {
-        guard testHooks == nil else { return }
-        let center = MPRemoteCommandCenter.shared()
-        let available = canTransport
-        remoteEligibility.update(transport: available, next: canNext, seek: canSeek, window: windowGeneration, occurrence: occurrence)
-        center.playCommand.isEnabled = available
-        center.pauseCommand.isEnabled = available
-        center.togglePlayPauseCommand.isEnabled = available
-        center.nextTrackCommand.isEnabled = canNext
-        center.changePlaybackPositionCommand.isEnabled = canSeek
-        let nowPlaying = MPNowPlayingInfoCenter.default()
-        guard nowPlayingAvailable else {
-            nowPlaying.nowPlayingInfo = nil
-            nowPlaying.playbackState = .stopped
-            return
+        let ownsMedia = mediaPublication?.isOwner(mediaOwner) == true
+        remoteEligibility.update(transport: ownsMedia && canTransport, next: ownsMedia && canNext,
+                                 seek: ownsMedia && canSeek, window: windowGeneration, occurrence: occurrence)
+        guard ownsMedia else { return }
+        var state = PlayerMediaState(transport: canTransport, next: canNext, seek: canSeek)
+        if nowPlayingAvailable {
+            state.title = queue[index].title ?? "Playback Lab · last accepted item \(index + 1)"
+            state.artist = queue[index].channel
+            state.playing = observedPlaying
+            if duration > 0 { state.duration = duration; state.elapsed = elapsed }
         }
-        var info: [String: Any] = [
-            MPMediaItemPropertyTitle: queue[index].title ?? "Playback Lab · last accepted item \(index + 1)"
-        ]
-        if let artist = queue[index].channel { info[MPMediaItemPropertyArtist] = artist }
-        // The embedded player may change speed; do not assert a rate of 1.
-        if !observedPlaying { info[MPNowPlayingInfoPropertyPlaybackRate] = 0.0 }
-        if duration > 0 {
-            info[MPMediaItemPropertyPlaybackDuration] = duration
-            info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = elapsed
-        }
-        nowPlaying.nowPlayingInfo = info
-        nowPlaying.playbackState = observedPlaying ? .playing : .paused
+        mediaPublication?.publish(state, owner: mediaOwner)
     }
 
     var nowPlayingAvailable: Bool {
@@ -631,7 +684,8 @@ final class PlayerCoordinator: ObservableObject {
                     // occurrence; a natural advance or window change between the
                     // system callback and this task discards the command instead
                     // of applying it to a superseded player.
-                    guard self.windowOpen, self.windowGeneration == eligibility.window, self.occurrence == eligibility.occurrence else {
+                    guard self.mediaPublication?.isOwner(self.mediaOwner) == true, self.windowOpen,
+                          self.windowGeneration == eligibility.window, self.occurrence == eligibility.occurrence else {
                         self.record("system command discarded; window or occurrence superseded")
                         return
                     }
@@ -665,10 +719,8 @@ final class PlayerCoordinator: ObservableObject {
 
     deinit {
         for (command, token) in remoteHandlers { command.removeTarget(token) }
-        if testHooks == nil {
-            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
-            MPNowPlayingInfoCenter.default().playbackState = .stopped
-        }
+        let publication = mediaPublication, owner = mediaOwner
+        Task { @MainActor in publication?.release(owner) }
     }
 
     /// A closed listening surface cannot retain media, remote controls or callbacks.
@@ -681,7 +733,8 @@ final class PlayerCoordinator: ObservableObject {
         player.stop()
         for (command, token) in remoteHandlers { command.removeTarget(token) }
         remoteHandlers.removeAll()
-        publishNowPlaying()
+        remoteEligibility.update(transport: false, next: false, seek: false, window: windowGeneration, occurrence: occurrence)
+        mediaPublication?.release(mediaOwner)
     }
 
     func attach(window: NSWindow) {

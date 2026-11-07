@@ -23,9 +23,16 @@ export function Footer() {
         <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-white/55">
           <Link
             href="/dashboard"
+            prefetch={false}
             className="inline-flex min-h-11 items-center rounded-lg transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/75"
           >
             Open app
+          </Link>
+          <Link
+            href="/macos"
+            className="inline-flex min-h-11 items-center rounded-lg transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/75"
+          >
+            Mac app &amp; installation
           </Link>
           <a
             href="https://github.com/gustavocaiano/tubeshuffle"

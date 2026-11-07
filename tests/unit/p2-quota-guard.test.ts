@@ -12,7 +12,10 @@ describe("P2 incomplete fail-closed quota boundary", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const playlist = await GET(new Request("https://example.com/api/youtube/playlist?playlistId=abcdefghij"));
-    const suggestions = await POST(new Request("https://example.com/api/youtube/suggestions", { method: "POST", body: "{}" }));
+    const suggestionsRequest = new Request("https://example.com/api/youtube/suggestions", { method: "POST", body: "{}" });
+    const readBody = vi.spyOn(suggestionsRequest, "body", "get");
+    const suggestions = await POST(suggestionsRequest);
+    expect(readBody).not.toHaveBeenCalled();
     expect(playlist.status).toBe(503);
     expect(suggestions.status).toBe(503);
     expect(playlist.headers.get("cache-control")).toContain("no-store");
@@ -36,6 +39,12 @@ describe("P2 incomplete fail-closed quota boundary", () => {
     vi.stubGlobal("fetch", fetchMock);
     const response = await GET(new Request("https://example.com/api/youtube/playlist", { headers: { authorization: "Basic invalid", cookie: "session=present" } }));
     expect(response.status).toBe(401);
+    const suggestionsRequest = new Request("https://example.com/api/youtube/suggestions", {
+      method: "POST", body: "x".repeat(300204), headers: { authorization: "Basic invalid", cookie: "session=present" },
+    });
+    const readBody = vi.spyOn(suggestionsRequest, "body", "get");
+    expect((await POST(suggestionsRequest)).status).toBe(401);
+    expect(readBody).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

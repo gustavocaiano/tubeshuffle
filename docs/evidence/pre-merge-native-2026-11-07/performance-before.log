@@ -1,0 +1,7 @@
+fixture: /var/folders/wc/klrm9xnd0fn17xqp95c5dxnr0000gn/T/tubeshuffle-review-perf-E68112D1-1B1E-40CB-B047-ECF5E6C47C8D
+import-5000: 0.89167812501546
+snapshot-5000: 3.611261625017505
+save-queue-5000: 3.6129996250383556
+advance-queue-5000: 3.6671766249928623
+smart-shuffle-5000: 0.447090333327651
+transfer-export-5000: 0.07425137498648837

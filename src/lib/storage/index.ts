@@ -77,16 +77,16 @@ export async function setMigratedFromLegacy(): Promise<void> {
   finishLegacyMigrationMarker(generation);
 }
 
-export async function getMetaValue<T>(key: string): Promise<T | null> {
-  const { transaction, done } = await beginStorageTransaction(STORE_META, "readonly");
+export async function getMetaValue<T>(key: string, expectedGeneration = getBrowserStorageState().generation): Promise<T | null> {
+  const { transaction, done } = await beginStorageTransaction(STORE_META, "readonly", expectedGeneration);
   const store = transaction.objectStore(STORE_META);
   const record = (await completeRequest(store.get(key))) as MetaRecord<T> | undefined;
   await done;
   return record?.value ?? null;
 }
 
-export async function setMetaValue<T>(key: string, value: T): Promise<void> {
-  const { transaction, done } = await beginStorageTransaction(STORE_META, "readwrite");
+export async function setMetaValue<T>(key: string, value: T, expectedGeneration = getBrowserStorageState().generation): Promise<void> {
+  const { transaction, done } = await beginStorageTransaction(STORE_META, "readwrite", expectedGeneration);
   const store = transaction.objectStore(STORE_META);
   store.put({ key, value } satisfies MetaRecord<T>);
   await done;

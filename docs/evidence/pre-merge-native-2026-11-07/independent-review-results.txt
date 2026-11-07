@@ -1,0 +1,5 @@
+Publication normalization: 8 valid, 12 invalid, strict import timestamp passed
+Smart shuffle: old/new classification, permutation and draw-count parity for 45 cases through 5,000 tracks; sampled Unicode key parity passed
+Transport: exact, overflow, misleading length, error body, advertised size, redirect, streaming cancellation and 50 pre-cancellation/reuse probes passed
+Queue worker: MainActor heartbeat, supersession, old-cleanup ownership and caller cancellation passed
+Media publication: revocation, successor ownership, stale publish/release rejection passed (pure gate only)
