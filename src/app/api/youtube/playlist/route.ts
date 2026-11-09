@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { parseIsoDuration } from "@/lib/utils";
 import type { YouTubePlaylistData, YouTubeVideoData } from "@/types/playlist";
+import { personalImportAuthorization } from "@/lib/server/personal-import-guard";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 const MAX_RESULTS_PER_PAGE = 50;
@@ -291,7 +292,11 @@ async function handleGet(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const { guardOwner, noStore } = await import("@/lib/server/owner-guard");
+  const { guardOwner, noStore, ownerError } = await import("@/lib/server/owner-guard");
+  const personal = personalImportAuthorization(request);
+  if (personal === "invalid") return ownerError(401);
+  if (personal === "unavailable") return ownerError(503);
+  if (personal === "allowed") return noStore(await handleGet(request));
   const denied = await guardOwner(request, "read");
   return denied ?? noStore(await handleGet(request));
 }

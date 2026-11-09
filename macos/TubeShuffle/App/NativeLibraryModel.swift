@@ -20,6 +20,9 @@ final class NativeLibraryModel: ObservableObject {
     private let calculations: NativeLibraryCalculations
     private var activeOperation: UUID?
     private var cancelCalculation: (() -> Void)?
+    #if DEBUG
+    var prepareCreatePanelForTesting: ((NSSavePanel) -> Void)?
+    #endif
 
     init(calculations: NativeLibraryCalculations = .init()) { self.calculations = calculations }
 
@@ -48,6 +51,9 @@ final class NativeLibraryModel: ObservableObject {
         panel.prompt = "Create library"
         panel.nameFieldStringValue = "TubeShuffle Library"
         panel.message = "Choose a new folder name. Existing folders and libraries are never replaced."
+        #if DEBUG
+        prepareCreatePanelForTesting?(panel)
+        #endif
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let scoped = url.startAccessingSecurityScopedResource()
         do {
@@ -163,7 +169,7 @@ final class NativeLibraryModel: ObservableObject {
             message = "This playlist is already in your library. Its tracks and history have been kept."
             return nil
         }
-        guard account.canFetchPlaylists else { message = "Connect your TubeShuffle account before importing a playlist."; return nil }
+        guard account.canFetchPlaylists else { message = "Wait for the current account operation before importing a playlist."; return nil }
         let epoch = generation
         let operation = beginOperation()
         defer { finishOperation(operation) }

@@ -6,6 +6,120 @@ import XCTest
 
 @MainActor
 final class NativeUIRenderingTests: XCTestCase {
+    #if DEBUG
+    func testImportSheetAfterCreatingLibraryCanCancel() async throws {
+        let action = "import.cancel"
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("tubeshuffle-import-sheet-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        let library = NativeLibraryModel()
+        let preferenceName = "tubeshuffle-import-sheet-\(UUID().uuidString)"
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: preferenceName))
+        var bounds: [String: CGRect] = [:]
+        var panelTimeout: DispatchWorkItem?
+        library.prepareCreatePanelForTesting = { panel in
+            panel.directoryURL = base
+            panel.nameFieldStringValue = "New synthetic library"
+            let timeout = DispatchWorkItem {
+                if NSApp.modalWindow === panel { panel.orderOut(nil); NSApp.stopModal(withCode: .cancel) }
+            }
+            panelTimeout = timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6, execute: timeout)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                guard NSApp.modalWindow === panel else { return }
+                timeout.cancel()
+                panel.orderOut(nil); NSApp.stopModal(withCode: .OK)
+            }
+        }
+        let root = NativeLibraryView(library: library, preferences: preferences, initialImportForTesting: "PLSyntheticImport0001") {
+            if $0.keys.contains(where: { $0.hasPrefix("import.") }) { bounds = $0 }
+        }
+        let host = NSHostingView(rootView: root)
+        let window = NSWindow(contentRect: NSRect(x: -5000, y: -5000, width: 828, height: 900), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = host; window.orderBack(nil)
+        defer {
+            panelTimeout?.cancel()
+            window.close(); library.closeLibrary()
+            preferences.removePersistentDomain(forName: preferenceName)
+            try? FileManager.default.removeItem(at: base)
+        }
+        func waitUntil(_ condition: () -> Bool) async throws -> Bool {
+            for _ in 0..<50 {
+                if condition() { return true }
+                try await Task.sleep(nanoseconds: 100_000_000)
+            }
+            return condition()
+        }
+        func click(_ name: String) throws {
+            let sheet = try XCTUnwrap(window.attachedSheet)
+            let rect = try XCTUnwrap(bounds[name])
+            let content = try XCTUnwrap(sheet.contentView)
+            let location = NSPoint(x: rect.midX, y: content.isFlipped ? rect.midY : content.bounds.height - rect.midY)
+            let point = content.convert(location, to: nil)
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                let event = try XCTUnwrap(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: sheet.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+                sheet.sendEvent(event)
+            }
+        }
+        let initialReady = try await waitUntil { window.attachedSheet != nil && bounds["import.createLibrary"] != nil }
+        XCTAssertTrue(initialReady)
+        let initialSheet = try XCTUnwrap(window.attachedSheet).windowNumber
+        try click("import.createLibrary")
+        let importReady = try await waitUntil {
+            library.isOpen && window.attachedSheet != nil && window.attachedSheet?.windowNumber != initialSheet && bounds[action] != nil
+        }
+        XCTAssertTrue(importReady, "The synthetic library and import sheet should be ready")
+        try click(action)
+        let transitioned = try await waitUntil { window.attachedSheet == nil }
+        XCTAssertTrue(transitioned, "\(action) should dismiss the import sheet after the file panel")
+    }
+    #endif
+
+    func testCancelStopsAnInFlightImportAndDiscardsLateResponse() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("tubeshuffle-cancel-import-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        let library = try NativeLibraryModel(store: NativeLocalLibraryStore.createNew(at: directory), at: directory)
+        let configuration = try NativeAccountConfiguration(supabaseOrigin: XCTUnwrap(URL(string: "https://example.supabase.co")),
+            publishableKey: "sb_publishable_synthetic", applicationAPIOrigin: XCTUnwrap(URL(string: "https://personal.example")))
+        let transport = DelayedPersonalImportTransport()
+        let token = PersonalImportToken.encode(Data(repeating: 7, count: 32))
+        let account = NativeAccountModel(personalImport: .init(configuration: { configuration }, token: { _ in token },
+            client: { try APIClient(origin: $0, transport: transport) }))
+        var bounds: [String: CGRect] = [:]
+        var cancelled = false, imported = false
+        let root = NativePlaylistImportView(library: library, account: account, input: .constant("PLSyntheticImport0001"),
+            fixtureMode: false, width: 448, createLibrary: {}, openLibrary: {}, openApp: {},
+            cancel: { cancelled = true }, imported: { _ in imported = true }, observeBounds: { bounds = $0 })
+        let host = NSHostingView(rootView: root)
+        let window = NSWindow(contentRect: NSRect(x: -5000, y: -5000, width: 448, height: 620), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = host; window.orderBack(nil)
+        defer { window.close(); library.closeLibrary(); try? FileManager.default.removeItem(at: directory) }
+        func click(_ name: String) throws {
+            let rect = try XCTUnwrap(bounds[name])
+            let location = NSPoint(x: rect.midX, y: host.isFlipped ? rect.midY : host.bounds.height - rect.midY)
+            let point = host.convert(location, to: nil)
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                let event = try XCTUnwrap(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+                window.sendEvent(event)
+            }
+        }
+        for _ in 0..<50 where bounds["import.submit"] == nil { try await Task.sleep(nanoseconds: 100_000_000) }
+        try click("import.submit")
+        for _ in 0..<50 {
+            if await transport.started { break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let started = await transport.started
+        XCTAssertTrue(started)
+        XCTAssertTrue(library.busy)
+        try click("import.cancel")
+        XCTAssertTrue(cancelled, "Cancel must remain usable during an import")
+        await transport.release()
+        for _ in 0..<50 where library.busy { try await Task.sleep(nanoseconds: 100_000_000) }
+        XCTAssertFalse(library.busy)
+        XCTAssertFalse(imported)
+        XCTAssertEqual(library.snapshot, .empty, "A late response must not write a cancelled import")
+    }
+
     func testPlaylistImportAndAccountSheetsFitTheMinimumWindow() async throws {
         let output = FileManager.default.temporaryDirectory.appendingPathComponent("tubeshuffle-import-render-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: false)
@@ -26,7 +140,7 @@ final class NativeUIRenderingTests: XCTestCase {
         XCTAssertEqual(configured.state, .signedOut)
         func importer(_ library: NativeLibraryModel, input: String = "", fixture: Bool = false) -> AnyView {
             AnyView(NativePlaylistImportView(library: library, account: account, input: .constant(input), fixtureMode: fixture, width: 448,
-                createLibrary: {}, openLibrary: {}, connectAccount: {}, openApp: {}, cancel: {}, imported: { _ in }))
+                createLibrary: {}, openLibrary: {}, openApp: {}, cancel: {}, imported: { _ in }))
         }
         local.message = "The playlist API is unavailable. Check your account, access, quota or connection; no local playlist was changed."
         let cases: [(String, AnyView)] = [
@@ -296,5 +410,22 @@ final class NativeUIRenderingTests: XCTestCase {
         XCTAssertEqual(subject.volume, 0.4)
         subject.stop()
         withExtendedLifetime(window) {}
+    }
+}
+
+private actor DelayedPersonalImportTransport: APITransport {
+    private(set) var started = false
+    private var pending: CheckedContinuation<(Data, URLResponse), Never>?
+    func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        started = true
+        return await withCheckedContinuation { continuation in
+            pending = continuation
+        }
+    }
+    func release() {
+        let url = URL(string: "https://personal.example/api/youtube/playlist")!
+        let body = Data(#"{"id":"PLSyntheticImport0001","title":"Synthetic","description":null,"thumbnail":null,"channelTitle":null,"videoCount":0,"videos":[]}"#.utf8)
+        pending?.resume(returning: (body, HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: [:])!))
+        pending = nil
     }
 }

@@ -27,6 +27,93 @@ private struct SyntheticAPIAccountLinkService: AccountLinkService {
 
 @MainActor
 final class AccountSessionCoordinatorTests: XCTestCase {
+    func testPersonalPlaylistImportDoesNotRequireAnAccountOrEnableCloudLinks() async throws {
+        let configuration = try NativeAccountConfiguration(supabaseOrigin: XCTUnwrap(URL(string: "https://example.supabase.co")),
+            publishableKey: "sb_publishable_synthetic", applicationAPIOrigin: XCTUnwrap(URL(string: "https://personal.example")))
+        let token = PersonalImportToken.encode(Data(repeating: 7, count: 32))
+        let transport = SyntheticPersonalImportTransport()
+        let services = NativePersonalImportServices(configuration: { configuration }, token: { received in
+            XCTAssertEqual(received, configuration); return token
+        }, client: { origin in
+            XCTAssertEqual(origin, configuration.applicationAPIOrigin)
+            return try APIClient(origin: origin, transport: transport)
+        })
+        let model = NativeAccountModel(personalImport: services)
+        let source = NativeImportPlaylistSource(account: model)
+        XCTAssertTrue(source.canFetchPlaylists)
+        XCTAssertFalse(model.canFetchPlaylists, "Cloud account operations remain signed out")
+        let result = await source.fetchPlaylist("PLSyntheticImport0001")
+        XCTAssertEqual(result?.id, "PLSyntheticImport0001")
+        XCTAssertEqual(model.state, .signedOut)
+        XCTAssertFalse(model.configured)
+        XCTAssertFalse(model.busy)
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(requests.first?.value(forHTTPHeaderField: "Authorization"), "TubeShuffleDevice \(token)")
+        XCTAssertEqual(requests.first?.url?.path, "/api/youtube/playlist")
+    }
+
+    func testUnpairedPersonalImportGivesAnActionableErrorWithoutNetwork() async throws {
+        let configuration = try NativeAccountConfiguration(supabaseOrigin: XCTUnwrap(URL(string: "https://example.supabase.co")),
+            publishableKey: "sb_publishable_synthetic", applicationAPIOrigin: XCTUnwrap(URL(string: "https://personal.example")))
+        let services = NativePersonalImportServices(configuration: { configuration }, token: { _ in nil }, client: { _ in
+            XCTFail("An unpaired device must not create a network client")
+            throw APIClientError.transport
+        })
+        let model = NativeAccountModel(personalImport: services)
+        let result = await NativeImportPlaylistSource(account: model).fetchPlaylist("PLSyntheticImport0001")
+        XCTAssertNil(result)
+        XCTAssertTrue(model.message?.contains("not set up") == true)
+        XCTAssertFalse(model.busy)
+        XCTAssertFalse(model.canFetchPlaylists)
+    }
+
+    func testPersonalSuggestionsWorkWithoutAccountAndCacheByCompleteInput() async throws {
+        let configuration = try NativeAccountConfiguration(supabaseOrigin: XCTUnwrap(URL(string: "https://example.supabase.co")),
+            publishableKey: "sb_publishable_synthetic", applicationAPIOrigin: XCTUnwrap(URL(string: "https://personal.example")))
+        let token = PersonalImportToken.encode(Data(repeating: 7, count: 32))
+        let transport = SyntheticAccountTransport()
+        let day = String(NativeLibraryModel.timestamp().prefix(10))
+        await transport.configure(status: 200, body: "{\"playlistId\":\"PLSyntheticImport0001\",\"generatedAt\":\"now\",\"dateKey\":\"\(day)\",\"query\":\"q\",\"quotaCost\":0,\"suggestions\":[]}")
+        let model = NativeAccountModel(personalImport: .init(configuration: { configuration }, token: { _ in token },
+            client: { try APIClient(origin: $0, transport: transport) }))
+        let first = SuggestionsRequest(playlistId: "PLSyntheticImport0001", seeds: [SuggestionSeed(title: "First", channelTitle: "Artist")])
+        let changed = SuggestionsRequest(playlistId: "PLSyntheticImport0001", seeds: [SuggestionSeed(title: "Second", channelTitle: "Artist")])
+        let initial = await model.fetchSuggestions(first)
+        let cached = await model.fetchSuggestions(first)
+        let different = await model.fetchSuggestions(changed)
+        XCTAssertNotNil(initial); XCTAssertNotNil(cached); XCTAssertNotNil(different)
+        XCTAssertEqual(model.state, .signedOut)
+        XCTAssertFalse(model.canFetchPlaylists)
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 2, "Different input must not reuse stale suggestions")
+        XCTAssertTrue(requests.allSatisfy { $0.value(forHTTPHeaderField: "Authorization") == "TubeShuffleDevice \(token)" })
+        XCTAssertTrue(requests.allSatisfy { $0.url?.path == "/api/youtube/suggestions" })
+    }
+
+    func testCancelledPersonalSuggestionsDiscardLateResults() async throws {
+        let configuration = try NativeAccountConfiguration(supabaseOrigin: XCTUnwrap(URL(string: "https://example.supabase.co")),
+            publishableKey: "sb_publishable_synthetic", applicationAPIOrigin: XCTUnwrap(URL(string: "https://personal.example")))
+        let token = PersonalImportToken.encode(Data(repeating: 7, count: 32))
+        let transport = SyntheticAccountTransport(), started = expectation(description: "personal request started")
+        let day = String(NativeLibraryModel.timestamp().prefix(10))
+        await transport.configure(status: 200, body: "{\"playlistId\":\"PLSyntheticImport0001\",\"generatedAt\":\"now\",\"dateKey\":\"\(day)\",\"query\":\"q\",\"quotaCost\":0,\"suggestions\":[]}", hold: true, started: started)
+        let model = NativeAccountModel(personalImport: .init(configuration: { configuration }, token: { _ in token },
+            client: { try APIClient(origin: $0, transport: transport) }))
+        let input = SuggestionsRequest(playlistId: "PLSyntheticImport0001", seeds: [SuggestionSeed(title: "First", channelTitle: "Artist")])
+        let task = Task { await model.fetchSuggestions(input) }
+        await fulfillment(of: [started], timeout: 2)
+        task.cancel()
+        await transport.complete()
+        let cancelled = await task.value
+        XCTAssertNil(cancelled)
+        XCTAssertFalse(model.busy)
+        let retried = await model.fetchSuggestions(input)
+        XCTAssertNotNil(retried)
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 2, "A cancelled result must not enter the local cache")
+    }
+
     func testBundledTubeShuffleSetupRequiresExplicitLoadingAndDoesNotSignIn() async throws {
         let model = NativeAccountModel()
         XCTAssertEqual(model.apiURL, "")
@@ -629,6 +716,15 @@ final class AccountSessionCoordinatorTests: XCTestCase {
     }
 }
 
+private actor SyntheticPersonalImportTransport: APITransport {
+    private(set) var requests: [URLRequest] = []
+    func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        requests.append(request)
+        let data = Data(#"{"id":"PLSyntheticImport0001","title":"Synthetic","description":null,"thumbnail":null,"channelTitle":null,"videoCount":0,"videos":[]}"#.utf8)
+        return (data, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: [:])!)
+    }
+}
+
 @MainActor
 private final class SyntheticAccountAuth: AccountAuthenticationService {
     private(set) var signInCount = 0
@@ -804,6 +900,26 @@ final class NativeAccountModelRecoveryTests: XCTestCase {
         let observation = model.$busy.filter { !$0 }.first().sink { _ in idle.fulfill() }
         await fulfillment(of: [idle], timeout: 2)
         withExtendedLifetime(observation) {}
+    }
+
+    func testSignedInImportKeepsUsingTheAccountSession() async throws {
+        let transport = SyntheticAccountTransport(), authentication = SyntheticAccountAuth()
+        let client = try APIClient(origin: URL(string: "https://example.test")!, transport: transport)
+        let service = AccountSessionCoordinator(authentication: authentication, links: APIAccountLinkService(client: client))
+        let personal = NativePersonalImportServices(configuration: {
+            XCTFail("A signed-in account import must not read the personal credential")
+            throw APIClientError.invalidCredential
+        }, token: { _ in nil }, client: { _ in throw APIClientError.transport })
+        let model = NativeAccountModel(service: service, personalImport: personal)
+        model.authenticate()
+        await waitUntilIdle(model)
+        await transport.configure(status: 200, body: playlistJSON)
+        let result = await NativeImportPlaylistSource(account: model).fetchPlaylist("PLSyntheticImport0001")
+        XCTAssertEqual(result?.id, "PLSyntheticImport0001")
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(requests.first?.value(forHTTPHeaderField: "Authorization"), "Bearer synthetic-token-1")
+        XCTAssertEqual(authentication.signInCount, 1)
     }
 
     func testFailedPlaylistReadsCanRetryAndReadCloudLinksWithoutReauthentication() async throws {

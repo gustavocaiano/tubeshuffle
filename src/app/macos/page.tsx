@@ -35,7 +35,7 @@ const setupSteps = [
   {
     title: "Bring a playlist",
     description:
-      "YouTube link imports currently require the configured owner’s Google account. Choose Library → Import YouTube playlist… (⌘L), paste a link, then Connect → Use TubeShuffle → Sign in with Google. Or bring a browser export below, with no sign-in.",
+      "Choose Library → Import YouTube playlist… (⌘L) and paste a public playlist link. The personal Mac preview can import after private device setup; the configured owner can alternatively sign in under Library → Account. A browser JSON export is another option.",
   },
 ];
 
@@ -53,7 +53,7 @@ const faqs = [
   {
     question: "Do I need to sign in?",
     answer:
-      "You can create or open a local library and import a JSON export without signing in. Fetching YouTube playlists in the current preview requires the configured owner’s Google account; general account access is not available yet. Choosing Use TubeShuffle selects the service configuration but does not sign you in.",
+      "You can create or open a local library and import a JSON export without signing in. Public playlist imports in the personal Mac preview need private device setup or the configured owner’s Google sign-in; general account access is not available yet.",
   },
   {
     question: "Will it work on my Mac?",

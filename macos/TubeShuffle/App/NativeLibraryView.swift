@@ -50,15 +50,16 @@ struct NativePlaylistImportView: View {
     let width: CGFloat
     let createLibrary: () -> Void
     let openLibrary: () -> Void
-    let connectAccount: () -> Void
     let openApp: () -> Void
     let cancel: () -> Void
     let imported: (PlaylistID) -> Void
+    var observeBounds: (([String: CGRect]) -> Void)? = nil
     @FocusState private var inputFocused: Bool
+    @State private var importTask: Task<Void, Never>?
 
     private var hasLocalLibrary: Bool { library.isOpen && !library.isDemo }
     private var validLink: Bool { NativeLibraryModel.playlistID(input) != nil }
-    private var canImport: Bool { !fixtureMode && hasLocalLibrary && validLink && account.canFetchPlaylists && !library.busy }
+    private var canImport: Bool { !fixtureMode && hasLocalLibrary && validLink && !account.busy && !library.busy }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -86,48 +87,46 @@ struct NativePlaylistImportView: View {
                         Label("Choose a local library", systemImage: "folder").font(.headline)
                         Text("Create a library for these tracks, or open one you already use.").font(.callout).foregroundStyle(NativeUIStyle.secondary)
                         HStack(spacing: 10) {
-                            Button("Create library…", action: createLibrary).buttonStyle(NativeActionStyle())
+                            Button("Create library…", action: createLibrary).buttonStyle(NativeActionStyle()).nativeBounds("import.createLibrary")
                             Button("Open library…", action: openLibrary).buttonStyle(NativeActionStyle())
                         }
                     }.padding(14).modifier(NativeCard(radius: 16))
                 } else {
                     Label("Save to: \(library.location)", systemImage: "folder").font(.callout).lineLimit(2)
                 }
-                if account.state != .signedIn {
-                    HStack(alignment: .top, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("Connect your account").font(.headline)
-                            Text("Sign in to TubeShuffle to load the playlist from YouTube.").font(.callout).foregroundStyle(NativeUIStyle.secondary)
-                        }
-                        Spacer(minLength: 0)
-                        Button("Connect", action: connectAccount).buttonStyle(NativeActionStyle())
-                            .disabled(!hasLocalLibrary || account.busy).accessibilityIdentifier("import.connect")
-                    }.padding(14).modifier(NativeCard(radius: 16))
-                }
                 if library.busy { ProgressView("Importing playlist…").controlSize(.small) }
                 if let message = library.message {
                     Text(message).font(.callout).foregroundStyle(NativeUIStyle.secondary)
                         .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("import.message")
                 }
-                Text("Saving the link to your account is optional and separate. Existing playlists and history are kept.")
+                Text("Existing playlists and history are kept.")
                     .font(.caption).foregroundStyle(NativeUIStyle.secondary)
             }
             HStack {
                 Spacer()
-                Button("Cancel", action: cancel).buttonStyle(NativeActionStyle()).keyboardShortcut(.cancelAction).disabled(library.busy)
+                Button("Cancel") { importTask?.cancel(); cancel() }
+                    .buttonStyle(NativeActionStyle()).keyboardShortcut(.cancelAction).nativeBounds("import.cancel")
                 if !fixtureMode {
                     Button("Import playlist", action: importPlaylist).buttonStyle(NativeActionStyle(prominent: true))
-                        .disabled(!canImport).accessibilityIdentifier("import.submit")
+                        .disabled(!canImport).accessibilityIdentifier("import.submit").nativeBounds("import.submit")
                 }
             }
         }.padding(24).frame(width: width).background(NativeUIStyle.background).foregroundStyle(.white)
+            .coordinateSpace(name: "native.window")
+            .onPreferenceChange(NativeUIBounds.self) { observeBounds?($0) }
             .interactiveDismissDisabled(library.busy)
             .onAppear { inputFocused = !fixtureMode }
+            .onDisappear { importTask?.cancel() }
     }
 
     private func importPlaylist() {
-        guard canImport else { return }
-        Task { if let id = await library.importPlaylist(input, account: account) { imported(id) } }
+        guard canImport, importTask == nil else { return }
+        let source = NativeImportPlaylistSource(account: account)
+        importTask = Task {
+            let id = await library.importPlaylist(input, account: source)
+            importTask = nil
+            if !Task.isCancelled, let id { imported(id) }
+        }
     }
 }
 
@@ -142,7 +141,6 @@ struct NativeLibraryView: View {
     @State private var showingLibrary = false
     @State private var showingImport = false
     @State private var libraryNextAction: LibraryAction?
-    @State private var importAfterAccount = false
     @State private var importNextStep: ImportNextStep?
     @State private var showingShortcuts = false
     @State private var playlistInput = ""
@@ -157,11 +155,13 @@ struct NativeLibraryView: View {
     @AppStorage private var zoom: Double
     @State private var windowWidth: CGFloat = 1280
     private var observeBounds: (([String: CGRect]) -> Void)?
-    private enum ImportNextStep { case createLibrary, openLibrary, account, ordinaryApp }
+    private enum ImportNextStep { case createLibrary, openLibrary, ordinaryApp }
     private enum LibraryAction { case importPlaylist, createLibrary, openLibrary, importJSON, exportJSON, closeLibrary, account }
 
     init(library: NativeLibraryModel? = nil, preferences: UserDefaults? = nil, session: NativeListeningSession? = nil,
-         stage: Bool = false, observeBounds: (([String: CGRect]) -> Void)? = nil) {
+         stage: Bool = false, initialImportForTesting: String? = nil, observeBounds: (([String: CGRect]) -> Void)? = nil) {
+        _showingImport = State(initialValue: initialImportForTesting != nil)
+        _playlistInput = State(initialValue: initialImportForTesting ?? "")
         let model = library ?? NativeLibraryModel()
         _library = StateObject(wrappedValue: model)
         _selected = State(initialValue: model.snapshot.playlists.first?.id)
@@ -232,9 +232,7 @@ struct NativeLibraryView: View {
         .background(NativeWindowAttachment { account.attach($0); library.attach($0) })
         .background(NativeZoomKeyboard(zoom: $zoom))
         .focusedSceneValue(\.nativeInterfaceZoom, zoomBinding)
-        .sheet(isPresented: $showingAccount, onDismiss: {
-            if importAfterAccount { importAfterAccount = false; showingImport = true }
-        }) { NativeAccountView(account: account, localPlaylist: playlist, demo: library.isDemo || NativeUIEnvironment.isFixture, width: sheetWidth(650)) }
+        .sheet(isPresented: $showingAccount) { NativeAccountView(account: account, localPlaylist: playlist, demo: library.isDemo || NativeUIEnvironment.isFixture, width: sheetWidth(650)) }
         .sheet(isPresented: $showingLibrary, onDismiss: continueLibraryAction) { libraryBrowser }
         .sheet(isPresented: $showingImport, onDismiss: continuePlaylistImport) { playlistImport }
         .sheet(isPresented: $showingShortcuts) { shortcuts }
@@ -383,21 +381,20 @@ struct NativeLibraryView: View {
             HStack {
                 Text("Daily Suggestions").font(.system(size: 23, weight: .bold)).tracking(-0.5)
                 Spacer()
-                if account.state == .signedIn && !library.isDemo {
+                if !library.isDemo && !NativeUIEnvironment.isFixture {
                     Button(suggestionsBusy ? "Finding…" : "Find suggestions", action: loadSuggestions)
-                        .buttonStyle(NativeActionStyle()).disabled(suggestionsBusy)
+                        .buttonStyle(NativeActionStyle()).disabled(suggestionsBusy || account.busy)
                 }
             }
             if suggestions.isEmpty {
                 HStack(alignment: .center, spacing: 12) {
                     Image(systemName: "sparkles").foregroundStyle(Color.yellow.opacity(0.8))
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(library.isDemo ? "Discover more with your account" : "A little inspiration for your next listen").font(.system(size: 13, weight: .medium))
-                        Text(suggestionsMessage ?? (library.isDemo ? "Suggestions are off in the demo. Your sample queue is ready to explore." : "Connect your account to find suggestions for this playlist."))
+                        Text("A little inspiration for your next listen").font(.system(size: 13, weight: .medium))
+                        Text(suggestionsMessage ?? (library.isDemo || NativeUIEnvironment.isFixture ? "Suggestions are off in the demo. Your sample queue is ready to explore." : "Uses a few track titles and artists to search YouTube."))
                             .font(.system(size: 12)).foregroundStyle(NativeUIStyle.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
-                    if !library.isDemo { Button("Account") { showingAccount = true }.buttonStyle(NativeActionStyle()).disabled(NativeUIEnvironment.isFixture) }
                 }.padding(16).background(Color.yellow.opacity(0.065), in: RoundedRectangle(cornerRadius: 15))
                     .overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(Color.yellow.opacity(0.10)))
             } else {
@@ -492,10 +489,10 @@ struct NativeLibraryView: View {
         NativePlaylistImportView(library: library, account: account, input: $playlistInput,
             fixtureMode: NativeUIEnvironment.isFixture, width: sheetWidth(540),
             createLibrary: { leaveImport(for: .createLibrary) }, openLibrary: { leaveImport(for: .openLibrary) },
-            connectAccount: { leaveImport(for: .account) }, openApp: { leaveImport(for: .ordinaryApp) },
+            openApp: { leaveImport(for: .ordinaryApp) },
             cancel: { showingImport = false }, imported: { id in
                 stopPlayback(); selected = id; playlistInput = ""; showingImport = false
-            })
+            }, observeBounds: observeBounds)
     }
 
     private func presentPlaylistImport() {
@@ -537,11 +534,11 @@ struct NativeLibraryView: View {
         importNextStep = nil
         switch step {
         case .createLibrary:
-            stopPlayback(); library.createLibrary(); selectFirst(); showingImport = true
+            stopPlayback(); library.createLibrary(); selectFirst()
+            reopenImportAfterFilePanel()
         case .openLibrary:
-            stopPlayback(); library.openLibrary(); selectFirst(); showingImport = true
-        case .account:
-            importAfterAccount = true; showingAccount = true
+            stopPlayback(); library.openLibrary(); selectFirst()
+            reopenImportAfterFilePanel()
         case .ordinaryApp:
             let configuration = NSWorkspace.OpenConfiguration()
             configuration.createsNewApplicationInstance = true
@@ -552,6 +549,12 @@ struct NativeLibraryView: View {
             }
         case nil: break
         }
+    }
+
+    private func reopenImportAfterFilePanel() {
+        // The file panel runs a nested modal loop during sheet dismissal. A
+        // synchronous re-presentation can leave a duplicate sheet attached.
+        DispatchQueue.main.async { showingImport = true }
     }
 
     @ViewBuilder private var transferPreview: some View {
@@ -616,10 +619,10 @@ struct NativeLibraryView: View {
     private func loadSuggestions() {
         guard let playlist, !suggestionsBusy else { return }
         let epoch = library.generation, selectedID = selected
-        let seeds = occurrences.prefix(5).map { SuggestionSeed(title: $0.title, channelTitle: $0.channelTitle, description: $0.description, categoryId: $0.categoryId, tags: $0.tags, duration: $0.duration) }
+        let seeds = occurrences.prefix(5).map { SuggestionSeed.minimal(title: $0.title, channelTitle: $0.channelTitle, duration: $0.duration) }
         suggestionsBusy = true
         Task {
-            let result = await account.fetchSuggestions(.init(playlistId: playlist.youtubeId, seeds: seeds, playlistTitle: playlist.title))
+            let result = await account.fetchSuggestions(.init(playlistId: playlist.youtubeId, seeds: seeds))
             suggestionsBusy = false
             guard epoch == library.generation, selectedID == selected else { return }
             suggestions = result?.suggestions ?? []

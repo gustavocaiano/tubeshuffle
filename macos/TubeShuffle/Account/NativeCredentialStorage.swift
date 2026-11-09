@@ -135,3 +135,59 @@ final class NativeCredentialStorage: AuthLocalStorage, @unchecked Sendable {
         }
     }
 }
+
+/// A separate, origin-bound credential for personal playlist reads only. It
+/// never reads, replaces or removes the account session or an unknown item.
+final class NativePersonalImportCredential {
+    enum Failure: Error, Equatable { case collision, corrupt, readFailed, writeFailed, randomFailed }
+    static let key = "device-token.v1"
+    private static let prefix = Data("TubeShuffle.PersonalImport.v1\0".utf8)
+    private let backend: any NativeCredentialBackend
+    private let lock = NSLock()
+    let service: String
+
+    init(configuration: NativeAccountConfiguration, backend: (any NativeCredentialBackend)? = nil) {
+        let origin = configuration.applicationAPIOrigin.absoluteString
+        let digest = SHA256.hash(data: Data(origin.utf8)).map { String(format: "%02x", $0) }.joined()
+        service = "com.tubeshuffle.native.personal-import.v1." + digest
+        self.backend = backend ?? NativeSecurityCredentialBackend()
+    }
+
+    private func readOwned() throws -> String? {
+        let (status, raw) = backend.read(service: service, key: Self.key)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let raw else { throw Failure.readFailed }
+        guard raw.starts(with: Self.prefix) else { throw Failure.collision }
+        guard let token = String(data: raw.dropFirst(Self.prefix.count), encoding: .utf8),
+              PersonalImportToken.isValid(token) else { throw Failure.corrupt }
+        return token
+    }
+
+    func retrieve() throws -> String? {
+        lock.lock(); defer { lock.unlock() }
+        return try readOwned()
+    }
+
+    /// Returns only a digest suitable for the server. A pre-existing valid
+    /// credential is reused; collisions and failed writes are never retried.
+    func prepare(randomBytes: () throws -> Data = NativePersonalImportCredential.randomBytes) throws -> String {
+        lock.lock(); defer { lock.unlock() }
+        let token: String
+        if let existing = try readOwned() { token = existing }
+        else {
+            let bytes = try randomBytes()
+            guard bytes.count == 32 else { throw Failure.randomFailed }
+            token = PersonalImportToken.encode(bytes)
+            let status = backend.add(service: service, key: Self.key, value: Self.prefix + Data(token.utf8))
+            guard status == errSecSuccess else { throw status == errSecDuplicateItem ? Failure.collision : Failure.writeFailed }
+        }
+        return SHA256.hash(data: Data(token.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func randomBytes() throws -> Data {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        let status = bytes.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, $0.count, $0.baseAddress!) }
+        guard status == errSecSuccess else { throw Failure.randomFailed }
+        return Data(bytes)
+    }
+}

@@ -170,6 +170,22 @@ enum ServerErrorKind: Equatable {
     case unknown
 }
 
+enum PersonalImportToken {
+    static func encode(_ bytes: Data) -> String {
+        bytes.base64EncodedString().replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+    }
+
+    static func isValid(_ token: String) -> Bool {
+        guard token.utf8.count == 43, token.utf8.allSatisfy({
+            (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || $0 == 45 || $0 == 95
+        }) else { return false }
+        let base64 = token.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/") + "="
+        guard let bytes = Data(base64Encoded: base64), bytes.count == 32 else { return false }
+        return encode(bytes) == token
+    }
+}
+
 struct SuggestionSeed: Encodable {
     let title: String
     let channelTitle: String
@@ -177,6 +193,14 @@ struct SuggestionSeed: Encodable {
     var categoryId: String? = nil
     var tags: [String]? = nil
     var duration: Double? = nil
+
+    static func minimal(title: String, channelTitle: String, duration: Double) -> Self {
+        // Bound Unicode scalars, not grapheme clusters: one displayed character
+        // can contain thousands of combining marks in imported metadata.
+        let boundedTitle = String(String.UnicodeScalarView(title.unicodeScalars.prefix(180)))
+        let boundedChannel = String(String.UnicodeScalarView(channelTitle.unicodeScalars.prefix(120)))
+        return .init(title: boundedTitle, channelTitle: boundedChannel, duration: duration)
+    }
 }
 
 struct SuggestionsRequest: Encodable {
@@ -214,10 +238,22 @@ struct APIClient {
                           expected: [200], body: nil)
     }
 
+    func personalPlaylist(id: String, token: String) async throws -> YouTubePlaylistDTO {
+        try await request(path: "/api/youtube/playlist", method: "GET",
+                          query: [URLQueryItem(name: "playlistId", value: id)], bearer: nil,
+                          expected: [200], body: nil, personalToken: token)
+    }
+
     func suggestions(_ input: SuggestionsRequest, bearer: String? = nil) async throws -> DailySuggestionsDTO {
         let body = try JSONEncoder().encode(input)
         return try await request(path: "/api/youtube/suggestions", method: "POST", bearer: bearer,
                                  expected: [200], body: body)
+    }
+
+    func personalSuggestions(_ input: SuggestionsRequest, token: String) async throws -> DailySuggestionsDTO {
+        let body = try JSONEncoder().encode(input)
+        return try await request(path: "/api/youtube/suggestions", method: "POST", bearer: nil,
+                                 expected: [200], body: body, personalToken: token)
     }
 
     func links(bearer: String? = nil) async throws -> PlaylistLinksResponseDTO {
@@ -244,15 +280,21 @@ struct APIClient {
 
     private struct LinkBody: Encodable { let playlistId: String }
 
-    private func request<T: Decodable>(path: String, method: String, query: [URLQueryItem] = [], bearer: String?, expected: [Int], body: Data?) async throws -> T {
-        let (data, response) = try await send(path: path, method: method, query: query, bearer: bearer, body: body)
+    private func request<T: Decodable>(path: String, method: String, query: [URLQueryItem] = [], bearer: String?, expected: [Int], body: Data?, personalToken: String? = nil) async throws -> T {
+        let (data, response) = try await send(path: path, method: method, query: query, bearer: bearer, body: body, personalToken: personalToken)
         try Self.check(response, data: data, expected: expected)
         do { return try JSONDecoder().decode(T.self, from: data) }
         catch { throw APIClientError.malformedResponse }
     }
 
-    private func send(path: String, method: String, query: [URLQueryItem] = [], bearer: String?, body: Data?) async throws -> (Data, URLResponse) {
+    private func send(path: String, method: String, query: [URLQueryItem] = [], bearer: String?, body: Data?, personalToken: String? = nil) async throws -> (Data, URLResponse) {
         try Task.checkCancellation()
+        if let personalToken {
+            let permitted = (path == "/api/youtube/playlist" && method == "GET" && body == nil) ||
+                (path == "/api/youtube/suggestions" && method == "POST" && body != nil && query.isEmpty)
+            guard bearer == nil, permitted,
+                  PersonalImportToken.isValid(personalToken) else { throw APIClientError.invalidCredential }
+        }
         // Restrict credentials to RFC 6750 b64token characters to prevent header injection.
         if let bearer = bearer {
             let bytes = Array(bearer.utf8)
@@ -275,6 +317,7 @@ struct APIClient {
         request.httpShouldHandleCookies = false
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let bearer = bearer { request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
+        if let personalToken { request.setValue("TubeShuffleDevice \(personalToken)", forHTTPHeaderField: "Authorization") }
         if let body = body {
             request.httpBody = body
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

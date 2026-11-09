@@ -5,6 +5,7 @@ import type { DailySuggestionsResult, SuggestedVideo } from "@/types/playlist";
 import { readBoundedBody } from "@/lib/server/bounded-body";
 import { MAX_SUGGESTION_REQUEST_BYTES, normalizeSuggestionsInput, SuggestionsInputError, type SuggestionSeed, type SuggestionsInput as ValidatedSuggestionsRequest } from "@/lib/suggestions/input-policy";
 import { suggestionFingerprint, SuggestionsServerState } from "@/lib/suggestions/server-state";
+import { personalImportAuthorization } from "@/lib/server/personal-import-guard";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 const TARGET_SUGGESTIONS = 5;
@@ -350,7 +351,7 @@ function toSuggestedVideo(
   };
 }
 
-async function handlePost(request: Request) {
+async function handlePost(request: Request, cacheResults: boolean) {
   try {
     const apiKey = process.env.YOUTUBE_API_KEY;
     if (!apiKey) {
@@ -372,8 +373,8 @@ async function handlePost(request: Request) {
     }
 
     const body = normalizeSuggestionsInput(rawBody);
-    const cacheKey = suggestionFingerprint(body);
-    const cached = serverState.getCached(cacheKey);
+    const cacheKey = cacheResults ? suggestionFingerprint(body) : null;
+    const cached = cacheKey ? serverState.getCached(cacheKey) : undefined;
     if (cached) return NextResponse.json(cached, { status: 200 });
 
     if (!serverState.admitRequest(getClientKey(request))) {
@@ -451,7 +452,7 @@ async function handlePost(request: Request) {
       suggestions,
     };
 
-    serverState.cacheResult(cacheKey, result);
+    if (cacheKey) serverState.cacheResult(cacheKey, result);
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
@@ -465,9 +466,14 @@ async function handlePost(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { guardOwner, noStore } = await import("@/lib/server/owner-guard");
-  const denied = await guardOwner(request, "mutation");
-  return denied ?? noStore(await handlePost(request));
+  const owner = await import("@/lib/server/owner-guard");
+  const personal = personalImportAuthorization(request);
+  if (personal === "invalid") return owner.ownerError(401);
+  if (personal === "unavailable") return owner.ownerError(503);
+  // Do not retain personal-device results in the server's suggestion cache.
+  if (personal === "allowed") return owner.noStore(await handlePost(request, false));
+  const denied = await owner.guardOwner(request, "mutation");
+  return denied ?? owner.noStore(await handlePost(request, true));
 }
 
 function methodNotAllowed() {
