@@ -84,6 +84,37 @@ final class NativeIntegrationTests: XCTestCase {
         reopened = nil
     }
 
+    func testPersonalImportPersistsWithoutAccountAndPreservesHistory() async throws {
+        let (library, directory) = try importLibrary(seed: NativeLibraryFixture.snapshot)
+        defer { library.closeLibrary(); try? FileManager.default.removeItem(at: directory) }
+        let fixture = NativeLibraryFixture.snapshot
+        library.recordNaturalCompletion(.init(id: 0, videoID: fixture.occurrences[0].youtubeId,
+            localOccurrenceID: fixture.occurrences[0].id), playlist: fixture.playlists[0].id, epoch: library.generation)
+        let history = library.snapshot.history
+        let dto = try playlistDTO()
+        let transport = PersonalImportLibraryTransport(data: try JSONEncoder().encode(dto))
+        let configuration = try NativeAccountConfiguration(supabaseOrigin: XCTUnwrap(URL(string: "https://example.supabase.co")),
+            publishableKey: "sb_publishable_synthetic", applicationAPIOrigin: XCTUnwrap(URL(string: "https://personal.example")))
+        let token = PersonalImportToken.encode(Data(repeating: 7, count: 32))
+        let account = NativeAccountModel(personalImport: .init(configuration: { configuration }, token: { _ in token },
+            client: { try APIClient(origin: $0, transport: transport) }))
+        let result = await library.importPlaylist(dto.id, account: NativeImportPlaylistSource(account: account))
+        let id = try XCTUnwrap(result)
+        let added = library.snapshot.occurrences.filter { $0.playlistId == id }
+        XCTAssertEqual(added.count, 2)
+        XCTAssertEqual(Set(added.map(\.id)).count, 2)
+        XCTAssertEqual(library.snapshot.history, history)
+        XCTAssertEqual(account.state, .signedOut)
+        XCTAssertFalse(account.canFetchPlaylists, "Personal import must not grant cloud account access")
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(requests.first?.value(forHTTPHeaderField: "Authorization"), "TubeShuffleDevice \(token)")
+        let saved = library.snapshot
+        library.closeLibrary()
+        let reopened = try NativeLocalLibraryStore.openExisting(at: directory)
+        XCTAssertEqual(try reopened.snapshot(), saved)
+    }
+
     func testFailedOrStalePlaylistImportDoesNotWriteAndPartialCountIsDisclosed() async throws {
         let (library, directory) = try importLibrary()
         defer { library.closeLibrary(); try? FileManager.default.removeItem(at: directory) }
@@ -394,5 +425,15 @@ final class NativeIntegrationTests: XCTestCase {
         try NativeTransferFiles.writeNew(Data("first".utf8), at: url)
         XCTAssertThrowsError(try NativeTransferFiles.writeNew(Data("second".utf8), at: url))
         XCTAssertEqual(try Data(contentsOf: url), Data("first".utf8))
+    }
+}
+
+private actor PersonalImportLibraryTransport: APITransport {
+    let data: Data
+    private(set) var requests: [URLRequest] = []
+    init(data: Data) { self.data = data }
+    func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        requests.append(request)
+        return (data, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: [:])!)
     }
 }

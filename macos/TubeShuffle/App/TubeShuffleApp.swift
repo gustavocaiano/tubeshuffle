@@ -133,6 +133,19 @@ final class AccountViewModel: NSObject, ObservableObject {
 struct TubeShuffleApp: App {
     private let diagnostic = ProcessInfo.processInfo.arguments.contains { $0 == "--playback-lab" || $0.hasPrefix("--local-") }
 
+    init() {
+        guard ProcessInfo.processInfo.arguments.dropFirst().elementsEqual(["--prepare-personal-import"]) else { return }
+        do {
+            let configuration = try NativePersonalImportServices.live.configuration()
+            let digest = try NativePersonalImportCredential(configuration: configuration).prepare()
+            FileHandle.standardOutput.write(Data((digest + "\n").utf8))
+            exit(0)
+        } catch {
+            FileHandle.standardError.write(Data("Personal import access could not be prepared. No existing credential was replaced.\n".utf8))
+            exit(1)
+        }
+    }
+
     var body: some Scene {
         Window("TubeShuffle", id: "player") {
             if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {

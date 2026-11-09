@@ -55,7 +55,7 @@ const faqs = [
   {
     question: "Does TubeShuffle store my playlists on a server?",
     answer:
-      "No account or TubeShuffle cloud library is required. Your library stays with your device.",
+      "Your playlist contents and history stay in this browser. You can separately save playlist links to the configured owner's account.",
   },
   {
     question: "Can it play YouTube audio only?",
@@ -65,16 +65,16 @@ const faqs = [
   {
     question: "Does it work with private playlists or Liked Videos?",
     answer:
-      "TubeShuffle has no Google login, so it works with public playlists. Private account-only collections are not imported.",
+      "TubeShuffle imports public playlists only. The current browser import uses the configured owner's Google sign-in; it does not import private playlists or Liked Videos.",
   },
 ];
 
 const bentoFeatures = [
   {
     icon: ShieldCheck,
-    title: "No account needed",
+    title: "Your local library",
     description:
-      "Paste a playlist and start listening without creating another music account.",
+      "Playlist contents and history stay in your browser. Import currently uses the configured owner's sign-in.",
     className: "md:col-span-2",
     visual: "privacy",
   },
@@ -113,9 +113,9 @@ const bentoFeatures = [
 ];
 
 const antiSaas = [
-  "No account wall",
+  "Library stored locally",
   "No subscription prompt",
-  "No cloud playlist database",
+  "No full-library cloud sync",
   "No fake music magic",
 ];
 
@@ -123,7 +123,7 @@ const steps = [
   {
     label: "Paste",
     title: "Drop in a playlist URL",
-    description: "Public YouTube playlist links or IDs are enough.",
+    description: "Use a public YouTube playlist link or ID with the configured owner's sign-in.",
   },
   {
     label: "Import",
@@ -266,7 +266,7 @@ function BentoVisual({ visual }: { visual: string }) {
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
           <LockKeyhole className="mx-auto h-6 w-6 text-amber-200" />
-          <p className="mt-2 text-xs text-white/55">No account</p>
+          <p className="mt-2 text-xs text-white/55">No cloud library</p>
         </div>
       </div>
     );

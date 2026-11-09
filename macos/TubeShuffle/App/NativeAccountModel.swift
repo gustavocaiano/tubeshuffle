@@ -1,4 +1,5 @@
 import AppKit
+import CryptoKit
 import SwiftUI
 
 @MainActor
@@ -6,6 +7,31 @@ protocol NativePlaylistSource: AnyObject {
     var canFetchPlaylists: Bool { get }
     var message: String? { get }
     func fetchPlaylist(_ id: String) async -> YouTubePlaylistDTO?
+}
+
+struct NativePersonalImportServices {
+    let configuration: () throws -> NativeAccountConfiguration
+    let token: (NativeAccountConfiguration) throws -> String?
+    let client: (URL) throws -> APIClient
+
+    static var live: Self {
+        .init(configuration: {
+            guard let url = Bundle.main.url(forResource: "TubeShuffle-account-setup", withExtension: "json") else {
+                throw NativeAccountSetupDocument.Failure.invalidDocument
+            }
+            return try NativeAccountSetupDocument.decode(Data(contentsOf: url))
+        }, token: { try NativePersonalImportCredential(configuration: $0).retrieve() },
+              client: { try APIClient(origin: $0, transport: URLSessionAPITransport()) })
+    }
+}
+
+@MainActor
+final class NativeImportPlaylistSource: NativePlaylistSource {
+    private let account: NativeAccountModel
+    init(account: NativeAccountModel) { self.account = account }
+    var canFetchPlaylists: Bool { !account.busy }
+    var message: String? { account.message }
+    func fetchPlaylist(_ id: String) async -> YouTubePlaylistDTO? { await account.fetchPlaylistForImport(id) }
 }
 
 @MainActor
@@ -20,6 +46,7 @@ final class NativeAccountModel: ObservableObject, NativePlaylistSource {
     @Published private(set) var uncertain = false
     @Published var message: String?
     private var service: AccountSessionCoordinator?
+    private let personalImport: NativePersonalImportServices
     private weak var window: NSWindow?
     private var operation: Task<Void, Never>?
     private var generation = UUID()
@@ -30,8 +57,9 @@ final class NativeAccountModel: ObservableObject, NativePlaylistSource {
     var hasUsableSession: Bool { service?.hasUsableSession ?? false }
     var canFetchPlaylists: Bool { configured && hasUsableSession && !busy }
 
-    init(service: AccountSessionCoordinator? = nil) {
+    init(service: AccountSessionCoordinator? = nil, personalImport: NativePersonalImportServices = .live) {
         self.service = service
+        self.personalImport = personalImport
         configured = service != nil
         state = service?.state ?? .signedOut
         uncertain = service?.hasUncertainMutations ?? false
@@ -195,25 +223,81 @@ final class NativeAccountModel: ObservableObject, NativePlaylistSource {
         return nil
     }
 
-    func fetchSuggestions(_ input: SuggestionsRequest) async -> DailySuggestionsDTO? {
-        guard canFetchPlaylists, let service else { return nil }
-        let day = String(NativeLibraryModel.timestamp().prefix(10))
-        let key = day + ":" + input.playlistId
-        if let cached = suggestionsCache[key] { return cached }
-        let epoch = generation; busy = true
-        let result = await service.suggestions(input)
-        guard generation == epoch else { return nil }
-        defer { busy = false; state = service.state }
-        if case .success(let value) = result {
-            guard value.playlistId == input.playlistId, value.dateKey == day, value.suggestions.count <= 5 else {
-                message = "The suggestions response could not be confirmed."; return nil
+    func fetchPlaylistForImport(_ id: String) async -> YouTubePlaylistDTO? {
+        if canFetchPlaylists { return await fetchPlaylist(id) }
+        guard !busy else { return nil }
+        let epoch = generation
+        busy = true; message = nil
+        defer { if generation == epoch { busy = false } }
+        do {
+            // The origin and credential namespace come from the same bundled
+            // public setup; a custom account origin never receives this token.
+            let configuration = try personalImport.configuration()
+            guard let token = try personalImport.token(configuration) else {
+                message = "This Mac is not set up for personal imports yet. Sign in under Library → Account or finish personal setup."
+                return nil
             }
-            suggestionsCache[key] = value; suggestionsOrder.append(key)
-            while suggestionsOrder.count > 20 { suggestionsCache.removeValue(forKey: suggestionsOrder.removeFirst()) }
-            return value
+            let client = try personalImport.client(configuration.applicationAPIOrigin)
+            let result = try await client.personalPlaylist(id: id, token: token)
+            guard generation == epoch, !Task.isCancelled else { return nil }
+            return result
+        } catch is CancellationError { return nil }
+        catch {
+            guard generation == epoch, !Task.isCancelled else { return nil }
+            message = "Personal import could not connect. Check this Mac's setup or sign in under Library → Account; your library was not changed."
+            return nil
         }
-        message = "Suggestions are unavailable. Check account access, quota or connection before retrying."
-        return nil
+    }
+
+    func fetchSuggestions(_ input: SuggestionsRequest) async -> DailySuggestionsDTO? {
+        guard !busy else { return nil }
+        let day = String(NativeLibraryModel.timestamp().prefix(10))
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        guard let encoded = try? encoder.encode(input) else { return nil }
+        let fingerprint = SHA256.hash(data: encoded).map { String(format: "%02x", $0) }.joined()
+        let key = day + ":" + fingerprint
+        if let cached = suggestionsCache[key] { return cached }
+        let accountService = canFetchPlaylists ? service : nil
+        let epoch = generation
+        busy = true; message = nil
+        defer {
+            if generation == epoch {
+                busy = false
+                if let accountService { state = accountService.state }
+            }
+        }
+        let value: DailySuggestionsDTO
+        if let accountService {
+            let result = await accountService.suggestions(input)
+            guard generation == epoch, !Task.isCancelled else { return nil }
+            guard case .success(let response) = result else {
+                message = "Suggestions are unavailable. Check account access, quota or connection before retrying."
+                return nil
+            }
+            value = response
+        } else {
+            do {
+                let configuration = try personalImport.configuration()
+                guard let token = try personalImport.token(configuration) else {
+                    message = "This Mac is not set up for personal suggestions yet. Check its setup or sign in under Library → Account."
+                    return nil
+                }
+                let client = try personalImport.client(configuration.applicationAPIOrigin)
+                value = try await client.personalSuggestions(input, token: token)
+            } catch is CancellationError { return nil }
+            catch {
+                guard generation == epoch, !Task.isCancelled else { return nil }
+                message = "Suggestions are unavailable. Check this Mac's setup, quota or connection before retrying."
+                return nil
+            }
+        }
+        guard generation == epoch, !Task.isCancelled else { return nil }
+        guard value.playlistId == input.playlistId, value.dateKey == day, value.suggestions.count <= 5 else {
+            message = "The suggestions response could not be confirmed."; return nil
+        }
+        suggestionsCache[key] = value; suggestionsOrder.append(key)
+        while suggestionsOrder.count > 20 { suggestionsCache.removeValue(forKey: suggestionsOrder.removeFirst()) }
+        return value
     }
 }
 

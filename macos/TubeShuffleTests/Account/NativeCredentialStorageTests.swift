@@ -1,4 +1,5 @@
 import Auth
+import CryptoKit
 import Foundation
 import Security
 import XCTest
@@ -45,6 +46,34 @@ private final class NativeMemoryBackend: NativeCredentialBackend {
 final class NativeCredentialStorageTests: XCTestCase {
     private let session = NativeCredentialStorage.sessionKey
     private let verifier = NativeCredentialStorage.verifierKey
+
+    func testPersonalImportCredentialIsOriginBoundAndNeverOverwrites() throws {
+        let first = try NativeAccountConfiguration(supabaseOrigin: XCTUnwrap(URL(string: "https://example.supabase.co")),
+            publishableKey: "sb_publishable_synthetic", applicationAPIOrigin: XCTUnwrap(URL(string: "https://one.example")))
+        let second = try NativeAccountConfiguration(supabaseOrigin: XCTUnwrap(URL(string: "https://example.supabase.co")),
+            publishableKey: "sb_publishable_synthetic", applicationAPIOrigin: XCTUnwrap(URL(string: "https://two.example")))
+        let backend = NativeMemoryBackend()
+        let one = NativePersonalImportCredential(configuration: first, backend: backend)
+        let two = NativePersonalImportCredential(configuration: second, backend: backend)
+        XCTAssertNotEqual(one.service, two.service)
+        XCTAssertNil(try one.retrieve())
+        let token = PersonalImportToken.encode(Data(repeating: 7, count: 32))
+        let expectedDigest = SHA256.hash(data: Data(token.utf8)).map { String(format: "%02x", $0) }.joined()
+        XCTAssertEqual(try one.prepare(randomBytes: { Data(repeating: 7, count: 32) }), expectedDigest)
+        XCTAssertEqual(try one.retrieve(), token)
+        XCTAssertNil(try two.retrieve())
+        XCTAssertEqual(try one.prepare(randomBytes: { XCTFail("must reuse the existing credential"); return Data() }), expectedDigest)
+        XCTAssertEqual(backend.calls.filter { $0.hasPrefix("add:") }.count, 1)
+        XCTAssertFalse(backend.calls.contains { $0.hasPrefix("update:") || $0.hasPrefix("delete:") })
+
+        let foreign = Data("foreign credential".utf8)
+        backend.set(foreign, service: two.service, key: NativePersonalImportCredential.key)
+        XCTAssertThrowsError(try two.prepare(randomBytes: { Data(repeating: 8, count: 32) })) {
+            XCTAssertEqual($0 as? NativePersonalImportCredential.Failure, .collision)
+        }
+        XCTAssertEqual(backend.value(service: two.service, key: NativePersonalImportCredential.key), foreign)
+        XCTAssertFalse(backend.calls.contains { $0.hasPrefix("update:") || $0.hasPrefix("delete:") })
+    }
 
     private func sessionData() throws -> Data {
         let user = User(id: UUID(), appMetadata: [:], userMetadata: [:], aud: "synthetic",

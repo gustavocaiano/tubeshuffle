@@ -32,6 +32,62 @@ final class APIClientTests: XCTestCase {
         XCTAssertNil(request.httpBody)
     }
 
+    func testPersonalCredentialIsScopedToPlaylistAndValidatedBeforeTransport() async throws {
+        let stub = Stub { request in
+            self.response(request, 200, #"{"id":"PLSyntheticImport0001","title":"t","description":null,"thumbnail":null,"channelTitle":null,"videoCount":0,"videos":[]}"#)
+        }
+        let client = try APIClient(origin: URL(string: "https://example.test")!, transport: stub)
+        let token = PersonalImportToken.encode(Data(repeating: 7, count: 32))
+        _ = try await client.personalPlaylist(id: "PLSyntheticImport0001", token: token)
+        let request = try XCTUnwrap(stub.requests.first)
+        XCTAssertEqual(request.url?.path, "/api/youtube/playlist")
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "TubeShuffleDevice \(token)")
+        XCTAssertNil(request.httpBody)
+        for invalid in ["short", token + "x", String(token.dropLast()) + "_", token + "\r\nInjected: yes"] {
+            do { _ = try await client.personalPlaylist(id: "PLSyntheticImport0001", token: invalid); XCTFail("accepted invalid token") }
+            catch { XCTAssertEqual(error as? APIClientError, .invalidCredential) }
+        }
+        XCTAssertEqual(stub.requests.count, 1)
+    }
+
+    func testPersonalSuggestionsUseOnlyTheScopedDeviceHeader() async throws {
+        let stub = Stub { request in
+            self.response(request, 200, #"{"playlistId":"p","generatedAt":"now","dateKey":"d","query":"q","quotaCost":0,"suggestions":[]}"#)
+        }
+        let client = try APIClient(origin: URL(string: "https://example.test")!, transport: stub)
+        let token = PersonalImportToken.encode(Data(repeating: 7, count: 32))
+        let input = SuggestionsRequest(playlistId: "p", seeds: [SuggestionSeed(title: "t", channelTitle: "c", duration: 42)])
+        _ = try await client.personalSuggestions(input, token: token)
+        let request = try XCTUnwrap(stub.requests.first)
+        XCTAssertEqual(request.url?.path, "/api/youtube/suggestions")
+        XCTAssertNil(request.url?.query)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "TubeShuffleDevice \(token)")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+        let seed = try XCTUnwrap((json["seeds"] as? [[String: Any]])?.first)
+        XCTAssertEqual(Set(seed.keys), Set(["title", "channelTitle", "duration"]))
+        XCTAssertFalse(String(data: request.httpBody!, encoding: .utf8)!.contains(token))
+        do { _ = try await client.personalSuggestions(input, token: "invalid"); XCTFail("accepted invalid token") }
+        catch { XCTAssertEqual(error as? APIClientError, .invalidCredential) }
+        XCTAssertEqual(stub.requests.count, 1)
+    }
+
+    func testMinimalSuggestionSeedsBoundComplexUnicodeAndDoNotSendDescriptions() throws {
+        let combined = "a" + String(repeating: "\u{0301}", count: 10_000)
+        let title = String(repeating: "🎵", count: 10_000)
+        let seed = SuggestionSeed.minimal(title: title, channelTitle: combined, duration: 42)
+        XCTAssertEqual(seed.title.unicodeScalars.count, 180)
+        XCTAssertEqual(seed.channelTitle.unicodeScalars.count, 120)
+        let input = SuggestionsRequest(playlistId: "PLSyntheticImport0001", seeds: Array(repeating: seed, count: 5))
+        let data = try JSONEncoder().encode(input)
+        XCTAssertLessThan(data.count, 10_000, "Valid local metadata must fit well below the server request limit")
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let seeds = try XCTUnwrap(body["seeds"] as? [[String: Any]])
+        XCTAssertTrue(seeds.allSatisfy { Set($0.keys) == Set(["title", "channelTitle", "duration"]) })
+    }
+
     func testSuggestionsAndLinkMethodsAndBodies() async throws {
         let stub = Stub { request in
             switch (request.httpMethod, request.url!.path) {

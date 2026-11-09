@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { cp, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -14,6 +15,8 @@ const sessionId = '22222222-2222-2222-2222-222222222222';
 const apiKey = 'synthetic-youtube-secret';
 const providerSecret = 'synthetic-provider-error-secret';
 const playlistId = 'PLabcdefghij';
+const deviceToken = Buffer.alloc(32, 7).toString('base64url');
+const deviceDigest = createHash('sha256').update(deviceToken, 'ascii').digest('hex');
 const b64 = (x) => Buffer.from(JSON.stringify(x)).toString('base64url');
 const token = (subject, issuer, expiry = Math.floor(Date.now() / 1000) + 3600, overrides = {}) =>
   `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: subject, iss: `${issuer}/auth/v1`, aud: 'authenticated', session_id: sessionId, exp: expiry, ...overrides })}.c2ln`;
@@ -74,6 +77,7 @@ test('real HTTP routes with isolated simulated provider and SDK', { timeout: 120
       if (url.pathname.startsWith('/youtube/v3/')) {
         youtube++;
         check(req.method === 'GET' && !body, 'YouTube method/body');
+        check(!req.headers.authorization, 'device/account credential must not reach YouTube');
         if (url.pathname.endsWith('/playlists')) {
           params({ part: 'snippet,contentDetails', id: null, maxResults: '1', key: apiKey });
           check([playlistId, 'PLerrorsecret'].includes(url.searchParams.get('id')), 'playlist id');
@@ -131,7 +135,7 @@ test('real HTTP routes with isolated simulated provider and SDK', { timeout: 120
   const reservation = createServer(); const appPort = await listen(reservation); await new Promise(r => reservation.close(r));
   const base = `http://127.0.0.1:${appPort}`;
   child = spawn(process.execPath, [join(root, 'node_modules/next/dist/bin/next'), 'dev', '--webpack', '-H', '127.0.0.1', '-p', String(appPort)], {
-    cwd: dir, detached: true, env: { PATH: process.env.PATH, HOME: dir, NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1', NODE_OPTIONS: `--require=${join(root, 'tests/integration/network-guard.cjs')}`, TEST_PROVIDER_PORT: String(port), NEXT_PUBLIC_SUPABASE_URL: issuer, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'synthetic-publishable', OWNER_USER_ID: owner, APP_ORIGIN: base, CSRF_HMAC_SECRET: 'ab'.repeat(32), YOUTUBE_API_KEY: apiKey }, stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: dir, detached: true, env: { PATH: process.env.PATH, HOME: dir, NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1', NODE_OPTIONS: `--require=${join(root, 'tests/integration/network-guard.cjs')}`, TEST_PROVIDER_PORT: String(port), NEXT_PUBLIC_SUPABASE_URL: issuer, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'synthetic-publishable', OWNER_USER_ID: owner, APP_ORIGIN: base, CSRF_HMAC_SECRET: 'ab'.repeat(32), YOUTUBE_API_KEY: apiKey, TUBESHUFFLE_PERSONAL_IMPORT_TOKEN_SHA256: deviceDigest }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   // Register immediately so fast exits and spawn failures cannot be missed during cleanup.
   childEnded = new Promise(resolve => { child.once('exit', resolve); child.on('error', () => { if (!child.pid) resolve(); }); });
@@ -144,12 +148,36 @@ test('real HTTP routes with isolated simulated provider and SDK', { timeout: 120
   const call = async (path, options = {}) => {
     const res = await fetch(base + path, { signal: AbortSignal.timeout(10000), ...options }); const text = await res.text();
     assert.match(res.headers.get('cache-control') || '', /no-store/);
-    assert.ok(!text.includes(apiKey) && !text.includes(providerSecret) && !text.includes(good));
+    assert.ok(!text.includes(apiKey) && !text.includes(providerSecret) && !text.includes(good) && !text.includes(deviceToken));
     if (res.status >= 400) for (const [, value] of res.headers) assert.ok(!value.includes(apiKey) && !value.includes(providerSecret) && !value.includes(good));
     return { status: res.status, text, headers: res.headers };
   };
   const playlist = '/api/youtube/playlist?playlistId=' + playlistId;
   const suggestions = '/api/youtube/suggestions';
+  await t.test('personal device access is limited to playlist reads and suggestions', async () => {
+    const beforeAuth = auth, beforeYoutube = youtube;
+    const wrong = Buffer.alloc(32, 8).toString('base64url');
+    assert.equal((await call(playlist, { headers: { authorization: `TubeShuffleDevice ${wrong}`, cookie } })).status, 401);
+    assert.equal(youtube, beforeYoutube);
+    assert.equal(auth, beforeAuth, 'a bad device credential must not fall back to the cookie');
+    const result = await call(playlist, { headers: { authorization: `TubeShuffleDevice ${deviceToken}` } });
+    assert.equal(result.status, 200, result.text);
+    assert.equal(JSON.parse(result.text).title, 'Synthetic playlist');
+    assert.equal(youtube, beforeYoutube + 2);
+    assert.equal(auth, beforeAuth, 'personal playlist reads must not start a cloud account session');
+    const body = JSON.stringify({ playlistId, dateKey: '2025-01-03', seeds: [{ title: 'Synthetic song', channelTitle: 'Synthetic artist' }], excludeVideoIds: ['excluded001'] });
+    const options = { method: 'POST', headers: { authorization: `TubeShuffleDevice ${deviceToken}`, 'content-type': 'application/json' }, body };
+    const beforeSuggestions = youtube;
+    const first = await call(suggestions, options);
+    assert.equal(first.status, 200, first.text);
+    assert.deepEqual(JSON.parse(first.text).suggestions.map(x => x.youtubeId), ['synthetic01']);
+    const calls = youtube - beforeSuggestions;
+    assert.ok(calls > 0);
+    assert.equal((await call(suggestions, options)).status, 200);
+    assert.equal(youtube - beforeSuggestions, calls * 2, 'personal suggestions must not use the server result cache');
+    assert.equal((await call(suggestions, { ...options, headers: { authorization: `TubeShuffleDevice ${wrong}`, cookie } })).status, 401);
+    assert.equal((await call('/api/playlist-links', { headers: { authorization: `TubeShuffleDevice ${deviceToken}` } })).status, 401);
+  });
   const forged = good.replace(/\.c2ln$/, '.Zm9yZ2Vk');
   for (const [header, status] of [[undefined, 401], ['Basic bad', 401], [`Bearer ${forged}`, 401], [`Bearer ${expired}`, 401], [`Bearer ${nonowner}`, 403]]) {
     for (const [path, method] of [[playlist, 'GET'], [suggestions, 'POST']]) {
