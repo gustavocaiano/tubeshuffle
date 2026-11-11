@@ -11,7 +11,7 @@ protocol NativePlaylistSource: AnyObject {
 
 struct NativePersonalImportServices {
     let configuration: () throws -> NativeAccountConfiguration
-    let token: (NativeAccountConfiguration) throws -> String?
+    let token: (NativeAccountConfiguration) async throws -> String?
     let client: (URL) throws -> APIClient
 
     static var live: Self {
@@ -20,8 +20,68 @@ struct NativePersonalImportServices {
                 throw NativeAccountSetupDocument.Failure.invalidDocument
             }
             return try NativeAccountSetupDocument.decode(Data(contentsOf: url))
-        }, token: { try NativePersonalImportCredential(configuration: $0).retrieve() },
+        }, token: { configuration in
+            try await NativePersonalCredentialRead.perform {
+                try NativePersonalImportCredential(configuration: configuration).retrieve()
+            }
+        },
               client: { try APIClient(origin: $0, transport: URLSessionAPITransport()) })
+    }
+}
+
+/// Keychain access may wait for a system prompt. Keep it off the UI thread and
+/// let the caller cancel without waiting for the system operation to finish.
+enum NativePersonalCredentialRead {
+    private static let queue = DispatchQueue(label: "com.tubeshuffle.personal-credential-read")
+
+    static func perform(_ read: @escaping () throws -> String?) async throws -> String? {
+        let pending = Pending()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                guard pending.install(continuation) else { return }
+                queue.async {
+                    guard pending.isActive else { return }
+                    pending.finish(Result { try read() })
+                }
+            }
+        } onCancel: {
+            pending.cancel()
+        }
+    }
+
+    private final class Pending: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<String?, Error>?
+        private var finished = false
+
+        var isActive: Bool {
+            lock.lock(); defer { lock.unlock() }
+            return !finished
+        }
+
+        func install(_ value: CheckedContinuation<String?, Error>) -> Bool {
+            lock.lock()
+            if finished {
+                lock.unlock()
+                value.resume(throwing: CancellationError())
+                return false
+            }
+            continuation = value
+            lock.unlock()
+            return true
+        }
+
+        func finish(_ result: Result<String?, Error>) {
+            lock.lock()
+            guard !finished else { lock.unlock(); return }
+            finished = true
+            let value = continuation
+            continuation = nil
+            lock.unlock()
+            value?.resume(with: result)
+        }
+
+        func cancel() { finish(.failure(CancellationError())) }
     }
 }
 
@@ -233,7 +293,9 @@ final class NativeAccountModel: ObservableObject, NativePlaylistSource {
             // The origin and credential namespace come from the same bundled
             // public setup; a custom account origin never receives this token.
             let configuration = try personalImport.configuration()
-            guard let token = try personalImport.token(configuration) else {
+            let storedToken = try await personalImport.token(configuration)
+            guard generation == epoch, !Task.isCancelled else { return nil }
+            guard let token = storedToken else {
                 message = "This Mac is not set up for personal imports yet. Sign in under Library → Account or finish personal setup."
                 return nil
             }
@@ -278,7 +340,9 @@ final class NativeAccountModel: ObservableObject, NativePlaylistSource {
         } else {
             do {
                 let configuration = try personalImport.configuration()
-                guard let token = try personalImport.token(configuration) else {
+                let storedToken = try await personalImport.token(configuration)
+                guard generation == epoch, !Task.isCancelled else { return nil }
+                guard let token = storedToken else {
                     message = "This Mac is not set up for personal suggestions yet. Check its setup or sign in under Library → Account."
                     return nil
                 }

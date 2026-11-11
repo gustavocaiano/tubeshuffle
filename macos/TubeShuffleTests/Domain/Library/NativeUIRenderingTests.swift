@@ -306,6 +306,67 @@ final class NativeUIRenderingTests: XCTestCase {
         XCTAssertNil(NativeArtwork.url(thumbnail: "https://name:secret@i.ytimg.com/image", videoID: "invalid"))
     }
 
+    func testQueueRowUsesCurrentOrderAndRespectsDisabledSelection() async throws {
+        let items = Array(NativeLibraryFixture.snapshot.occurrences.prefix(2))
+        let state = QueueInteractionState()
+        let host = NSHostingView(rootView: QueueInteractionView(state: state, items: items))
+        let window = NSWindow(contentRect: NSRect(x: -5000, y: -5000, width: 500, height: 400),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = host; window.orderBack(nil)
+        defer { window.close() }
+        func clickFirstRow() throws {
+            let point = host.convert(NSPoint(x: 160, y: host.isFlipped ? 85 : host.bounds.height - 85), to: nil)
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                let event = try XCTUnwrap(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                    timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                    eventNumber: 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+                window.sendEvent(event)
+            }
+        }
+        try await Task.sleep(nanoseconds: 200_000_000)
+        host.layoutSubtreeIfNeeded()
+        try clickFirstRow()
+        XCTAssertEqual(state.selections, [items[0].id])
+        state.reversed = true
+        try await Task.sleep(nanoseconds: 200_000_000)
+        host.layoutSubtreeIfNeeded()
+        try clickFirstRow()
+        XCTAssertEqual(state.selections, [items[0].id, items[1].id])
+        state.enabled = false
+        try await Task.sleep(nanoseconds: 200_000_000)
+        host.layoutSubtreeIfNeeded()
+        try clickFirstRow()
+        XCTAssertEqual(state.selections.count, 2, "Disabled rows must not accept selection")
+    }
+
+    func testLargeQueueUpdatesKeepTheMainActorResponsive() async throws {
+        let playlist = PlaylistID("synthetic-playlist")
+        let description = String(repeating: "synthetic description ", count: 450)
+        let tags = Array(repeating: "synthetic-tag", count: 12)
+        let items = (0..<3_000).map { index in
+            LibraryOccurrence(id: OccurrenceID("synthetic-\(index)"), playlistId: playlist,
+                youtubeId: "ScMzIvxBSi4", title: "Synthetic title \(index)", channelTitle: "Synthetic artist",
+                thumbnail: "", duration: 180, position: index, viewCount: nil, likeCount: nil,
+                description: description, tags: tags, categoryId: nil, publishedAt: nil)
+        }
+        let state = QueueStressState()
+        let host = NSHostingView(rootView: QueueStressView(state: state, items: items))
+        let window = NSWindow(contentRect: NSRect(x: -5000, y: -5000, width: 500, height: 650),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = host; window.orderBack(nil)
+        defer { window.close() }
+        try await Task.sleep(nanoseconds: 300_000_000)
+        host.layoutSubtreeIfNeeded(); window.displayIfNeeded()
+        let start = ProcessInfo.processInfo.systemUptime
+        for tick in 1...3 {
+            state.tick = tick
+            try await Task.sleep(nanoseconds: 150_000_000)
+            host.layoutSubtreeIfNeeded(); window.displayIfNeeded()
+        }
+        let elapsed = ProcessInfo.processInfo.systemUptime - start
+        XCTAssertLessThan(elapsed, 4, "Repeated queue updates must not block the UI for multiple seconds")
+    }
+
     func testResizeFocusAndZoomKeepTheExistingPlayerAndOccurrence() async throws {
         let library = NativeLibraryModel()
         library.openDemo()
@@ -410,6 +471,39 @@ final class NativeUIRenderingTests: XCTestCase {
         XCTAssertEqual(subject.volume, 0.4)
         subject.stop()
         withExtendedLifetime(window) {}
+    }
+}
+
+@MainActor
+private final class QueueInteractionState: ObservableObject {
+    @Published var reversed = false
+    @Published var enabled = true
+    var selections: [OccurrenceID] = []
+}
+
+@MainActor
+private struct QueueInteractionView: View {
+    @ObservedObject var state: QueueInteractionState
+    let items: [LibraryOccurrence]
+    var body: some View {
+        let displayed = state.reversed ? Array(items.reversed()) : items
+        NativeQueueCard(items: displayed, currentIndex: nil, showArtwork: false, demo: true, height: 400,
+                        canSelect: state.enabled, select: { state.selections.append(displayed[$0].id) })
+    }
+}
+
+@MainActor
+private final class QueueStressState: ObservableObject {
+    @Published var tick = 0
+}
+
+@MainActor
+private struct QueueStressView: View {
+    @ObservedObject var state: QueueStressState
+    let items: [LibraryOccurrence]
+    var body: some View {
+        NativeQueueCard(items: items.map { $0 }, currentIndex: state.tick, showArtwork: false, demo: true,
+                        height: 500, canSelect: true, status: "Synthetic \(state.tick)", select: { _ in })
     }
 }
 

@@ -251,7 +251,8 @@ struct NativeQueueCard: View {
                 ScrollView(.vertical) {
                     LazyVStack(spacing: 6) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            row(item, index: index).id(item.id)
+                            NativeQueueRow(item: item, index: index, active: currentIndex == index,
+                                           showArtwork: showArtwork, demo: demo, canSelect: canSelect, select: select).id(item.id)
                         }
                     }
                 }.onChange(of: currentIndex) { index in
@@ -264,10 +265,21 @@ struct NativeQueueCard: View {
             }
         }.padding(16).frame(height: height).modifier(NativeCard()).accessibilityIdentifier("player.queue").nativeBounds("queue")
     }
+}
 
-    private func row(_ item: LibraryOccurrence, index: Int) -> some View {
-        let active = currentIndex == index
-        return HStack(spacing: 0) {
+// Keep each row's captured state independent of the full queue. Otherwise
+// SwiftUI can repeatedly compare every occurrence's metadata for every row.
+private struct NativeQueueRow: View {
+    let item: LibraryOccurrence
+    let index: Int
+    let active: Bool
+    let showArtwork: Bool
+    let demo: Bool
+    let canSelect: Bool
+    let select: (Int) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
             Button { select(index) } label: {
                 HStack(spacing: 10) {
                     if showArtwork {
