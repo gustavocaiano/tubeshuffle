@@ -68,6 +68,78 @@ final class AccountSessionCoordinatorTests: XCTestCase {
         XCTAssertFalse(model.canFetchPlaylists)
     }
 
+    func testCancellingImportWhileCredentialReadWaitsKeepsInterfaceUsable() async throws {
+        let configuration = try NativeAccountConfiguration(supabaseOrigin: XCTUnwrap(URL(string: "https://example.supabase.co")),
+            publishableKey: "sb_publishable_synthetic", applicationAPIOrigin: XCTUnwrap(URL(string: "https://personal.example")))
+        let token = PersonalImportToken.encode(Data(repeating: 7, count: 32))
+        let started = expectation(description: "synthetic credential read started")
+        let released = expectation(description: "synthetic credential read released")
+        let completed = expectation(description: "cancelled import completed")
+        let gate = DispatchSemaphore(value: 0)
+        let transport = SyntheticPersonalImportTransport()
+        let model = NativeAccountModel(personalImport: .init(configuration: { configuration }, token: { _ in
+            try await NativePersonalCredentialRead.perform {
+                started.fulfill()
+                _ = gate.wait(timeout: .now() + 10)
+                released.fulfill()
+                return token
+            }
+        }, client: { try APIClient(origin: $0, transport: transport) }))
+
+        let task = Task { await model.fetchPlaylistForImport("PLSyntheticImport0001") }
+        await fulfillment(of: [started], timeout: 2)
+        XCTAssertTrue(model.busy)
+        task.cancel()
+        Task {
+            let result = await task.value
+            XCTAssertNil(result)
+            completed.fulfill()
+        }
+        await fulfillment(of: [completed], timeout: 2)
+        XCTAssertFalse(model.busy, "Cancel must not wait for Keychain to respond")
+        let requestsBeforeRelease = await transport.requests
+        XCTAssertTrue(requestsBeforeRelease.isEmpty)
+        gate.signal()
+        await fulfillment(of: [released], timeout: 2)
+        let requestsAfterRelease = await transport.requests
+        XCTAssertTrue(requestsAfterRelease.isEmpty, "A late credential must not start a request")
+    }
+
+    func testQueuedCredentialReadsCanBeCancelledWithoutStarting() async throws {
+        let started = expectation(description: "first synthetic read started")
+        let queued = expectation(description: "second synthetic read queued")
+        let released = expectation(description: "first synthetic read released")
+        let skipped = expectation(description: "cancelled queued read must not start")
+        skipped.isInverted = true
+        let gate = DispatchSemaphore(value: 0)
+        let first = Task {
+            try await NativePersonalCredentialRead.perform {
+                started.fulfill()
+                _ = gate.wait(timeout: .now() + 10)
+                released.fulfill()
+                return "synthetic"
+            }
+        }
+        await fulfillment(of: [started], timeout: 2)
+        let second = Task {
+            queued.fulfill()
+            return try await NativePersonalCredentialRead.perform {
+                skipped.fulfill()
+                return "unused"
+            }
+        }
+        await fulfillment(of: [queued], timeout: 2)
+        second.cancel()
+        do { _ = try await second.value; XCTFail("Expected cancellation") }
+        catch is CancellationError { }
+        gate.signal()
+        await fulfillment(of: [released, skipped], timeout: 1)
+        let firstValue = try await first.value
+        XCTAssertEqual(firstValue, "synthetic")
+        let nextValue = try await NativePersonalCredentialRead.perform { "next" }
+        XCTAssertEqual(nextValue, "next")
+    }
+
     func testPersonalSuggestionsWorkWithoutAccountAndCacheByCompleteInput() async throws {
         let configuration = try NativeAccountConfiguration(supabaseOrigin: XCTUnwrap(URL(string: "https://example.supabase.co")),
             publishableKey: "sb_publishable_synthetic", applicationAPIOrigin: XCTUnwrap(URL(string: "https://personal.example")))

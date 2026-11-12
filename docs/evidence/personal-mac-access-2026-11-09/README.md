@@ -17,3 +17,9 @@ The import sheet no longer presents account controls. The previous sheet lifecyc
 - Both the earlier committed image configuration and the newer configuration on main were built and tested; the latter is preserved unchanged for the eventual merge. No real browser profile, real library, actual personal playlist, live login, production migration or schema change was used in tests.
 
 This is a focused self-review and synthetic validation, not proof of production security or live-service availability. Signed-Keychain behavior was previously exercised across launches using a separate synthetic service and targeted cleanup; actual personal pairing and provider playback require their own observed result. The YouTube minimized/hidden playback policy and public-release gates remain open.
+
+## Production and personal installation
+
+PR [#15](https://github.com/gustavocaiano/tubeshuffle/pull/15) merged as `149d55ab9849fda79582dc38fbbf0d9fafdca9a5`; Vercel reported the matching production deployment READY with the canonical aliases assigned. The ad-hoc arm64 Mac app was installed with the previous app retained as a backup. A new sensitive production-only environment variable contains the locally generated device credential's digest; existing environment metadata was unchanged and the raw credential was not copied to the server. Anonymous and wrong-device live probes for playlists, suggestions and cloud links returned 401/no-store. The updated homepage returned 200. [Sanitized local receipts](../../../build/tubeshuffle-personal-access-96csw4_c/).
+
+Subsequently, after the owner approved the Keychain prompt, a live suggestions request using the existing device credential returned nonempty results for synthetic seeds in a disposable library. A live public-playlist import, Cancel and reopen check remain unverified. No existing library or real playlist was accessed by the agent. Hidden/minimized playback policy and public release remain open.

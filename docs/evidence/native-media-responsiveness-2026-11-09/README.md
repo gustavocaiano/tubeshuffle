@@ -1,0 +1,33 @@
+# Native playback responsiveness — 2026-11-09
+
+## Report and scope
+
+The owner reported that Play/Pause through both the app and physical media keys can take roughly a minute, with the window visible, minimized, or hidden. The affected playlist has approximately 100–1,000 videos. These are owner reports; the latency was not independently timed. No real library or browser profile was opened or inspected.
+
+A passive sample of the running app, observed around 98% of one CPU core, showed main-thread SwiftUI work comparing arrays of complete `LibraryOccurrence` metadata. No playlist contents, links, credentials, or queue contents were read. This points to UI load as a contributing cause, but does not prove it explains all of the owner's latency or exclude WebKit/system-command delays.
+
+## Changes and synthetic evidence
+
+Queue rows now receive only their individual occurrence and display/selection state rather than implicitly capturing the whole queue. Identity, metadata equality, order, persistence, playback policy, and history semantics are unchanged. In a synthetic hosted view with fresh arrays, one 1,000-item update caused about 100,000 deep comparisons before the change and nine after it. A 3,000-item long-metadata stress run took 13.20 seconds for three updates before versus 0.46 seconds after, including 0.45 seconds of deliberate waits; those figures are controlled experiments, not a benchmark for the owner's playlist. An uninstrumented regression test went from 12.99 seconds and failure to a passing 0.815 seconds including fixture setup. Separate synthetic interaction tests verify row selection after reordering and disabled selection.
+
+Updating this locally ad-hoc-signed app changes its code-signing requirement. A test with a unique, disposable Keychain item and two differently signed synthetic apps timed out while the second signature read it; its sample showed a wait inside macOS Security. That test did not establish whether an approval prompt appeared or whether the actual device credential is accessible after an update. The synthetic item was deleted by the app that created it and absence verified. No actual credential or server configuration was read, rotated, or changed.
+
+Personal-import credential reads now run on a single background queue; cancelling an import can complete without waiting for a stalled system read. Generation and cancellation are rechecked before network use, so late credentials do not start a request. An already-running Keychain operation itself cannot be cancelled and may remain pending until macOS resolves it. Synthetic blocking-read tests cover responsive cancellation, discarding late results, and cancelling a queued read without starting it.
+
+The focused review checked queue selection and occurrence identity, the continuation's cancellation/completion race, the generation checks before network use, and the credential scope. The serial worker limits concurrency: if the system call never returns, later credential reads wait behind it, although their callers can cancel. A restart may be needed to clear that condition. The wall-clock regression threshold is sensitive to host load; the owner's actual control latency is not established by that test.
+
+## Verification and limitations
+
+The first full post-change run executed 278 tests with two skips and failed two tests: the isolated host still contained the fake Keychain-test setup, and a pre-existing player test expected a retired coordinator to deallocate after one scheduler yield. After restoring the copied public setup, each affected test passed five isolated reruns; the deallocation failure may be scheduling-sensitive, but its cause is not established. The final full rerun passed **278 executed, two skipped, zero failures**; the large-queue test completed in 0.796 seconds including setup.
+
+The Release arm64 app built successfully and its ad-hoc signature was verified against its declared entitlements. After the owner confirmed that the installed app was closed, the candidate replaced it at `~/Applications/TubeShuffle.app`; the previous app was kept at `build/tubeshuffle-media-fix-ssn0ydns/previous-installed-before-media-fix.app`. The candidate was not launched and no library or Keychain credential was opened during installation. The owner's physical media keys, real playlist, visual focus, minimized/hidden audio and post-update personal-import access have not been tested by this work. Playback and YouTube policy remain separate open gates; this is not release approval. The browser's storage and deployed service were not changed.
+
+## Installed-app synthetic rehearsal — 2026-11-11
+
+At the owner's request, the agent verified that the installed binary still matched the tested update and launched it with no library open. Using the native file panels, the agent created a new folder solely within the designated disposable directory and previewed `synthetic-queue.json`. The app reported one playlist, 1,000 occurrences, zero history events and zero omitted orphan events. The import then reported success. No real library or browser profile was opened.
+
+After starting Shuffle & listen, the app reported Playing and subsequently the second queue occurrence. Automated clicks on its on-screen Pause and Play controls changed the displayed state to Paused after approximately 1.03 seconds and Playing after approximately 2.13 seconds, respectively; timings include accessibility polling. These observations do not establish audible audio or physical media-key routing. Minimized and Cmd+H controls remain untested.
+
+Find suggestions prompted macOS Keychain to ask for authorization and the login-keychain password for the existing TubeShuffle personal-import credential. While that prompt remained open, a further accessibility Pause action returned in 0.44 seconds and the app subsequently displayed Paused. This confirms a response in this one synthetic situation, not audible playback or a bound on all Keychain waits. The owner reported approving the prompt directly in macOS; afterward, the prompt was no longer visible and the app displayed its nonempty suggestions-results view for the synthetic seeds. This confirms suggestions worked in this run with this installed signature; playlist import and future app signatures were not tested. The agent did not read, request, or enter the password or the credential. No server settings were changed.
+
+The owner subsequently reported that response was "muito mais rápido não se compara". This is qualitative confirmation of improvement; exact timings and individual foreground, minimized and Cmd+H results were not supplied.
