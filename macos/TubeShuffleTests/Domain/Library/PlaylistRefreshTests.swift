@@ -100,9 +100,11 @@ final class PlaylistRefreshTests: XCTestCase {
     func testLibraryRefreshUpdatesTracksAndSavedQueue() async throws {
         let directory = try temporaryLibraryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        let store = try NativeLocalLibraryStore.createNew(at: directory)
-        try store.importIntoEmpty(seed())
-        let library = try NativeLibraryModel(store: store, at: directory)
+        var store: NativeLocalLibraryStore? = try NativeLocalLibraryStore.createNew(at: directory)
+        try store!.importIntoEmpty(seed())
+        let library = try NativeLibraryModel(store: store!, at: directory)
+        // The model holds the only reference, so closing it releases the library lock.
+        store = nil
         defer { library.closeLibrary() }
         library.saveQueue(items: [item(0, "b"), item(1, "a")], index: 1, playlist: playlistID, epoch: library.generation)
         XCTAssertEqual(library.savedQueue?.occurrenceIDs, ["b", "a"])
