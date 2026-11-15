@@ -516,7 +516,7 @@ struct NativeLibraryView: View {
             Group {
                 if let listening {
                     NativeLiveDeck(coordinator: listening.coordinator, session: listening, showArtwork: $showArtwork, focus: $focus,
-                        stage: $stage, metrics: metrics, demo: library.isDemo, restart: restartPlayback)
+                        stage: $stage, metrics: metrics, demo: library.isDemo, restart: restartPlayback, covered: showsHome)
                         .id(listening.id)
                 } else {
                     NativeIdleDeck(item: occurrences.first, count: occurrences.count, showArtwork: $showArtwork, focus: $focus,

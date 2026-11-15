@@ -2,6 +2,14 @@ import AppKit
 import WebKit
 import CoreFoundation
 
+// The retained player view. While another page is drawn over it (the playlist grid
+// during playback) it stays mounted and visible to WebKit, but must not take clicks
+// meant for what is on top: SwiftUI's allowsHitTesting does not reach AppKit hit testing.
+final class CoverableWebView: WKWebView {
+    var ignoresMouse = false
+    override func hitTest(_ point: NSPoint) -> NSView? { ignoresMouse ? nil : super.hitTest(point) }
+}
+
 // Owns one web view for the coordinator's lifetime. Generations attribute callbacks
 // to player instances, not authenticated remote video identity; the top-level API
 // script can still forge messages. Main-frame/origin checks remain essential.
@@ -9,7 +17,7 @@ import CoreFoundation
 final class DirectPlayer: NSObject, WKNavigationDelegate {
     enum Event { case iframeReady, ready(Int), state(Int, Int), error(Int, Int), autoplayBlocked(Int), failure }
     var onEvent: ((Event) -> Void)?
-    let webView: WKWebView
+    let webView: CoverableWebView
     private let proxy = MessageProxy()
     private let origin = "https://com.tubeshuffle.playbacklab"
     private var initialNavigation = true
@@ -22,7 +30,7 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
     override init() {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
-        webView = WKWebView(frame: .zero, configuration: configuration)
+        webView = CoverableWebView(frame: .zero, configuration: configuration)
         super.init()
         proxy.owner = self
         configuration.userContentController.add(proxy, name: "events")

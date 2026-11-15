@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import WebKit
 import XCTest
 @testable import TubeShuffle
 
@@ -284,6 +285,16 @@ final class PlaylistRefreshTests: XCTestCase {
                 XCTAssertLessThanOrEqual(rect.maxX, size.width + 1, "\(size) \(key) overflows right")
             }
         }
+    }
+
+    func testPlayerViewTakesNoClicksWhileTheGridCoversIt() {
+        let view = CoverableWebView(frame: NSRect(x: 0, y: 0, width: 200, height: 120), configuration: WKWebViewConfiguration())
+        let inside = NSPoint(x: 100, y: 60)
+        XCTAssertNotNil(view.hitTest(inside))
+        view.ignoresMouse = true
+        XCTAssertNil(view.hitTest(inside), "Clicks must reach the grid drawn over the player")
+        view.ignoresMouse = false
+        XCTAssertNotNil(view.hitTest(inside))
     }
 
     // MARK: Fixtures
