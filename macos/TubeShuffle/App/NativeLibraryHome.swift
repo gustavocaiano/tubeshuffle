@@ -8,11 +8,13 @@ struct NativePlaylistCard: View {
     let firstVideoID: String
     let showArtwork: Bool
     let demo: Bool
-    let playing: Bool
+    /// The player of the queue taken from this playlist, if one is playing or paused.
+    let session: PlayerCoordinator?
     let refreshing: Bool
     let canRefresh: Bool
     let open: () -> Void
     let refresh: () -> Void
+    private var playing: Bool { session != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -60,11 +62,27 @@ struct NativePlaylistCard: View {
                 .background(.black.opacity(0.72), in: Capsule()).padding(8)
             if refreshing || playing {
                 HStack(spacing: 6) {
-                    if refreshing { ProgressView().controlSize(.small) } else { Image(systemName: "waveform") }
-                    Text(refreshing ? "Refreshing" : "Playing").font(.system(size: 10, weight: .semibold))
+                    if refreshing {
+                        ProgressView().controlSize(.small)
+                        Text("Refreshing").font(.system(size: 10, weight: .semibold))
+                    } else if let session {
+                        NativePlaybackState(coordinator: session)
+                    }
                 }.padding(.horizontal, 8).padding(.vertical, 5).background(.black.opacity(0.72), in: Capsule())
                     .padding(8).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
+        }
+    }
+}
+
+/// Says whether a card's player is playing or paused, following it as it changes.
+private struct NativePlaybackState: View {
+    @ObservedObject var coordinator: PlayerCoordinator
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: coordinator.isPlaying ? "waveform" : "pause.fill")
+            Text(coordinator.isPlaying ? "Playing" : "Paused").font(.system(size: 10, weight: .semibold))
         }
     }
 }

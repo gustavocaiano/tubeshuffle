@@ -11,12 +11,13 @@ final class NativeListeningSession: Identifiable {
     private(set) var occurrencesByID: [OccurrenceID: LibraryOccurrence]
     private var readySubscription: AnyCancellable?
 
-    init(items: [LibraryOccurrence], playlist: LibraryPlaylist, library: NativeLibraryModel, index: Int = 0, autoplay: Bool = false, testHooks: PlayerCoordinator.TestHooks? = nil) {
+    init(items: [LibraryOccurrence], playlist: LibraryPlaylist, library: NativeLibraryModel, index: Int = 0, autoplay: Bool = false,
+         volume: Double = 1, testHooks: PlayerCoordinator.TestHooks? = nil) {
         self.playlist = playlist
         occurrencesByID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
         coordinator = PlayerCoordinator(initialItems: items.enumerated().map { index, item in
             PlayerCoordinator.Item(id: index, videoID: item.youtubeId, localOccurrenceID: item.id, title: item.title, channel: item.channelTitle)
-        }, initialIndex: index, testHooks: testHooks)
+        }, initialIndex: index, volume: volume, testHooks: testHooks)
         let epoch = library.generation
         coordinator.onNaturalCompletion = { [weak library] item in
             library?.recordNaturalCompletion(item, playlist: playlist.id, epoch: epoch)
@@ -421,7 +422,7 @@ struct NativeLibraryView: View {
                 ForEach(entries, id: \.playlist.id) { entry in
                     NativePlaylistCard(playlist: entry.playlist, count: entry.count, firstVideoID: entry.firstVideoID,
                                        showArtwork: showArtwork, demo: library.isDemo,
-                                       playing: listening?.playlist.id == entry.playlist.id,
+                                       session: listening?.playlist.id == entry.playlist.id ? listening?.coordinator : nil,
                                        refreshing: library.refreshing == entry.playlist.id,
                                        canRefresh: !library.isDemo && !library.busy,
                                        open: { openPlaylist(entry.playlist.id) },
@@ -650,7 +651,11 @@ struct NativeLibraryView: View {
     private func dismissMessageLater() async {
         guard library.message != nil else { return }
         try? await Task.sleep(nanoseconds: 10_000_000_000)
-        guard !Task.isCancelled, !showingImport, !showingAccount, library.pendingImport == nil else { return }
+        // A sheet may still be showing this message; it goes once the sheet closes.
+        while !Task.isCancelled, showingImport || showingAccount || library.pendingImport != nil {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        guard !Task.isCancelled else { return }
         library.message = nil
     }
 
@@ -675,8 +680,8 @@ struct NativeLibraryView: View {
         guard !library.busy else { return }
         switch action {
         case .importPlaylist: library.message = nil; showingImport = true
-        case .createLibrary: library.createLibrary()
-        case .openLibrary: library.openLibrary()
+        case .createLibrary: Task { await library.createLibrary() }
+        case .openLibrary: Task { await library.openLibrary() }
         case .importJSON: library.previewImport()
         case .exportJSON: library.exportLibrary()
         case .closeLibrary: stopPlayback(); library.closeAndForgetLibrary()
@@ -694,11 +699,9 @@ struct NativeLibraryView: View {
         importNextStep = nil
         switch step {
         case .createLibrary:
-            library.createLibrary()
-            reopenImportAfterFilePanel()
+            Task { await library.createLibrary(); reopenImportAfterFilePanel() }
         case .openLibrary:
-            library.openLibrary()
-            reopenImportAfterFilePanel()
+            Task { await library.openLibrary(); reopenImportAfterFilePanel() }
         case .ordinaryApp:
             let configuration = NSWorkspace.OpenConfiguration()
             configuration.createsNewApplicationInstance = true
@@ -712,8 +715,8 @@ struct NativeLibraryView: View {
     }
 
     private func reopenImportAfterFilePanel() {
-        // The file panel runs a nested modal loop during sheet dismissal. A
-        // synchronous re-presentation can leave a duplicate sheet attached.
+        // The import sheet returns once the file panel has closed; presenting it
+        // on the next turn lets the panel's sheet finish leaving the window.
         DispatchQueue.main.async { showingImport = true }
     }
 
@@ -817,8 +820,10 @@ struct NativeLibraryView: View {
         guard items.allSatisfy({ $0.youtubeId.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil }) else {
             library.message = "This queue contains an ID that cannot be played. No occurrences were silently skipped."; return
         }
+        // A new queue keeps the volume chosen in the one it replaces.
+        let volume = listening?.coordinator.volume ?? 1
         stopPlayback()
-        listening = NativeListeningSession(items: items, playlist: playlist, library: library, index: index, autoplay: autoplay)
+        listening = NativeListeningSession(items: items, playlist: playlist, library: library, index: index, autoplay: autoplay, volume: volume)
     }
 
     private func loadSuggestions() {

@@ -18,6 +18,8 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
     enum Event { case iframeReady, ready(Int), state(Int, Int), error(Int, Int), autoplayBlocked(Int), failure }
     var onEvent: ((Event) -> Void)?
     let webView: CoverableWebView
+    /// Volume (0...1) the first instance starts at; later instances keep the last one set.
+    var initialVolume: Double = 1
     private let proxy = MessageProxy()
     private let origin = "https://com.tubeshuffle.playbacklab"
     private var initialNavigation = true
@@ -43,11 +45,12 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
         guard videoID.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil,
               Bundle.main.bundleIdentifier == "com.tubeshuffle.playbacklab",
               let base = URL(string: origin + "/") else { onEvent?(.failure); return }
+        let startingVolume = Int((min(1, max(0, initialVolume.isFinite ? initialVolume : 1)) * 100).rounded())
         webView.loadHTMLString("""
         <!doctype html><html><head><meta name="referrer" content="strict-origin-when-cross-origin">
         <style>html,body,#container {width:100%;height:100%;margin:0} #container iframe {display:block;width:100%;height:100%;border:0}</style></head>
         <body><div id="container"></div><script>
-        let player = null, currentGeneration = 0, playerReady = false, desiredVolume = 100;
+        let player = null, currentGeneration = 0, playerReady = false, desiredVolume = \(startingVolume);
         function emit(type,value,generation) { window.webkit.messageHandlers.events.postMessage({type:type,value:value,generation:generation}); }
         function replacePlayer(generation, videoId, autoplay) {
           if (!Number.isSafeInteger(generation) || generation <= currentGeneration) throw new Error('stale generation');

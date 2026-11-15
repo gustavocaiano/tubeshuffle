@@ -154,10 +154,14 @@ final class PlayerCoordinator: ObservableObject {
     var onQueueChanged: (([Item], Int) -> Void)?
     private var lastCompletedGeneration: Int?
 
-    init(initialItems: [Item]? = nil, initialIndex: Int = 0, testHooks: TestHooks? = nil,
+    init(initialItems: [Item]? = nil, initialIndex: Int = 0, volume initialVolume: Double = 1, testHooks: TestHooks? = nil,
          mediaPublication: PlayerMediaPublication? = nil) {
         self.testHooks = testHooks
         self.mediaPublication = mediaPublication ?? (testHooks == nil ? .system : nil)
+        // The first instance starts at this volume, before any autoplay.
+        let startingVolume = initialVolume.isFinite ? min(1, max(0, initialVolume)) : 1
+        volume = startingVolume
+        player.initialVolume = startingVolume
         if let initialItems {
             precondition(!initialItems.isEmpty && Set(initialItems.map(\.id)).count == initialItems.count)
             playbackQueue = PlaybackQueue(items: initialItems, state: QueueState(count: initialItems.count, initialIndex: initialIndex))

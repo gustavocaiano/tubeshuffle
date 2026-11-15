@@ -22,8 +22,10 @@ final class NativeLibraryModel: ObservableObject {
     private let recents: NativeRecentLibrary?
     private var activeOperation: UUID?
     private var cancelCalculation: (() -> Void)?
+    private var choosingFile = false
     #if DEBUG
-    var prepareCreatePanelForTesting: ((NSSavePanel) -> Void)?
+    /// Tests answer file panels here instead of presenting them.
+    var answerFilePanelForTesting: ((NSSavePanel) -> URL?)?
     #endif
 
     init(calculations: NativeLibraryCalculations = .init(), recents: NativeRecentLibrary? = nil) {
@@ -49,17 +51,36 @@ final class NativeLibraryModel: ObservableObject {
 
     deinit { if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) } }
 
-    func createLibrary() {
+    /// File panels open as a sheet on the library window instead of `runModal()`.
+    /// A modal loop started from a main-actor task (as export does) starves every
+    /// other main-actor job until it ends, so the player's progress checks never
+    /// finish and playback is declared stalled. A sheet keeps playback, media keys
+    /// and the rest of the app running while a location is chosen.
+    private func choose(_ panel: NSSavePanel) async -> URL? {
+        guard !choosingFile else { return nil }
+        #if DEBUG
+        if let answerFilePanelForTesting { return answerFilePanelForTesting(panel) }
+        #endif
+        choosingFile = true
+        defer { choosingFile = false }
+        let response = await withCheckedContinuation { (continuation: CheckedContinuation<NSApplication.ModalResponse, Never>) in
+            if let window, window.isVisible, window.attachedSheet == nil {
+                panel.beginSheetModal(for: window) { continuation.resume(returning: $0) }
+            } else {
+                panel.begin { continuation.resume(returning: $0) }
+            }
+        }
+        return response == .OK ? panel.url : nil
+    }
+
+    func createLibrary() async {
         guard !busy else { return }
         let panel = NSSavePanel()
         panel.title = "Create an empty local library"
         panel.prompt = "Create library"
         panel.nameFieldStringValue = "TubeShuffle Library"
         panel.message = "Choose a new folder name. Existing folders and libraries are never replaced."
-        #if DEBUG
-        prepareCreatePanelForTesting?(panel)
-        #endif
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let url = await choose(panel), !busy else { return }
         let scoped = url.startAccessingSecurityScopedResource()
         do {
             // Never use withIntermediateDirectories: an existing destination is an error.
@@ -74,12 +95,12 @@ final class NativeLibraryModel: ObservableObject {
         }
     }
 
-    func openLibrary() {
+    func openLibrary() async {
         guard !busy else { return }
         let panel = NSOpenPanel()
         panel.title = "Open a TubeShuffle library folder"
         panel.canChooseFiles = false; panel.canChooseDirectories = true; panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let url = await choose(panel), !busy else { return }
         let scoped = url.startAccessingSecurityScopedResource()
         do {
             try install(NativeLocalLibraryStore.openExisting(at: url), at: url, scoped: scoped)
@@ -144,10 +165,10 @@ final class NativeLibraryModel: ObservableObject {
         let panel = NSOpenPanel()
         panel.title = "Preview a TubeShuffle transfer"
         panel.allowedContentTypes = [.json]; panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
         let epoch = generation
-        let operation = beginOperation()
         Task {
+            guard let url = await choose(panel), generation == epoch, isOpen, !busy else { return }
+            let operation = beginOperation()
             defer { finishOperation(operation) }
             do {
                 let data = try NativeTransferFiles.read(url)
@@ -186,7 +207,7 @@ final class NativeLibraryModel: ObservableObject {
                 panel.title = "Export local library"
                 panel.allowedContentTypes = [.json]; panel.nameFieldStringValue = "tubeshuffle-library.json"
                 panel.message = "Unencrypted JSON. \(result.omittedOrphans.count) orphan history events omitted. Queue, preferences, suggestions, credentials and media are excluded. Choose a new filename."
-                guard panel.runModal() == .OK, let url = panel.url else { return }
+                guard let url = await choose(panel), generation == epoch, activeOperation == operation, !Task.isCancelled else { return }
                 try NativeTransferFiles.writeNew(result.data, at: url)
                 message = "Export saved. \(result.omittedOrphans.count) orphan history events were omitted."
             } catch {
