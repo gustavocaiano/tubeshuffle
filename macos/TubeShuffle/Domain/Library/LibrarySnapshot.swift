@@ -146,3 +146,90 @@ struct LibrarySnapshot: Equatable {
 protocol LibraryRepository {
     func snapshot() throws -> LibrarySnapshot
 }
+
+// Refreshes one existing playlist from a new API response. Every track that is
+// still in the playlist keeps its local occurrence identity, and therefore its
+// listening history; tracks that left the playlist are reported as removed so
+// their history can be dropped with them. Repeated copies of one video are
+// paired with the new copies in playlist order: a best-effort identity, not
+// proof that a particular copy survived.
+struct PlaylistRefreshPlan: Equatable {
+    enum Failure: Error, Equatable {
+        case unknownPlaylist
+        case mismatchedPlaylist
+        case emptyResult
+        case duplicateOccurrence
+    }
+
+    let playlist: LibraryPlaylist
+    let kept: [LibraryOccurrence]
+    let added: [LibraryOccurrence]
+    let removed: [OccurrenceID]
+
+    var changesTracks: Bool { !added.isEmpty || !removed.isEmpty }
+
+    /// `fetched` is the single-playlist snapshot PlaylistAPIImport made for the
+    /// same YouTube playlist. Its fresh identities are used only for new tracks.
+    static func make(existing snapshot: LibrarySnapshot, playlistId: PlaylistID,
+                     fetched: LibrarySnapshot, refreshedAt: String) throws -> PlaylistRefreshPlan {
+        guard let current = snapshot.playlists.first(where: { $0.id == playlistId }) else { throw Failure.unknownPlaylist }
+        guard fetched.playlists.count == 1, let remote = fetched.playlists.first,
+              scalarEqual(remote.youtubeId, current.youtubeId) else { throw Failure.mismatchedPlaylist }
+        let existing = snapshot.occurrences.filter { $0.playlistId == playlistId }.sorted(by: playlistOrder)
+        let incoming = fetched.occurrences.filter { $0.playlistId == remote.id }.sorted(by: playlistOrder)
+        guard incoming.count == fetched.occurrences.count else { throw Failure.mismatchedPlaylist }
+        // An empty answer for a playlist that has tracks is far more likely a
+        // service problem than a deliberately emptied playlist.
+        guard !incoming.isEmpty || existing.isEmpty else { throw Failure.emptyResult }
+
+        var pool: [String: [LibraryOccurrence]] = [:]
+        for item in existing { pool[item.youtubeId, default: []].append(item) }
+        var used: [String: Int] = [:]
+        var kept: [LibraryOccurrence] = []
+        var added: [LibraryOccurrence] = []
+        var keptIDs = Set<OccurrenceID>()
+        let taken = Set(snapshot.occurrences.map(\.id))
+        for item in incoming {
+            let next = used[item.youtubeId, default: 0]
+            if let candidates = pool[item.youtubeId], next < candidates.count {
+                used[item.youtubeId] = next + 1
+                let local = candidates[next]
+                keptIDs.insert(local.id)
+                kept.append(item.assigned(id: local.id, playlistId: playlistId))
+            } else {
+                guard !taken.contains(item.id) else { throw Failure.duplicateOccurrence }
+                added.append(item.assigned(id: item.id, playlistId: playlistId))
+            }
+        }
+        let removed = existing.filter { !keptIDs.contains($0.id) }.map(\.id)
+        let playlist = LibraryPlaylist(id: current.id, youtubeId: current.youtubeId, title: remote.title,
+                                       description: remote.description, thumbnail: remote.thumbnail,
+                                       channelTitle: remote.channelTitle, videoCount: remote.videoCount,
+                                       createdAt: current.createdAt, updatedAt: refreshedAt)
+        return PlaylistRefreshPlan(playlist: playlist, kept: kept, added: added, removed: removed)
+    }
+
+    /// The library after this refresh. History that refers to a removed
+    /// occurrence is dropped with it; all other history is unchanged.
+    func applied(to snapshot: LibrarySnapshot) -> LibrarySnapshot {
+        let removedIDs = Set(removed)
+        return LibrarySnapshot(
+            playlists: snapshot.playlists.map { $0.id == playlist.id ? playlist : $0 },
+            occurrences: snapshot.occurrences.filter { $0.playlistId != playlist.id } + kept + added,
+            history: snapshot.history.filter { !removedIDs.contains($0.videoId) })
+    }
+
+    private static func playlistOrder(_ lhs: LibraryOccurrence, _ rhs: LibraryOccurrence) -> Bool {
+        if lhs.position != rhs.position { return lhs.position < rhs.position }
+        return lhs.id.rawValue.unicodeScalars.map(\.value).lexicographicallyPrecedes(rhs.id.rawValue.unicodeScalars.map(\.value))
+    }
+}
+
+private extension LibraryOccurrence {
+    func assigned(id: OccurrenceID, playlistId: PlaylistID) -> LibraryOccurrence {
+        LibraryOccurrence(id: id, playlistId: playlistId, youtubeId: youtubeId, title: title, channelTitle: channelTitle,
+                          thumbnail: thumbnail, duration: duration, position: position, viewCount: viewCount,
+                          likeCount: likeCount, description: description, tags: tags, categoryId: categoryId,
+                          publishedAt: publishedAt)
+    }
+}

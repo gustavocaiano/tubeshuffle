@@ -225,7 +225,7 @@ struct QueueState {
         let target: Int
         let reason: Reason
     }
-    let count: Int
+    private(set) var count: Int
     private(set) var index = 0
     private(set) var pending: Request?
     private(set) var failedTarget: Int?
@@ -250,6 +250,18 @@ struct QueueState {
         self.count = count
         precondition(initialIndex >= 0 && (count == 0 ? initialIndex == 0 : initialIndex < count))
         self.index = initialIndex
+    }
+
+    // The queue around the active occurrence was replaced (for example after a
+    // playlist refresh). Only between loads, so no pending target can refer to
+    // the previous order; the active generation and its observations stay.
+    @discardableResult
+    mutating func rebase(count: Int, index: Int) -> Bool {
+        guard pending == nil, count > 0, (0..<count).contains(index) else { return false }
+        self.count = count
+        self.index = index
+        failedTarget = nil
+        return true
     }
 
     var nextTarget: Int { (failedTarget ?? index) + 1 }

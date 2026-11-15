@@ -517,6 +517,30 @@ final class PlayerCoordinator: ObservableObject {
         queue = shuffledUpcoming(queue, after: index) { Double.random(in: 0..<1) }
     }
 
+    /// Replaces the queue around the item that is playing now without reloading
+    /// it: the current occurrence keeps its generation and observations and only
+    /// its position may change. Refused while any player operation is in flight,
+    /// so a pending target can never point into a different queue.
+    @discardableResult
+    func replaceQueue(_ items: [Item], currentIndex newIndex: Int) -> Bool {
+        guard ready, windowOpen, !recoveryRequired, !playerError, !isShuffledQueuePending,
+              queueState.pending == nil, queueState.failedTarget == nil,
+              !mutationInFlight, !mutationGate.busy, !seekGate.seeking, !deferredSeekEnd,
+              items.indices.contains(newIndex), queue.indices.contains(index), items[newIndex].id == queue[index].id,
+              Set(items.map(\.id)).count == items.count else {
+            record("queue update rejected; player busy or current item missing")
+            return false
+        }
+        var next = playbackQueue
+        guard next.state.rebase(count: items.count, index: newIndex) else { return false }
+        next.items = items
+        // One publication: the new order and its index never appear separately.
+        playbackQueue = next
+        publishNowPlaying()
+        record("queue updated around the current item; \(items.count) items")
+        return true
+    }
+
     var canShuffleSampleQueue: Bool {
         !isShuffledQueuePending && shuffleAdmission.allowsSampleQueue(count: queue.count, index: index)
     }
