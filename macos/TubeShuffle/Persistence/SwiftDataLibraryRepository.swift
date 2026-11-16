@@ -43,6 +43,12 @@ enum LibraryStorageKey {
         thumbnail = value.thumbnail; channelTitle = value.channelTitle; videoCount = value.videoCount
         createdAt = value.createdAt; updatedAt = value.updatedAt
     }
+    // Identity (id/key) never changes; only the playlist's metadata does.
+    func update(from value: LibraryPlaylist) {
+        youtubeId = value.youtubeId; title = value.title; detail = value.description
+        thumbnail = value.thumbnail; channelTitle = value.channelTitle; videoCount = value.videoCount
+        createdAt = value.createdAt; updatedAt = value.updatedAt
+    }
     var value: LibraryPlaylist {
         LibraryPlaylist(id: PlaylistID(id), youtubeId: youtubeId, title: title, description: detail,
                         thumbnail: thumbnail, channelTitle: channelTitle, videoCount: videoCount,
@@ -71,6 +77,13 @@ enum LibraryStorageKey {
     init(_ value: LibraryOccurrence) {
         id = value.id.rawValue; key = LibraryStorageKey.encode(value.id.rawValue)
         playlistId = value.playlistId.rawValue; playlistKey = LibraryStorageKey.encode(value.playlistId.rawValue)
+        youtubeId = value.youtubeId; title = value.title; channelTitle = value.channelTitle
+        thumbnail = value.thumbnail; duration = value.duration; position = value.position
+        viewCount = value.viewCount; likeCount = value.likeCount; detail = value.description
+        tags = value.tags; categoryId = value.categoryId; publishedAt = value.publishedAt
+    }
+    // Identity and playlist membership never change; metadata and position do.
+    func update(from value: LibraryOccurrence) {
         youtubeId = value.youtubeId; title = value.title; channelTitle = value.channelTitle
         thumbnail = value.thumbnail; duration = value.duration; position = value.position
         viewCount = value.viewCount; likeCount = value.likeCount; detail = value.description

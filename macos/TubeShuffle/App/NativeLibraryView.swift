@@ -6,17 +6,18 @@ import WebKit
 @MainActor
 final class NativeListeningSession: Identifiable {
     let id = UUID()
-    let playlist: LibraryPlaylist
+    private(set) var playlist: LibraryPlaylist
     let coordinator: PlayerCoordinator
-    let occurrencesByID: [OccurrenceID: LibraryOccurrence]
+    private(set) var occurrencesByID: [OccurrenceID: LibraryOccurrence]
     private var readySubscription: AnyCancellable?
 
-    init(items: [LibraryOccurrence], playlist: LibraryPlaylist, library: NativeLibraryModel, index: Int = 0, autoplay: Bool = false, testHooks: PlayerCoordinator.TestHooks? = nil) {
+    init(items: [LibraryOccurrence], playlist: LibraryPlaylist, library: NativeLibraryModel, index: Int = 0, autoplay: Bool = false,
+         volume: Double = 1, testHooks: PlayerCoordinator.TestHooks? = nil) {
         self.playlist = playlist
         occurrencesByID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
         coordinator = PlayerCoordinator(initialItems: items.enumerated().map { index, item in
             PlayerCoordinator.Item(id: index, videoID: item.youtubeId, localOccurrenceID: item.id, title: item.title, channel: item.channelTitle)
-        }, initialIndex: index, testHooks: testHooks)
+        }, initialIndex: index, volume: volume, testHooks: testHooks)
         let epoch = library.generation
         coordinator.onNaturalCompletion = { [weak library] item in
             library?.recordNaturalCompletion(item, playlist: playlist.id, epoch: epoch)
@@ -32,6 +33,41 @@ final class NativeListeningSession: Identifiable {
                 Task { @MainActor in coordinator?.play() }
             }
         }
+    }
+
+    /// Brings the live queue up to date after its playlist was refreshed without
+    /// interrupting the current track: tracks that left the playlist leave the
+    /// queue (the one playing now is allowed to finish) and new tracks are placed
+    /// at random positions among the upcoming ones. `occurrences` are all of the
+    /// refreshed playlist's tracks; `added` are the ones that are new to it.
+    /// Returns false when the player is busy and the queue was left unchanged.
+    @discardableResult
+    func applyRefresh(playlist updated: LibraryPlaylist, occurrences: [LibraryOccurrence], added: [LibraryOccurrence],
+                      draw: () -> Double = { Double.random(in: 0..<1) }) -> Bool {
+        var latest: [OccurrenceID: LibraryOccurrence] = [:]
+        for item in occurrences { latest[item.id] = item }
+        let queue = coordinator.queue, current = coordinator.index
+        guard queue.indices.contains(current) else { return false }
+        func refreshed(_ entry: PlayerCoordinator.Item) -> PlayerCoordinator.Item? {
+            guard let id = entry.localOccurrenceID, let value = latest[id] else { return nil }
+            return PlayerCoordinator.Item(id: entry.id, videoID: entry.videoID, localOccurrenceID: id,
+                                          title: value.title, channel: value.channelTitle)
+        }
+        let played = queue[..<current].compactMap(refreshed)
+        var upcoming = queue[(current + 1)...].compactMap(refreshed)
+        var nextID = (queue.map(\.id).max() ?? -1) + 1
+        let queued = Set(queue.compactMap(\.localOccurrenceID))
+        for value in added where !queued.contains(value.id) && latest[value.id] != nil {
+            let slot = min(upcoming.count, max(0, Int(draw() * Double(upcoming.count + 1))))
+            upcoming.insert(PlayerCoordinator.Item(id: nextID, videoID: value.youtubeId, localOccurrenceID: value.id,
+                                                   title: value.title, channel: value.channelTitle), at: slot)
+            nextID += 1
+        }
+        let now = refreshed(queue[current]) ?? queue[current]
+        // Rows read these values when the coordinator publishes the new queue.
+        for (id, value) in latest { occurrencesByID[id] = value }
+        playlist = updated
+        return coordinator.replaceQueue(played + [now] + upcoming, currentIndex: played.count)
     }
 }
 
@@ -135,40 +171,48 @@ struct NativeLibraryView: View {
     @StateObject private var library: NativeLibraryModel
     @StateObject private var account = NativeAccountModel()
     @StateObject private var queuePreparation = NativeQueuePreparation()
+    // The playlist whose page is mounted. During playback it stays mounted (and
+    // equal to the playing playlist) while the home grid is shown on top.
     @State private var selected: PlaylistID?
+    @State private var showingHome = false
     @State private var listening: NativeListeningSession?
     @State private var showingAccount = false
-    @State private var showingLibrary = false
     @State private var showingImport = false
-    @State private var libraryNextAction: LibraryAction?
     @State private var importNextStep: ImportNextStep?
     @State private var showingShortcuts = false
     @State private var playlistInput = ""
     @State private var suggestions: [SuggestedVideoDTO] = []
     @State private var suggestionsMessage: String?
     @State private var suggestionsBusy = false
-    @State private var mode = 0
     @State private var stage = false
+    @AppStorage private var mode: Int
     @AppStorage private var excludeWatched: Bool
     @AppStorage private var showArtwork: Bool
     @AppStorage private var focus: Bool
     @AppStorage private var zoom: Double
     @State private var windowWidth: CGFloat = 1280
+    private let restoresRecentLibrary: Bool
     private var observeBounds: (([String: CGRect]) -> Void)?
     private enum ImportNextStep { case createLibrary, openLibrary, ordinaryApp }
     private enum LibraryAction { case importPlaylist, createLibrary, openLibrary, importJSON, exportJSON, closeLibrary, account }
+    private struct HomeEntry { let playlist: LibraryPlaylist; let count: Int; let firstVideoID: String }
 
     init(library: NativeLibraryModel? = nil, preferences: UserDefaults? = nil, session: NativeListeningSession? = nil,
          stage: Bool = false, initialImportForTesting: String? = nil, observeBounds: (([String: CGRect]) -> Void)? = nil) {
         _showingImport = State(initialValue: initialImportForTesting != nil)
         _playlistInput = State(initialValue: initialImportForTesting ?? "")
-        let model = library ?? NativeLibraryModel()
+        let store = preferences ?? NativeUIEnvironment.preferences
+        // Only the app's own library reopens the last location. Injected
+        // libraries (tests) and the synthetic demo never read or change it.
+        let restores = library == nil && !NativeUIEnvironment.isFixture
+        let model = library ?? NativeLibraryModel(recents: restores ? NativeRecentLibrary(defaults: store) : nil)
+        restoresRecentLibrary = restores
         _library = StateObject(wrappedValue: model)
-        _selected = State(initialValue: model.snapshot.playlists.first?.id)
+        _selected = State(initialValue: session?.playlist.id ?? model.snapshot.playlists.first?.id)
         _listening = State(initialValue: session)
         _stage = State(initialValue: stage)
         self.observeBounds = observeBounds
-        let store = preferences ?? NativeUIEnvironment.preferences
+        _mode = AppStorage(wrappedValue: 0, "native.shuffleMode", store: store)
         _excludeWatched = AppStorage(wrappedValue: false, "native.excludeWatched", store: store)
         _showArtwork = AppStorage(wrappedValue: true, "native.showArtwork", store: store)
         _focus = AppStorage(wrappedValue: false, "native.focus", store: store)
@@ -177,8 +221,9 @@ struct NativeLibraryView: View {
 
     private var playlist: LibraryPlaylist? { library.snapshot.playlists.first { $0.id == selected } }
     private var occurrences: [LibraryOccurrence] { library.snapshot.occurrences.filter { $0.playlistId == selected }.sorted { $0.position < $1.position } }
+    private var showsHome: Bool { playlist == nil || showingHome }
     private var zoomBinding: Binding<Double>? {
-        showingAccount || showingLibrary || showingImport || showingShortcuts || library.pendingImport != nil ? nil : $zoom
+        showingAccount || showingImport || showingShortcuts || library.pendingImport != nil ? nil : $zoom
     }
     private func sheetWidth(_ maximum: CGFloat) -> CGFloat { min(maximum, max(320, windowWidth - 32)) }
 
@@ -189,38 +234,25 @@ struct NativeLibraryView: View {
             let metrics = NativePlayerLayout(width: size.width, height: size.height, stage: stage, focus: focus, showArtwork: showArtwork, scale: scale)
             VStack(spacing: 0) {
                 if !stage { navigationBar(metrics) }
-                ScrollViewReader { scroll in
-                ScrollView(.vertical) {
-                    VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
-                        if let playlist {
-                            if !stage { playlistHeading(playlist, metrics: metrics, scroll: scroll) }
-                            playerColumns(metrics, playlist: playlist, scroll: scroll).id("player")
-                            if !stage {
-                                shufflePanel(playlist, scroll: scroll).frame(width: metrics.playerWidth).id("shuffle")
-                                suggestionsPanel
-                            }
-                        } else { welcome }
-                        if let message = library.message { notice(message) }
-                        if library.busy { ProgressView("Working with your library…").tint(.white) }
-                        if !stage {
-                            HStack {
-                                Text(library.isDemo ? "Demo library · sample videos · changes stay in memory" : "Library content and listening history stay on this Mac")
-                                Spacer(minLength: 0)
-                            }.font(.system(size: 11)).foregroundStyle(.white.opacity(0.35)).padding(.top, 4)
-                        }
+                ZStack(alignment: .top) {
+                    if let playlist {
+                        // While the home grid is shown during playback, the player
+                        // page and its single web view stay mounted underneath, so
+                        // browsing playlists never stops or reloads the music.
+                        playlistPage(playlist, metrics: metrics)
+                            .opacity(showsHome ? 0 : 1)
+                            .allowsHitTesting(!showsHome)
+                            .accessibilityHidden(showsHome)
                     }
-                    .frame(width: metrics.contentWidth, alignment: .leading)
-                    .padding(.top, metrics.pageTopInset).padding(.bottom, 28)
-                    .frame(maxWidth: .infinity)
-                }.scrollIndicators(.visible)
+                    if showsHome { homePage(metrics) }
                 }
             }
-            .background {
-                ZStack(alignment: .top) {
-                    NativeUIStyle.background
-                    RadialGradient(colors: [.white.opacity(0.09), .clear], center: .top, startRadius: 0, endRadius: 650).frame(height: 600)
-                }.ignoresSafeArea()
+            .overlay(alignment: .bottom) {
+                if let message = library.message {
+                    notice(message).frame(maxWidth: min(560, size.width - 24)).padding(.bottom, 16)
+                }
             }
+            .background { pageBackground }
             .frame(width: size.width, height: size.height)
             .scaleEffect(scale, anchor: .topLeading)
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
@@ -233,35 +265,47 @@ struct NativeLibraryView: View {
         .background(NativeZoomKeyboard(zoom: $zoom))
         .focusedSceneValue(\.nativeInterfaceZoom, zoomBinding)
         .sheet(isPresented: $showingAccount) { NativeAccountView(account: account, localPlaylist: playlist, demo: library.isDemo || NativeUIEnvironment.isFixture, width: sheetWidth(650)) }
-        .sheet(isPresented: $showingLibrary, onDismiss: continueLibraryAction) { libraryBrowser }
         .sheet(isPresented: $showingImport, onDismiss: continuePlaylistImport) { playlistImport }
         .sheet(isPresented: $showingShortcuts) { shortcuts }
         .sheet(isPresented: Binding(get: { library.pendingImport != nil }, set: { if !$0 { library.pendingImport = nil } })) { transferPreview }
-        .onChange(of: selected) { queuePreparation.cancel(); suggestions = []; suggestionsMessage = nil }
-        .onChange(of: library.generation) { stopPlayback() }
-        .onChange(of: mode) { queuePreparation.cancel() }
+        // A different (or closed) library invalidates the session and the page.
+        .onChange(of: library.generation) { stopPlayback(); selectPage(nil); showingHome = false; stage = false }
         .onChange(of: excludeWatched) { queuePreparation.cancel() }
-        .onChange(of: library.snapshot.playlists.map(\.id)) { ids in if selected == nil { selected = ids.first } }
         .onExitCommand { if stage { stage = false } }
         .onDisappear { stopPlayback() }
-        .onAppear { if NativeUIEnvironment.isFixture, !library.isOpen { library.openDemo(); selectFirst() } }
+        .onAppear {
+            if NativeUIEnvironment.isFixture, !library.isOpen { library.openDemo() }
+            else if restoresRecentLibrary { library.reopenRecentLibrary() }
+        }
+        .task(id: library.message) { await dismissMessageLater() }
+    }
+
+    private var pageBackground: some View {
+        ZStack(alignment: .top) {
+            NativeUIStyle.background
+            RadialGradient(colors: [.white.opacity(0.09), .clear], center: .top, startRadius: 0, endRadius: 650).frame(height: 600)
+        }.ignoresSafeArea()
     }
 
     private func navigationBar(_ metrics: NativePlayerLayout) -> some View {
         HStack(spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "shuffle").font(.system(size: 15, weight: .semibold)).frame(width: 30, height: 30)
-                    .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
-                Text("TubeShuffle").font(.system(size: 15, weight: .bold))
-            }
+            Button(action: goHome) {
+                HStack(spacing: 8) {
+                    Image(systemName: "shuffle").font(.system(size: 15, weight: .semibold)).frame(width: 30, height: 30)
+                        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
+                    Text("TubeShuffle").font(.system(size: 15, weight: .bold))
+                }.contentShape(Rectangle())
+            }.buttonStyle(.plain).help("Your playlists").accessibilityLabel("TubeShuffle, your playlists")
             Spacer(minLength: 8)
-            Menu {
-                Button("Your playlists…") { showingLibrary = true }
-                Divider()
-                libraryActions
-            } label: { Label("Library", systemImage: "square.grid.2x2").frame(minHeight: 36) }
+            if library.busy { ProgressView().controlSize(.small) }
+            Button(action: goHome) {
+                Label("Playlists", systemImage: "square.grid.2x2").frame(minHeight: 36).contentShape(Rectangle())
+            }.buttonStyle(.plain).font(.system(size: 13, weight: showsHome ? .semibold : .medium))
+                .foregroundStyle(showsHome ? Color.white : Color.white.opacity(0.80))
+                .accessibilityIdentifier("library.playlists").help("Your saved playlists")
+            Menu { libraryActions } label: { Label("Library", systemImage: "folder").frame(minHeight: 36) }
                 .menuStyle(.borderlessButton).fixedSize().font(.system(size: 13, weight: .medium))
-                .accessibilityIdentifier("library.menu").help("Playlists, import, library files and account")
+                .accessibilityIdentifier("library.menu").help("Import, library files and account")
                 .nativeBounds("libraryAction")
         }.foregroundStyle(.white.opacity(0.80)).padding(.horizontal, metrics.narrow ? 12 : 28).frame(height: metrics.navigationHeight)
             .background(.black.opacity(0.45)).overlay(alignment: .bottom) { Rectangle().fill(.white.opacity(0.07)).frame(height: 1) }
@@ -271,6 +315,7 @@ struct NativeLibraryView: View {
     @ViewBuilder private var libraryActions: some View {
         Group {
             Button("Import YouTube playlist…", action: presentPlaylistImport).keyboardShortcut("l", modifiers: .command)
+            Divider()
             Button("New library…") { performLibraryAction(.createLibrary) }.keyboardShortcut("n", modifiers: .command)
             Button("Open library…") { performLibraryAction(.openLibrary) }.keyboardShortcut("o", modifiers: .command)
             Divider()
@@ -278,15 +323,163 @@ struct NativeLibraryView: View {
             Button("Export library…") { performLibraryAction(.exportJSON) }.disabled(!library.isOpen).keyboardShortcut("e", modifiers: [.command, .shift])
             if library.isOpen { Button("Close library") { performLibraryAction(.closeLibrary) } }
             Divider()
+            Button("Shortcuts & media keys") { showingShortcuts = true }
             Button("Account…") { performLibraryAction(.account) }.disabled(NativeUIEnvironment.isFixture)
         }.disabled(library.busy)
     }
 
+    // MARK: Home
+
+    private func homePage(_ metrics: NativePlayerLayout) -> some View {
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
+                if let listening {
+                    NativeMiniPlayer(coordinator: listening.coordinator, session: listening, showArtwork: showArtwork,
+                                     demo: library.isDemo, open: returnToPlayer)
+                } else if let resume = resumableQueue {
+                    resumeCard(playlist: resume.playlist, index: resume.index, count: resume.count)
+                }
+                if library.isOpen {
+                    libraryHeader(metrics)
+                    playlistGrid
+                } else { welcome }
+                footer
+            }
+            .frame(width: metrics.contentWidth, alignment: .leading)
+            .padding(.top, metrics.pageTopInset).padding(.bottom, 28)
+            .frame(maxWidth: .infinity)
+        }.scrollIndicators(.visible).background { pageBackground }.nativeBounds("home")
+    }
+
+    private var resumableQueue: (playlist: LibraryPlaylist, index: Int, count: Int)? {
+        guard listening == nil, let saved = library.savedQueue,
+              let playlist = library.snapshot.playlists.first(where: { $0.id == PlaylistID(saved.playlistID) }) else { return nil }
+        return (playlist, saved.index, saved.occurrenceIDs.count)
+    }
+
+    private func resumeCard(playlist: LibraryPlaylist, index: Int, count: Int) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "clock.arrow.circlepath").font(.system(size: 17, weight: .medium)).frame(width: 40, height: 40)
+                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Continue where you left off").font(.system(size: 13, weight: .semibold))
+                Text("\(playlist.title) · Track \(index + 1) of \(count)").font(.system(size: 11))
+                    .foregroundStyle(NativeUIStyle.secondary).lineLimit(1)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            Button("Resume queue", action: resumeQueue).buttonStyle(NativeActionStyle())
+        }.padding(12).modifier(NativeCard(radius: 18)).nativeBounds("resume")
+    }
+
+    private func libraryHeader(_ metrics: NativePlayerLayout) -> some View {
+        let layout = metrics.narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 14)) : AnyLayout(HStackLayout(alignment: .center, spacing: 16))
+        return layout {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("YOUR LIBRARY").font(.system(size: 11, weight: .semibold)).tracking(2.5).foregroundStyle(.white.opacity(0.42))
+                Text("My Playlists").font(.system(size: metrics.narrow ? 28 : 34, weight: .heavy)).tracking(-1)
+                Text(librarySubtitle).font(.system(size: 13)).foregroundStyle(NativeUIStyle.secondary).lineLimit(1)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            if !library.isDemo {
+                Button(action: presentPlaylistImport) { Label("Import playlist", systemImage: "plus") }
+                    .buttonStyle(NativeActionStyle(prominent: true)).disabled(library.busy)
+                    .accessibilityIdentifier("library.importYouTube").help("Add a public YouTube playlist (⌘L)")
+            }
+        }.padding(22).modifier(NativeCard()).nativeBounds("libraryHeader")
+    }
+
+    private var librarySubtitle: String {
+        if library.isDemo { return "Demo · sample videos · changes stay in memory" }
+        let count = library.snapshot.playlists.count
+        return "\(count) playlist\(count == 1 ? "" : "s") ready to shuffle · \(library.location)"
+    }
+
+    private var homeEntries: [HomeEntry] {
+        var counts: [PlaylistID: Int] = [:]
+        var first: [PlaylistID: (position: Int, video: String)] = [:]
+        for item in library.snapshot.occurrences {
+            counts[item.playlistId, default: 0] += 1
+            if let known = first[item.playlistId], known.position <= item.position { continue }
+            first[item.playlistId] = (item.position, item.youtubeId)
+        }
+        return library.snapshot.playlists
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+            .map { HomeEntry(playlist: $0, count: counts[$0.id] ?? 0, firstVideoID: first[$0.id]?.video ?? "") }
+    }
+
+    @ViewBuilder private var playlistGrid: some View {
+        let entries = homeEntries
+        if entries.isEmpty {
+            VStack(spacing: 12) {
+                Image(systemName: "music.note.list").font(.system(size: 30)).foregroundStyle(NativeUIStyle.secondary)
+                Text("No playlists yet").font(.system(size: 18, weight: .semibold))
+                Text("Import a public YouTube playlist to start listening.").font(.callout).foregroundStyle(NativeUIStyle.secondary)
+                if !library.isDemo {
+                    Button("Import your first playlist", action: presentPlaylistImport)
+                        .buttonStyle(NativeActionStyle(prominent: true)).disabled(library.busy)
+                }
+            }.frame(maxWidth: .infinity).padding(.vertical, 48).modifier(NativeCard())
+        } else {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 210), spacing: 16)], alignment: .leading, spacing: 16) {
+                ForEach(entries, id: \.playlist.id) { entry in
+                    NativePlaylistCard(playlist: entry.playlist, count: entry.count, firstVideoID: entry.firstVideoID,
+                                       showArtwork: showArtwork, demo: library.isDemo,
+                                       session: listening?.playlist.id == entry.playlist.id ? listening?.coordinator : nil,
+                                       refreshing: library.refreshing == entry.playlist.id,
+                                       canRefresh: !library.isDemo && !library.busy,
+                                       open: { openPlaylist(entry.playlist.id) },
+                                       refresh: { refreshPlaylist(entry.playlist.id) })
+                }
+            }.nativeBounds("playlistGrid")
+        }
+    }
+
+    private var welcome: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Your music. A different order.").font(.system(size: 34, weight: .bold)).tracking(-1)
+            Text("Open the library with your playlists, or create a new one on this Mac. TubeShuffle opens it again automatically next time.")
+                .font(.system(size: 15)).foregroundStyle(NativeUIStyle.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                Button("Open library…") { performLibraryAction(.openLibrary) }.buttonStyle(NativeActionStyle(prominent: true))
+                    .accessibilityIdentifier("welcome.openLibrary")
+                Button("Create library…") { performLibraryAction(.createLibrary) }.buttonStyle(NativeActionStyle())
+                    .accessibilityIdentifier("welcome.createLibrary")
+            }.disabled(library.busy)
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(32).padding(.vertical, 30).modifier(NativeCard()).nativeBounds("welcome")
+    }
+
+    private var footer: some View {
+        HStack {
+            Text(library.isDemo ? "Demo library · sample videos · changes stay in memory" : "Library content and listening history stay on this Mac")
+            Spacer(minLength: 0)
+        }.font(.system(size: 11)).foregroundStyle(.white.opacity(0.35)).padding(.top, 4)
+    }
+
+    // MARK: Playlist page
+
+    private func playlistPage(_ playlist: LibraryPlaylist, metrics: NativePlayerLayout) -> some View {
+        ScrollViewReader { scroll in
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
+                    if !stage { playlistHeading(playlist, metrics: metrics, scroll: scroll) }
+                    playerColumns(metrics, playlist: playlist, scroll: scroll).id("player")
+                    if !stage {
+                        shufflePanel(playlist, scroll: scroll).frame(width: metrics.playerWidth).id("shuffle")
+                        suggestionsPanel
+                        footer
+                    }
+                }
+                .frame(width: metrics.contentWidth, alignment: .leading)
+                .padding(.top, metrics.pageTopInset).padding(.bottom, 28)
+                .frame(maxWidth: .infinity)
+            }.scrollIndicators(.visible)
+        }
+    }
+
     private func playlistHeading(_ playlist: LibraryPlaylist, metrics: NativePlayerLayout, scroll: ScrollViewProxy) -> some View {
         let layout = metrics.narrow ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 16))
+        let refreshingThis = library.refreshing == playlist.id
         return layout {
             HStack(spacing: metrics.narrow ? 8 : 16) {
-                NativeIconButton(symbol: "arrow.left", label: "Back to library") { showingLibrary = true }
+                NativeIconButton(symbol: "arrow.left", label: "Back to your playlists", action: goHome)
                 VStack(alignment: .leading, spacing: metrics.compactChrome ? 4 : 5) {
                     Text(playlist.title).font(.system(size: metrics.compactChrome ? 22 : 26, weight: .bold)).tracking(-0.6).lineLimit(1)
                     HStack(spacing: 7) {
@@ -303,10 +496,17 @@ struct NativeLibraryView: View {
                 if !metrics.horizontal {
                     Button { scroll.scrollTo("queue", anchor: .top) } label: { Label("Queue", systemImage: "list.bullet") }.buttonStyle(NativeActionStyle())
                 }
-                Button { scroll.scrollTo("shuffle", anchor: .bottom) } label: { Label("Shuffle", systemImage: "shuffle") }.buttonStyle(NativeActionStyle())
-                if library.savedQueue != nil, listening == nil {
-                    Button("Resume queue", action: resumeQueue).buttonStyle(NativeActionStyle())
+                if !library.isDemo {
+                    Button { refreshPlaylist(playlist.id) } label: {
+                        Label(refreshingThis ? "Refreshing…" : "Refresh", systemImage: "arrow.clockwise")
+                    }.buttonStyle(NativeActionStyle()).disabled(library.busy || showsHome)
+                        .keyboardShortcut("r", modifiers: .command)
+                        .help("Get the tracks added to or removed from this playlist on YouTube (⌘R)")
+                        .accessibilityIdentifier("playlist.refresh")
                 }
+                Button { scroll.scrollTo("player", anchor: .top); startQueue(playlist) } label: { Label("Shuffle", systemImage: "shuffle") }
+                    .buttonStyle(NativeActionStyle()).disabled(occurrences.isEmpty || queuePreparation.busy)
+                    .help("Shuffle this playlist again and keep listening")
             }
         }.frame(height: metrics.headingHeight).nativeBounds("heading")
     }
@@ -317,7 +517,7 @@ struct NativeLibraryView: View {
             Group {
                 if let listening {
                     NativeLiveDeck(coordinator: listening.coordinator, session: listening, showArtwork: $showArtwork, focus: $focus,
-                        stage: $stage, metrics: metrics, demo: library.isDemo, restart: restartPlayback)
+                        stage: $stage, metrics: metrics, demo: library.isDemo, restart: restartPlayback, covered: showsHome)
                         .id(listening.id)
                 } else {
                     NativeIdleDeck(item: occurrences.first, count: occurrences.count, showArtwork: $showArtwork, focus: $focus,
@@ -344,13 +544,13 @@ struct NativeLibraryView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Shape your queue").font(.system(size: 13, weight: .semibold))
             HStack(spacing: 4) {
-                shuffleChoice("Normal", subtitle: "Every track, a surprise", value: 0)
-                shuffleChoice("Smart", subtitle: "A smoother energy flow", value: 1)
+                shuffleChoice("Normal", subtitle: "Every track, a surprise", value: 0, playlist: playlist, scroll: scroll)
+                shuffleChoice("Smart", subtitle: "A smoother energy flow", value: 1, playlist: playlist, scroll: scroll)
             }.padding(4).background(.black.opacity(0.32), in: RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(NativeUIStyle.border))
             Button { scroll.scrollTo("player", anchor: .top); startQueue(playlist) } label: {
                 Label(shuffleButtonTitle, systemImage: "shuffle").frame(maxWidth: .infinity)
-            }.buttonStyle(NativeActionStyle(prominent: true)).disabled(occurrences.isEmpty || library.busy || queuePreparation.busy)
+            }.buttonStyle(NativeActionStyle(prominent: true)).disabled(occurrences.isEmpty || queuePreparation.busy)
             Rectangle().fill(NativeUIStyle.border).frame(height: 1)
             HStack {
                 VStack(alignment: .leading, spacing: 5) {
@@ -365,15 +565,22 @@ struct NativeLibraryView: View {
         }.padding(16).modifier(NativeCard())
     }
 
-    private func shuffleChoice(_ title: String, subtitle: String, value: Int) -> some View {
-        Button { mode = value } label: {
+    // Like the website, choosing a mode shuffles again straight away.
+    private func shuffleChoice(_ title: String, subtitle: String, value: Int, playlist: LibraryPlaylist, scroll: ScrollViewProxy) -> some View {
+        Button {
+            mode = value
+            scroll.scrollTo("player", anchor: .top)
+            startQueue(playlist, mode: value)
+        } label: {
             VStack(alignment: .leading, spacing: 5) {
                 Text(title).font(.system(size: 13, weight: .semibold))
                 Text(subtitle).font(.system(size: 11)).opacity(0.60)
             }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
                 .foregroundStyle(mode == value ? Color.black : Color.white)
                 .background(mode == value ? Color.white : Color.clear, in: RoundedRectangle(cornerRadius: 10))
-        }.buttonStyle(.plain).accessibilityAddTraits(mode == value ? .isSelected : [])
+                .contentShape(Rectangle())
+        }.buttonStyle(.plain).disabled(occurrences.isEmpty || queuePreparation.busy)
+            .accessibilityAddTraits(mode == value ? .isSelected : []).help("Shuffle with \(title)")
     }
 
     private var suggestionsPanel: some View {
@@ -414,61 +621,12 @@ struct NativeLibraryView: View {
         }.padding(22).modifier(NativeCard())
     }
 
-    private var welcome: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            Text(library.isOpen ? "Your library, ready for a new mix." : "Your music. A different order.").font(.system(size: 34, weight: .bold)).tracking(-1)
-            Text("Open Library to add your playlists and start listening.").font(.system(size: 15)).foregroundStyle(NativeUIStyle.secondary)
-            Button("Open Library") { showingLibrary = true }.buttonStyle(NativeActionStyle(prominent: true))
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(32).padding(.vertical, 50).modifier(NativeCard())
-    }
-
-    private var librarySubtitle: String {
-        if library.isDemo { return "Demo · six public playback examples" }
-        if library.isOpen { return library.location }
-        return "Your playlists, saved on this Mac."
-    }
-
-    private var libraryBrowser: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack { Text("Library").font(.system(size: 26, weight: .bold)); Spacer(); Button("Done") { showingLibrary = false }.buttonStyle(NativeActionStyle()) }
-            Text(librarySubtitle).font(.system(size: 12)).foregroundStyle(NativeUIStyle.secondary)
-            ScrollView {
-                if library.snapshot.playlists.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "music.note.list").font(.system(size: 30)).foregroundStyle(NativeUIStyle.secondary)
-                        Text("No playlists yet").font(.system(size: 18, weight: .semibold))
-                        Text("Import a YouTube playlist to start your library.").font(.callout).foregroundStyle(NativeUIStyle.secondary)
-                    }.frame(maxWidth: .infinity).padding(.vertical, 56)
-                }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 230))], spacing: 16) {
-                    ForEach(library.snapshot.playlists, id: \.id) { item in
-                        let tracks = library.snapshot.occurrences.filter { $0.playlistId == item.id }
-                        Button {
-                            if selected != item.id { stopPlayback() }
-                            selected = item.id; showingLibrary = false
-                        } label: {
-                            VStack(alignment: .leading, spacing: 10) {
-                                NativeArtwork(videoID: tracks.first?.youtubeId ?? "", thumbnail: item.thumbnail ?? "", bundledDemo: library.isDemo).frame(height: 125)
-                                Text(item.title).font(.system(size: 15, weight: .semibold)).lineLimit(2)
-                                Text("\(tracks.count) videos · Open playlist").font(.system(size: 12)).foregroundStyle(NativeUIStyle.secondary)
-                            }.padding(12).modifier(NativeCard(radius: 20))
-                        }.buttonStyle(.plain)
-                    }
-                }
-            }.frame(minHeight: 220, maxHeight: 380)
-            HStack(spacing: 12) {
-                Button("Import YouTube playlist", action: presentPlaylistImport).buttonStyle(NativeActionStyle(prominent: true))
-                    .accessibilityIdentifier("library.importYouTube").disabled(library.busy)
-                Spacer(minLength: 0)
-                Menu("Options") { libraryActions }.menuStyle(.borderlessButton).fixedSize()
-            }
-        }.padding(28).frame(width: sheetWidth(640)).background(NativeUIStyle.background).foregroundStyle(.white)
-    }
+    // MARK: Sheets and messages
 
     private var shortcuts: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Shortcuts & media keys").font(.title2.bold())
-            ForEach([("Play / pause", "⌘⌥P"), ("Previous / next", "⌘⌥← / →"), ("Zoom in / out", "⌘+ / ⌘−"), ("Actual size", "⌘0"), ("Leave Stage", "Esc"), ("Import YouTube playlist", "⌘L"), ("New / open library", "⌘N / ⌘O"), ("Import / export JSON", "⌘⇧I / ⌘⇧E")], id: \.0) { label, keys in
+            ForEach([("Play / pause", "⌘⌥P"), ("Previous / next", "⌘⌥← / →"), ("Refresh playlist", "⌘R"), ("Zoom in / out", "⌘+ / ⌘−"), ("Actual size", "⌘0"), ("Leave Stage", "Esc"), ("Import YouTube playlist", "⌘L"), ("New / open library", "⌘N / ⌘O"), ("Import / export JSON", "⌘⇧I / ⌘⇧E")], id: \.0) { label, keys in
                 HStack { Text(label); Spacer(); Text(keys).foregroundStyle(NativeUIStyle.secondary).monospaced() }
             }
             Text("System media keys use the same player controls. Playback must be ready first.").font(.caption).foregroundStyle(NativeUIStyle.secondary)
@@ -482,7 +640,23 @@ struct NativeLibraryView: View {
             Text(message).font(.system(size: 12)).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
             NativeIconButton(symbol: "xmark", label: "Dismiss message") { library.message = nil }
-        }.padding(16).modifier(NativeCard(radius: 16))
+        }.padding(14).background(Color(white: 0.12), in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(NativeUIStyle.border))
+            .shadow(color: .black.opacity(0.45), radius: 18, y: 8)
+            .padding(.horizontal, 12).nativeBounds("notice")
+    }
+
+    // Messages fade after a while, like the website's toasts, but never while a
+    // sheet that shows the same message is open.
+    private func dismissMessageLater() async {
+        guard library.message != nil else { return }
+        try? await Task.sleep(nanoseconds: 10_000_000_000)
+        // A sheet may still be showing this message; it goes once the sheet closes.
+        while !Task.isCancelled, showingImport || showingAccount || library.pendingImport != nil {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        guard !Task.isCancelled else { return }
+        library.message = nil
     }
 
     private var playlistImport: some View {
@@ -490,8 +664,9 @@ struct NativeLibraryView: View {
             fixtureMode: NativeUIEnvironment.isFixture, width: sheetWidth(540),
             createLibrary: { leaveImport(for: .createLibrary) }, openLibrary: { leaveImport(for: .openLibrary) },
             openApp: { leaveImport(for: .ordinaryApp) },
-            cancel: { showingImport = false }, imported: { id in
-                stopPlayback(); selected = id; playlistInput = ""; showingImport = false
+            cancel: { showingImport = false }, imported: { _ in
+                // The new playlist appears in the grid; playback (if any) continues.
+                playlistInput = ""; showingImport = false; goHome()
             }, observeBounds: observeBounds)
     }
 
@@ -499,27 +674,17 @@ struct NativeLibraryView: View {
         performLibraryAction(.importPlaylist)
     }
 
+    // Library changes reset the page through the generation change, so a
+    // cancelled file panel leaves the current playlist and playback alone.
     private func performLibraryAction(_ action: LibraryAction) {
-        guard !library.busy else { return }
-        if showingLibrary { libraryNextAction = action; showingLibrary = false }
-        else { applyLibraryAction(action) }
-    }
-
-    private func continueLibraryAction() {
-        guard let action = libraryNextAction else { return }
-        libraryNextAction = nil
-        applyLibraryAction(action)
-    }
-
-    private func applyLibraryAction(_ action: LibraryAction) {
         guard !library.busy else { return }
         switch action {
         case .importPlaylist: library.message = nil; showingImport = true
-        case .createLibrary: stopPlayback(); library.createLibrary(); selectFirst()
-        case .openLibrary: stopPlayback(); library.openLibrary(); selectFirst()
+        case .createLibrary: Task { await library.createLibrary() }
+        case .openLibrary: Task { await library.openLibrary() }
         case .importJSON: library.previewImport()
         case .exportJSON: library.exportLibrary()
-        case .closeLibrary: stopPlayback(); library.closeLibrary(); selected = nil
+        case .closeLibrary: stopPlayback(); library.closeAndForgetLibrary()
         case .account: showingAccount = true
         }
     }
@@ -534,11 +699,9 @@ struct NativeLibraryView: View {
         importNextStep = nil
         switch step {
         case .createLibrary:
-            stopPlayback(); library.createLibrary(); selectFirst()
-            reopenImportAfterFilePanel()
+            Task { await library.createLibrary(); reopenImportAfterFilePanel() }
         case .openLibrary:
-            stopPlayback(); library.openLibrary(); selectFirst()
-            reopenImportAfterFilePanel()
+            Task { await library.openLibrary(); reopenImportAfterFilePanel() }
         case .ordinaryApp:
             let configuration = NSWorkspace.OpenConfiguration()
             configuration.createsNewApplicationInstance = true
@@ -552,8 +715,8 @@ struct NativeLibraryView: View {
     }
 
     private func reopenImportAfterFilePanel() {
-        // The file panel runs a nested modal loop during sheet dismissal. A
-        // synchronous re-presentation can leave a duplicate sheet attached.
+        // The import sheet returns once the file panel has closed; presenting it
+        // on the next turn lets the panel's sheet finish leaving the window.
         DispatchQueue.main.async { showingImport = true }
     }
 
@@ -569,12 +732,55 @@ struct NativeLibraryView: View {
                     if preview.source.omittedOrphans.count > 20 { Text("Only the first 20 omissions are shown.").font(.caption) }
                 }
                 if !preview.mayCreateFreshLibrary { Label("This library is not empty. Create a new library to import this file.", systemImage: "exclamationmark.circle") }
-                HStack { Spacer(); Button("Cancel") { library.pendingImport = nil }; Button("Import into empty library") { library.confirmImport(); selectFirst() }.disabled(!preview.mayCreateFreshLibrary || library.isDemo).buttonStyle(.borderedProminent) }
+                HStack { Spacer(); Button("Cancel") { library.pendingImport = nil }; Button("Import into empty library") { library.confirmImport(); goHome() }.disabled(!preview.mayCreateFreshLibrary || library.isDemo).buttonStyle(.borderedProminent) }
             }.padding(24).frame(width: sheetWidth(620))
         }
     }
 
-    private func selectFirst() { selected = library.snapshot.playlists.first?.id }
+    // MARK: Navigation and playback
+
+    private func selectPage(_ id: PlaylistID?) {
+        if selected != id { suggestions = []; suggestionsMessage = nil }
+        selected = id
+    }
+
+    private func goHome() {
+        stage = false
+        showingHome = true
+        // Without playback there is nothing to keep mounted under the grid.
+        if listening == nil { queuePreparation.cancel(); selectPage(nil) }
+    }
+
+    private func returnToPlayer() {
+        guard listening != nil else { return }
+        showingHome = false
+    }
+
+    /// Opening a playlist shuffles it and starts listening, like the website.
+    /// Opening the playlist that is already playing just returns to it.
+    private func openPlaylist(_ id: PlaylistID) {
+        guard let target = library.snapshot.playlists.first(where: { $0.id == id }) else { return }
+        if let listening, listening.playlist.id == id { selectPage(id); showingHome = false; return }
+        stopPlayback()
+        selectPage(id)
+        showingHome = false
+        guard library.snapshot.occurrences.contains(where: { $0.playlistId == id }) else { return }
+        startQueue(target)
+    }
+
+    private func refreshPlaylist(_ id: PlaylistID) {
+        guard !library.busy, !library.isDemo else { return }
+        let source = NativeImportPlaylistSource(account: account)
+        Task {
+            guard let outcome = await library.refreshPlaylist(id, account: source), outcome.changesTracks else { return }
+            guard let listening, listening.playlist.id == id else { return }
+            let current = library.snapshot.occurrences.filter { $0.playlistId == id }
+            if !listening.applyRefresh(playlist: outcome.playlist, occurrences: current, added: outcome.added) {
+                library.message = (library.message.map { $0 + " " } ?? "") + "Shuffle again to bring the changes into the queue that is playing."
+            }
+        }
+    }
+
     private func stopPlayback() { queuePreparation.cancel(); listening?.coordinator.stop(); listening = nil }
     private func restartPlayback() {
         guard let listening, listening.coordinator.recoveryRequired else { return }
@@ -587,19 +793,21 @@ struct NativeLibraryView: View {
               let playlist = library.snapshot.playlists.first(where: { $0.id == PlaylistID(saved.playlistID) }) else { return }
         do {
             let items = try saved.resolve(in: library.snapshot)
-            selected = playlist.id
+            selectPage(playlist.id)
+            showingHome = false
             beginSession(items: items, playlist: playlist, index: saved.index, autoplay: false)
         } catch { library.message = "The saved queue no longer matches this library. No occurrence identities were inferred." }
     }
-    private func startQueue(_ playlist: LibraryPlaylist) {
+    private func startQueue(_ playlist: LibraryPlaylist, mode requested: Int? = nil) {
         let source = library.snapshot, epoch = library.generation, selectedID = selected
-        let requestedMode = mode, requestedExclusion = excludeWatched, sessionID = listening?.id
+        let requestedMode = requested ?? mode, requestedExclusion = excludeWatched, sessionID = listening?.id
         Task {
             guard epoch == library.generation, selected == selectedID, listening?.id == sessionID else { return }
             let items = await queuePreparation.prepare(snapshot: source, playlist: playlist.id,
-                mode: requestedMode == 0 ? .normal : .smart, excludeWatched: requestedExclusion)
+                mode: requestedMode == 1 ? .smart : .normal, excludeWatched: requestedExclusion)
+            // A newer shuffle supersedes this one inside the preparation itself.
             guard let items, epoch == library.generation, selected == selectedID, listening?.id == sessionID,
-                  mode == requestedMode, excludeWatched == requestedExclusion else { return }
+                  excludeWatched == requestedExclusion else { return }
             beginSession(items: items, playlist: playlist, index: 0, autoplay: true)
         }
     }
@@ -612,8 +820,10 @@ struct NativeLibraryView: View {
         guard items.allSatisfy({ $0.youtubeId.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil }) else {
             library.message = "This queue contains an ID that cannot be played. No occurrences were silently skipped."; return
         }
+        // A new queue keeps the volume chosen in the one it replaces.
+        let volume = listening?.coordinator.volume ?? 1
         stopPlayback()
-        listening = NativeListeningSession(items: items, playlist: playlist, library: library, index: index, autoplay: autoplay)
+        listening = NativeListeningSession(items: items, playlist: playlist, library: library, index: index, autoplay: autoplay, volume: volume)
     }
 
     private func loadSuggestions() {

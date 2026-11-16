@@ -154,10 +154,14 @@ final class PlayerCoordinator: ObservableObject {
     var onQueueChanged: (([Item], Int) -> Void)?
     private var lastCompletedGeneration: Int?
 
-    init(initialItems: [Item]? = nil, initialIndex: Int = 0, testHooks: TestHooks? = nil,
+    init(initialItems: [Item]? = nil, initialIndex: Int = 0, volume initialVolume: Double = 1, testHooks: TestHooks? = nil,
          mediaPublication: PlayerMediaPublication? = nil) {
         self.testHooks = testHooks
         self.mediaPublication = mediaPublication ?? (testHooks == nil ? .system : nil)
+        // The first instance starts at this volume, before any autoplay.
+        let startingVolume = initialVolume.isFinite ? min(1, max(0, initialVolume)) : 1
+        volume = startingVolume
+        player.initialVolume = startingVolume
         if let initialItems {
             precondition(!initialItems.isEmpty && Set(initialItems.map(\.id)).count == initialItems.count)
             playbackQueue = PlaybackQueue(items: initialItems, state: QueueState(count: initialItems.count, initialIndex: initialIndex))
@@ -515,6 +519,30 @@ final class PlayerCoordinator: ObservableObject {
     func shuffleUpcoming() {
         guard canShuffleUpcoming else { return }
         queue = shuffledUpcoming(queue, after: index) { Double.random(in: 0..<1) }
+    }
+
+    /// Replaces the queue around the item that is playing now without reloading
+    /// it: the current occurrence keeps its generation and observations and only
+    /// its position may change. Refused while any player operation is in flight,
+    /// so a pending target can never point into a different queue.
+    @discardableResult
+    func replaceQueue(_ items: [Item], currentIndex newIndex: Int) -> Bool {
+        guard ready, windowOpen, !recoveryRequired, !playerError, !isShuffledQueuePending,
+              queueState.pending == nil, queueState.failedTarget == nil,
+              !mutationInFlight, !mutationGate.busy, !seekGate.seeking, !deferredSeekEnd,
+              items.indices.contains(newIndex), queue.indices.contains(index), items[newIndex].id == queue[index].id,
+              Set(items.map(\.id)).count == items.count else {
+            record("queue update rejected; player busy or current item missing")
+            return false
+        }
+        var next = playbackQueue
+        guard next.state.rebase(count: items.count, index: newIndex) else { return false }
+        next.items = items
+        // One publication: the new order and its index never appear separately.
+        playbackQueue = next
+        publishNowPlaying()
+        record("queue updated around the current item; \(items.count) items")
+        return true
     }
 
     var canShuffleSampleQueue: Bool {

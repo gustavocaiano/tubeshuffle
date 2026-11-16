@@ -196,6 +196,43 @@ final class NativeLocalLibraryStore: @preconcurrency LibraryRepository {
         }
     }
 
+    // Applies a refresh computed from this library's current tracks for that
+    // playlist. Kept occurrences retain their identity and history; removed
+    // occurrences are deleted together with the history events that refer to
+    // them. History is matched here, at write time, so a completion recorded
+    // while the refresh was fetching is handled too. One save, or nothing.
+    func applyRefresh(_ plan: PlaylistRefreshPlan) throws {
+        let existing = try snapshot()
+        let current = Set(existing.occurrences.lazy.filter { $0.playlistId == plan.playlist.id }.map(\.id))
+        let planned = plan.kept.map(\.id) + plan.removed
+        guard existing.playlists.contains(where: { $0.id == plan.playlist.id }),
+              planned.count == current.count, Set(planned) == current else { throw Failure.invalidSnapshot }
+        try validate(plan.applied(to: existing), limits: limits)
+        let playlistKey = LibraryStorageKey.encode(plan.playlist.id.rawValue)
+        let removedKeys = Set(plan.removed.map { LibraryStorageKey.encode($0.rawValue) })
+        var keptByKey: [String: LibraryOccurrence] = [:]
+        for value in plan.kept { keptByKey[LibraryStorageKey.encode(value.id.rawValue)] = value }
+        do {
+            let playlists = try boundedFetch(StoredPlaylist.self, limit: limits.playlists)
+            guard let stored = playlists.first(where: { $0.key == playlistKey }) else { throw Failure.invalidSnapshot }
+            stored.update(from: plan.playlist)
+            for record in try boundedFetch(StoredOccurrence.self, limit: limits.occurrences) where record.playlistKey == playlistKey {
+                if let value = keptByKey[record.key] { record.update(from: value) }
+                else if removedKeys.contains(record.key) { context.delete(record) }
+            }
+            if !removedKeys.isEmpty {
+                for record in try boundedFetch(StoredHistoryEvent.self, limit: limits.history) where removedKeys.contains(record.videoKey) {
+                    context.delete(record)
+                }
+            }
+            plan.added.forEach { context.insert(StoredOccurrence($0)) }
+            try context.save()
+        } catch {
+            context.rollback()
+            throw (error as? Failure) ?? Failure.saveFailed
+        }
+    }
+
     // Completion refers to one exact local occurrence. Repeating the same
     // event ID with byte-for-byte equivalent values is idempotent; a reused ID
     // with different values is ambiguous and rejected without overwriting it.
@@ -247,6 +284,16 @@ final class NativeLocalLibraryStore: @preconcurrency LibraryRepository {
         } else {
             try root.writeNew(Self.queueName, bytes: Array(data))
         }
+    }
+
+    // A refresh can remove every track of a saved queue. Only a recognised
+    // queue file is removed; an unknown or symlinked file is kept and reported.
+    func removeSavedQueue() throws {
+        let root = try PrivateDirectory.open(directory)
+        defer { root.close() }
+        guard root.exists(Self.queueName) else { return }
+        _ = try decodeQueue(root.readRegular(Self.queueName, limit: Self.queueByteLimit))
+        try root.remove(Self.queueName)
     }
 
     private func decodeQueue(_ bytes: [UInt8]) throws -> NativeSavedQueue {
@@ -481,6 +528,10 @@ private final class PrivateDirectory {
                 }
             } else if errno != ENOENT { throw NativeLocalLibraryStore.Failure.incompatibleStore }
         }
+    }
+
+    func remove(_ name: String) throws {
+        guard unlinkat(descriptor, name, 0) == 0 else { throw NativeLocalLibraryStore.Failure.unavailable }
     }
 
     func writeNew(_ name: String, bytes: [UInt8]) throws {

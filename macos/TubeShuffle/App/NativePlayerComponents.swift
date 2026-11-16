@@ -120,6 +120,7 @@ struct NativeLiveDeck: View {
     let metrics: NativePlayerLayout
     let demo: Bool
     let restart: () -> Void
+    var covered = false
 
     private var current: PlayerCoordinator.Item { coordinator.queue[coordinator.index] }
     var body: some View {
@@ -128,7 +129,7 @@ struct NativeLiveDeck: View {
             // Same NSViewRepresentable identity in Video, Focus, Stage and resize.
             // Focus uses real native hiding; no page visibility override or playback command.
             ZStack {
-                NativePlayerWebView(player: coordinator.player, hidden: focus)
+                NativePlayerWebView(player: coordinator.player, hidden: focus, covered: covered)
                     .frame(width: metrics.videoWidth, height: metrics.videoHeight)
                     .background(focus ? Color.clear : Color.black).clipShape(RoundedRectangle(cornerRadius: 14))
                     .accessibilityIdentifier("player.viewport").accessibilityHidden(focus).nativeBounds("video")
@@ -314,8 +315,10 @@ private struct NativeQueueRow: View {
 struct NativePlayerWebView: NSViewRepresentable {
     let player: DirectPlayer
     var hidden = false
-    func makeNSView(context: Context) -> WKWebView { player.webView.isHidden = hidden; return player.webView }
-    func updateNSView(_ view: WKWebView, context: Context) { view.isHidden = hidden }
+    // Another page (the playlist grid) is drawn over the player: it keeps playing, but clicks go to that page.
+    var covered = false
+    func makeNSView(context: Context) -> WKWebView { player.webView.isHidden = hidden; player.webView.ignoresMouse = covered; return player.webView }
+    func updateNSView(_ view: WKWebView, context: Context) { view.isHidden = hidden; player.webView.ignoresMouse = covered }
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: WKWebView, context: Context) -> CGSize? {
         CGSize(width: proposal.width ?? 480, height: proposal.height ?? 270)
     }

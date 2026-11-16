@@ -2,6 +2,14 @@ import AppKit
 import WebKit
 import CoreFoundation
 
+// The retained player view. While another page is drawn over it (the playlist grid
+// during playback) it stays mounted and visible to WebKit, but must not take clicks
+// meant for what is on top: SwiftUI's allowsHitTesting does not reach AppKit hit testing.
+final class CoverableWebView: WKWebView {
+    var ignoresMouse = false
+    override func hitTest(_ point: NSPoint) -> NSView? { ignoresMouse ? nil : super.hitTest(point) }
+}
+
 // Owns one web view for the coordinator's lifetime. Generations attribute callbacks
 // to player instances, not authenticated remote video identity; the top-level API
 // script can still forge messages. Main-frame/origin checks remain essential.
@@ -9,7 +17,9 @@ import CoreFoundation
 final class DirectPlayer: NSObject, WKNavigationDelegate {
     enum Event { case iframeReady, ready(Int), state(Int, Int), error(Int, Int), autoplayBlocked(Int), failure }
     var onEvent: ((Event) -> Void)?
-    let webView: WKWebView
+    let webView: CoverableWebView
+    /// Volume (0...1) the first instance starts at; later instances keep the last one set.
+    var initialVolume: Double = 1
     private let proxy = MessageProxy()
     private let origin = "https://com.tubeshuffle.playbacklab"
     private var initialNavigation = true
@@ -22,7 +32,7 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
     override init() {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
-        webView = WKWebView(frame: .zero, configuration: configuration)
+        webView = CoverableWebView(frame: .zero, configuration: configuration)
         super.init()
         proxy.owner = self
         configuration.userContentController.add(proxy, name: "events")
@@ -35,11 +45,12 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
         guard videoID.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil,
               Bundle.main.bundleIdentifier == "com.tubeshuffle.playbacklab",
               let base = URL(string: origin + "/") else { onEvent?(.failure); return }
+        let startingVolume = Int((min(1, max(0, initialVolume.isFinite ? initialVolume : 1)) * 100).rounded())
         webView.loadHTMLString("""
         <!doctype html><html><head><meta name="referrer" content="strict-origin-when-cross-origin">
         <style>html,body,#container {width:100%;height:100%;margin:0} #container iframe {display:block;width:100%;height:100%;border:0}</style></head>
         <body><div id="container"></div><script>
-        let player = null, currentGeneration = 0, playerReady = false, desiredVolume = 100;
+        let player = null, currentGeneration = 0, playerReady = false, desiredVolume = \(startingVolume);
         function emit(type,value,generation) { window.webkit.messageHandlers.events.postMessage({type:type,value:value,generation:generation}); }
         function replacePlayer(generation, videoId, autoplay) {
           if (!Number.isSafeInteger(generation) || generation <= currentGeneration) throw new Error('stale generation');

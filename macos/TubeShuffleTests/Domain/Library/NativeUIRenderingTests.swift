@@ -15,20 +15,10 @@ final class NativeUIRenderingTests: XCTestCase {
         let preferenceName = "tubeshuffle-import-sheet-\(UUID().uuidString)"
         let preferences = try XCTUnwrap(UserDefaults(suiteName: preferenceName))
         var bounds: [String: CGRect] = [:]
-        var panelTimeout: DispatchWorkItem?
-        library.prepareCreatePanelForTesting = { panel in
-            panel.directoryURL = base
-            panel.nameFieldStringValue = "New synthetic library"
-            let timeout = DispatchWorkItem {
-                if NSApp.modalWindow === panel { panel.orderOut(nil); NSApp.stopModal(withCode: .cancel) }
-            }
-            panelTimeout = timeout
-            DispatchQueue.main.asyncAfter(deadline: .now() + 6, execute: timeout)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                guard NSApp.modalWindow === panel else { return }
-                timeout.cancel()
-                panel.orderOut(nil); NSApp.stopModal(withCode: .OK)
-            }
+        var panelTitles: [String] = []
+        library.answerFilePanelForTesting = { panel in
+            panelTitles.append(panel.title)
+            return base.appendingPathComponent("New synthetic library", isDirectory: true)
         }
         let root = NativeLibraryView(library: library, preferences: preferences, initialImportForTesting: "PLSyntheticImport0001") {
             if $0.keys.contains(where: { $0.hasPrefix("import.") }) { bounds = $0 }
@@ -37,7 +27,6 @@ final class NativeUIRenderingTests: XCTestCase {
         let window = NSWindow(contentRect: NSRect(x: -5000, y: -5000, width: 828, height: 900), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; window.contentView = host; window.orderBack(nil)
         defer {
-            panelTimeout?.cancel()
             window.close(); library.closeLibrary()
             preferences.removePersistentDomain(forName: preferenceName)
             try? FileManager.default.removeItem(at: base)
@@ -68,6 +57,7 @@ final class NativeUIRenderingTests: XCTestCase {
             library.isOpen && window.attachedSheet != nil && window.attachedSheet?.windowNumber != initialSheet && bounds[action] != nil
         }
         XCTAssertTrue(importReady, "The synthetic library and import sheet should be ready")
+        XCTAssertEqual(panelTitles, ["Create an empty local library"], "Exactly one create panel should be asked for")
         try click(action)
         let transitioned = try await waitUntil { window.attachedSheet == nil }
         XCTAssertTrue(transitioned, "\(action) should dismiss the import sheet after the file panel")
