@@ -163,6 +163,15 @@ func shuffledUpcoming<Element>(_ queue: [Element], after index: Int, draw: () ->
     return result
 }
 
+// Play next: `item` goes right after the current occurrence. Upcoming copies it
+// replaces are removed, so asking again moves it up instead of queueing it
+// twice. The current occurrence and everything before it keep their positions.
+func queueWithNext<Element>(_ queue: [Element], after index: Int, item: Element,
+                            replacing isCopy: (Element) -> Bool) -> [Element] {
+    guard index >= 0, index < queue.count else { return queue }
+    return Array(queue[...index]) + [item] + queue[(index + 1)...].filter { !isCopy($0) }
+}
+
 // A timed-out bridge mutation remains quarantined even if it later completes.
 struct MutationGate {
     struct Context: Equatable { let occurrence: Int; let lifecycle: Int }

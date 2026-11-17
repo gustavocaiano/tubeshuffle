@@ -5,19 +5,60 @@ import WebKit
 
 @MainActor
 final class NativeListeningSession: Identifiable {
+    /// One track of the queue. A suggestion added with Play next plays like any
+    /// other track, but it is not in the library: it records no history and the
+    /// saved queue leaves it out.
+    enum Entry {
+        case occurrence(LibraryOccurrence)
+        case suggestion(SuggestedVideoDTO)
+
+        var youtubeId: String {
+            switch self {
+            case .occurrence(let value): return value.youtubeId
+            case .suggestion(let value): return value.youtubeId
+            }
+        }
+    }
+
     let id = UUID()
     private(set) var playlist: LibraryPlaylist
     let coordinator: PlayerCoordinator
+    /// The queue plays the playlist in its own order (In order, or the idle Play
+    /// control), so a refresh puts new tracks at their place in the playlist.
+    let inOrder: Bool
     private(set) var occurrencesByID: [OccurrenceID: LibraryOccurrence]
+    /// Suggestions in the queue, by queue item ID.
+    private(set) var suggestionsByItem: [Int: SuggestedVideoDTO] = [:]
     private var readySubscription: AnyCancellable?
 
-    init(items: [LibraryOccurrence], playlist: LibraryPlaylist, library: NativeLibraryModel, index: Int = 0, autoplay: Bool = false,
-         volume: Double = 1, testHooks: PlayerCoordinator.TestHooks? = nil) {
+    convenience init(items: [LibraryOccurrence], playlist: LibraryPlaylist, library: NativeLibraryModel, index: Int = 0,
+                     autoplay: Bool = false, volume: Double = 1, inOrder: Bool = false, testHooks: PlayerCoordinator.TestHooks? = nil) {
+        self.init(entries: items.map { Entry.occurrence($0) }, playlist: playlist, library: library, index: index,
+                  autoplay: autoplay, volume: volume, inOrder: inOrder, testHooks: testHooks)
+    }
+
+    init(entries: [Entry], playlist: LibraryPlaylist, library: NativeLibraryModel, index: Int = 0, autoplay: Bool = false,
+         volume: Double = 1, inOrder: Bool = false, testHooks: PlayerCoordinator.TestHooks? = nil) {
         self.playlist = playlist
-        occurrencesByID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
-        coordinator = PlayerCoordinator(initialItems: items.enumerated().map { index, item in
-            PlayerCoordinator.Item(id: index, videoID: item.youtubeId, localOccurrenceID: item.id, title: item.title, channel: item.channelTitle)
-        }, initialIndex: index, volume: volume, testHooks: testHooks)
+        self.inOrder = inOrder
+        var occurrences: [OccurrenceID: LibraryOccurrence] = [:]
+        var suggestions: [Int: SuggestedVideoDTO] = [:]
+        var items: [PlayerCoordinator.Item] = []
+        for (offset, entry) in entries.enumerated() {
+            switch entry {
+            case .occurrence(let value):
+                let earlier = occurrences.updateValue(value, forKey: value.id)
+                precondition(earlier == nil, "A queue holds each occurrence once")
+                items.append(PlayerCoordinator.Item(id: offset, videoID: value.youtubeId, localOccurrenceID: value.id,
+                                                    title: value.title, channel: value.channelTitle))
+            case .suggestion(let value):
+                suggestions[offset] = value
+                items.append(PlayerCoordinator.Item(id: offset, videoID: value.youtubeId, title: value.title, channel: value.channelTitle))
+            }
+        }
+        occurrencesByID = occurrences
+        suggestionsByItem = suggestions
+        coordinator = PlayerCoordinator(initialItems: items, initialIndex: index, volume: volume, testHooks: testHooks)
         let epoch = library.generation
         coordinator.onNaturalCompletion = { [weak library] item in
             library?.recordNaturalCompletion(item, playlist: playlist.id, epoch: epoch)
@@ -38,9 +79,11 @@ final class NativeListeningSession: Identifiable {
     /// Brings the live queue up to date after its playlist was refreshed without
     /// interrupting the current track: tracks that left the playlist leave the
     /// queue (the one playing now is allowed to finish) and new tracks are placed
-    /// at random positions among the upcoming ones. `occurrences` are all of the
-    /// refreshed playlist's tracks; `added` are the ones that are new to it.
-    /// Returns false when the player is busy and the queue was left unchanged.
+    /// at random positions among the upcoming ones, or at their place in the
+    /// playlist when the queue plays in order. Suggestions stay where they are.
+    /// `occurrences` are all of the refreshed playlist's tracks; `added` are the
+    /// ones that are new to it. Returns false when the player is busy and the
+    /// queue was left unchanged.
     @discardableResult
     func applyRefresh(playlist updated: LibraryPlaylist, occurrences: [LibraryOccurrence], added: [LibraryOccurrence],
                       draw: () -> Double = { Double.random(in: 0..<1) }) -> Bool {
@@ -49,7 +92,8 @@ final class NativeListeningSession: Identifiable {
         let queue = coordinator.queue, current = coordinator.index
         guard queue.indices.contains(current) else { return false }
         func refreshed(_ entry: PlayerCoordinator.Item) -> PlayerCoordinator.Item? {
-            guard let id = entry.localOccurrenceID, let value = latest[id] else { return nil }
+            guard let id = entry.localOccurrenceID else { return suggestionsByItem[entry.id] == nil ? nil : entry }
+            guard let value = latest[id] else { return nil }
             return PlayerCoordinator.Item(id: entry.id, videoID: entry.videoID, localOccurrenceID: id,
                                           title: value.title, channel: value.channelTitle)
         }
@@ -58,7 +102,15 @@ final class NativeListeningSession: Identifiable {
         var nextID = (queue.map(\.id).max() ?? -1) + 1
         let queued = Set(queue.compactMap(\.localOccurrenceID))
         for value in added where !queued.contains(value.id) && latest[value.id] != nil {
-            let slot = min(upcoming.count, max(0, Int(draw() * Double(upcoming.count + 1))))
+            let slot: Int
+            if inOrder {
+                // Before the first upcoming track that comes later in the playlist.
+                slot = upcoming.firstIndex { entry in
+                    entry.localOccurrenceID.flatMap { latest[$0] }.map { $0.position > value.position } ?? false
+                } ?? upcoming.count
+            } else {
+                slot = min(upcoming.count, max(0, Int(draw() * Double(upcoming.count + 1))))
+            }
             upcoming.insert(PlayerCoordinator.Item(id: nextID, videoID: value.youtubeId, localOccurrenceID: value.id,
                                                    title: value.title, channel: value.channelTitle), at: slot)
             nextID += 1
@@ -69,6 +121,60 @@ final class NativeListeningSession: Identifiable {
         playlist = updated
         return coordinator.replaceQueue(played + [now] + upcoming, currentIndex: played.count)
     }
+
+    /// Plays a suggestion right after the current track, like the website's
+    /// Next. The current track keeps playing; asking again moves a queued copy
+    /// up instead of adding another. Returns false when the player is busy (for
+    /// example while a track loads) and the queue was left unchanged.
+    @discardableResult
+    func playNext(_ suggestion: SuggestedVideoDTO) -> Bool {
+        let queue = coordinator.queue, current = coordinator.index
+        guard queue.indices.contains(current), Self.isPlayable(suggestion) else { return false }
+        let id = (queue.map(\.id).max() ?? -1) + 1
+        let item = PlayerCoordinator.Item(id: id, videoID: suggestion.youtubeId, title: suggestion.title, channel: suggestion.channelTitle)
+        let updated = queueWithNext(queue, after: current, item: item) { isSuggestion($0) && $0.videoID == suggestion.youtubeId }
+        // Rows read the suggestion when the coordinator publishes the new queue.
+        suggestionsByItem[id] = suggestion
+        guard coordinator.replaceQueue(updated, currentIndex: current) else {
+            suggestionsByItem[id] = nil
+            return false
+        }
+        let kept = Set(updated.map(\.id))
+        suggestionsByItem = suggestionsByItem.filter { kept.contains($0.key) }
+        return true
+    }
+
+    static func isPlayable(_ suggestion: SuggestedVideoDTO) -> Bool {
+        suggestion.youtubeId.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil
+    }
+
+    func isSuggestion(_ item: PlayerCoordinator.Item) -> Bool {
+        item.localOccurrenceID == nil && suggestionsByItem[item.id] != nil
+    }
+
+    func entry(for item: PlayerCoordinator.Item) -> Entry? {
+        if let id = item.localOccurrenceID { return occurrencesByID[id].map { Entry.occurrence($0) } }
+        return suggestionsByItem[item.id].map { Entry.suggestion($0) }
+    }
+
+    /// What the player and the queue show for a queue item. A suggestion gets a
+    /// stand-in for display only; it is never stored or given to the library.
+    func displayOccurrence(for item: PlayerCoordinator.Item) -> LibraryOccurrence? {
+        switch entry(for: item) {
+        case .occurrence(let value)?:
+            return value
+        case .suggestion(let value)?:
+            return LibraryOccurrence(id: Self.displayID(forItem: item.id), playlistId: playlist.id, youtubeId: value.youtubeId,
+                                     title: value.title, channelTitle: value.channelTitle, thumbnail: value.thumbnail,
+                                     duration: value.duration, position: -1, viewCount: nil, likeCount: nil, description: nil,
+                                     tags: nil, categoryId: nil, publishedAt: nil)
+        case nil:
+            return nil
+        }
+    }
+
+    /// The display ID of a suggestion's queue row.
+    static func displayID(forItem id: Int) -> OccurrenceID { OccurrenceID("suggestion:\(id)") }
 }
 
 private enum NativeUIEnvironment {
@@ -198,9 +304,11 @@ struct NativeLibraryView: View {
     private struct HomeEntry { let playlist: LibraryPlaylist; let count: Int; let firstVideoID: String }
 
     init(library: NativeLibraryModel? = nil, preferences: UserDefaults? = nil, session: NativeListeningSession? = nil,
-         stage: Bool = false, initialImportForTesting: String? = nil, observeBounds: (([String: CGRect]) -> Void)? = nil) {
+         stage: Bool = false, initialImportForTesting: String? = nil, suggestionsForTesting: [SuggestedVideoDTO] = [],
+         observeBounds: (([String: CGRect]) -> Void)? = nil) {
         _showingImport = State(initialValue: initialImportForTesting != nil)
         _playlistInput = State(initialValue: initialImportForTesting ?? "")
+        _suggestions = State(initialValue: suggestionsForTesting)
         let store = preferences ?? NativeUIEnvironment.preferences
         // Only the app's own library reopens the last location. Injected
         // libraries (tests) and the synthetic demo never read or change it.
@@ -424,7 +532,7 @@ struct NativeLibraryView: View {
                                        showArtwork: showArtwork, demo: library.isDemo,
                                        session: listening?.playlist.id == entry.playlist.id ? listening?.coordinator : nil,
                                        refreshing: library.refreshing == entry.playlist.id,
-                                       canRefresh: !library.isDemo && !library.busy,
+                                       canRefresh: !library.isDemo && !library.busy, inOrder: playsInOrder,
                                        open: { openPlaylist(entry.playlist.id) },
                                        refresh: { refreshPlaylist(entry.playlist.id) })
                 }
@@ -504,9 +612,10 @@ struct NativeLibraryView: View {
                         .help("Get the tracks added to or removed from this playlist on YouTube (⌘R)")
                         .accessibilityIdentifier("playlist.refresh")
                 }
-                Button { scroll.scrollTo("player", anchor: .top); startQueue(playlist) } label: { Label("Shuffle", systemImage: "shuffle") }
-                    .buttonStyle(NativeActionStyle()).disabled(occurrences.isEmpty || queuePreparation.busy)
-                    .help("Shuffle this playlist again and keep listening")
+                Button { scroll.scrollTo("player", anchor: .top); startQueue(playlist) } label: {
+                    Label(playsInOrder ? "Play in order" : "Shuffle", systemImage: queueSymbol)
+                }.buttonStyle(NativeActionStyle()).disabled(occurrences.isEmpty || queuePreparation.busy)
+                    .help(playsInOrder ? "Play this playlist again from its first track" : "Shuffle this playlist again and keep listening")
             }
         }.frame(height: metrics.headingHeight).nativeBounds("heading")
     }
@@ -521,7 +630,9 @@ struct NativeLibraryView: View {
                         .id(listening.id)
                 } else {
                     NativeIdleDeck(item: occurrences.first, count: occurrences.count, showArtwork: $showArtwork, focus: $focus,
-                        stage: $stage, metrics: metrics, demo: library.isDemo) { beginSession(items: occurrences, playlist: playlist, index: 0, autoplay: true) }
+                        stage: $stage, metrics: metrics, demo: library.isDemo) {
+                            beginSession(items: occurrences, playlist: playlist, index: 0, autoplay: true, inOrder: true)
+                        }
                 }
             }.frame(width: metrics.playerWidth).nativeBounds("deck")
             if !stage {
@@ -532,7 +643,7 @@ struct NativeLibraryView: View {
                         NativeQueueCard(items: occurrences, currentIndex: nil, showArtwork: showArtwork, demo: library.isDemo,
                             height: metrics.horizontal ? metrics.deckHeight : 420, canSelect: !library.busy) { index in
                                 scroll.scrollTo("player", anchor: .top)
-                                beginSession(items: occurrences, playlist: playlist, index: index, autoplay: true)
+                                beginSession(items: occurrences, playlist: playlist, index: index, autoplay: true, inOrder: true)
                             }
                     }
                 }.frame(width: metrics.queueWidth).id("queue")
@@ -546,16 +657,19 @@ struct NativeLibraryView: View {
             HStack(spacing: 4) {
                 shuffleChoice("Normal", subtitle: "Every track, a surprise", value: 0, playlist: playlist, scroll: scroll)
                 shuffleChoice("Smart", subtitle: "A smoother energy flow", value: 1, playlist: playlist, scroll: scroll)
-            }.padding(4).background(.black.opacity(0.32), in: RoundedRectangle(cornerRadius: 14))
+                shuffleChoice("In order", subtitle: "The playlist as it is", value: Self.inOrderMode, playlist: playlist, scroll: scroll)
+            }.fixedSize(horizontal: false, vertical: true) // Choices share the height of the tallest one.
+                .padding(4).background(.black.opacity(0.32), in: RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(NativeUIStyle.border))
+                .nativeBounds("queueModes")
             Button { scroll.scrollTo("player", anchor: .top); startQueue(playlist) } label: {
-                Label(shuffleButtonTitle, systemImage: "shuffle").frame(maxWidth: .infinity)
+                Label(shuffleButtonTitle, systemImage: queueSymbol).frame(maxWidth: .infinity)
             }.buttonStyle(NativeActionStyle(prominent: true)).disabled(occurrences.isEmpty || queuePreparation.busy)
             Rectangle().fill(NativeUIStyle.border).frame(height: 1)
             HStack {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Skip watched").font(.system(size: 13, weight: .medium))
-                    Text("Leave completed tracks out of your next shuffle.").font(.system(size: 11)).foregroundStyle(NativeUIStyle.secondary)
+                    Text("Leave completed tracks out of your next queue.").font(.system(size: 11)).foregroundStyle(NativeUIStyle.secondary)
                 }
                 Spacer(minLength: 12)
                 Toggle("", isOn: $excludeWatched).toggleStyle(NativeSwitch()).accessibilityLabel("Skip watched")
@@ -565,7 +679,8 @@ struct NativeLibraryView: View {
         }.padding(16).modifier(NativeCard())
     }
 
-    // Like the website, choosing a mode shuffles again straight away.
+    // Like the website, choosing a mode shuffles again straight away; In order
+    // starts again from the playlist's first track.
     private func shuffleChoice(_ title: String, subtitle: String, value: Int, playlist: LibraryPlaylist, scroll: ScrollViewProxy) -> some View {
         Button {
             mode = value
@@ -575,12 +690,13 @@ struct NativeLibraryView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(title).font(.system(size: 13, weight: .semibold))
                 Text(subtitle).font(.system(size: 11)).opacity(0.60)
-            }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
+            }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(10)
                 .foregroundStyle(mode == value ? Color.black : Color.white)
                 .background(mode == value ? Color.white : Color.clear, in: RoundedRectangle(cornerRadius: 10))
                 .contentShape(Rectangle())
         }.buttonStyle(.plain).disabled(occurrences.isEmpty || queuePreparation.busy)
-            .accessibilityAddTraits(mode == value ? .isSelected : []).help("Shuffle with \(title)")
+            .accessibilityAddTraits(mode == value ? .isSelected : [])
+            .help(value == Self.inOrderMode ? "Play the playlist in its own order" : "Shuffle with \(title)")
     }
 
     private var suggestionsPanel: some View {
@@ -605,20 +721,26 @@ struct NativeLibraryView: View {
                 }.padding(16).background(Color.yellow.opacity(0.065), in: RoundedRectangle(cornerRadius: 15))
                     .overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(Color.yellow.opacity(0.10)))
             } else {
+                // Play next adds to the queue of this playlist, once it is playing.
+                let session = listening?.playlist.id == selected ? listening : nil
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 180))], spacing: 16) {
                     ForEach(Array(suggestions.prefix(5).enumerated()), id: \.offset) { _, item in
                         VStack(alignment: .leading, spacing: 8) {
-                            NativeArtwork(videoID: item.youtubeId).frame(height: 110)
-                            Text(item.title).font(.system(size: 13, weight: .medium)).lineLimit(2)
-                            Text(item.channelTitle).font(.system(size: 11)).foregroundStyle(NativeUIStyle.secondary)
-                            if item.youtubeId.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil,
+                            NativeArtwork(videoID: item.youtubeId, thumbnail: item.thumbnail, bundledDemo: library.isDemo).frame(height: 110)
+                            Text(item.title).font(.system(size: 13, weight: .medium)).lineLimit(2, reservesSpace: true)
+                            Text(item.channelTitle).font(.system(size: 11)).foregroundStyle(NativeUIStyle.secondary).lineLimit(1)
+                            NativeSuggestionPlayNext(suggestion: item, session: session) {
+                                library.message = "The player is busy. Choose Play next again in a moment."
+                            }
+                            if NativeListeningSession.isPlayable(item),
                                let url = URL(string: "https://www.youtube.com/watch?v=\(item.youtubeId)") { Link("Open on YouTube ↗", destination: url).font(.system(size: 12)) }
                         }
                     }
                 }
-                Text("Suggestions open on YouTube. Their listening events are not in this library or its export.").font(.caption).foregroundStyle(NativeUIStyle.secondary)
+                Text("Play next adds a suggestion to the queue that is playing, after the current track. Suggestions are not added to this playlist, its history or export.")
+                    .font(.caption).foregroundStyle(NativeUIStyle.secondary).fixedSize(horizontal: false, vertical: true)
             }
-        }.padding(22).modifier(NativeCard())
+        }.padding(22).modifier(NativeCard()).nativeBounds("suggestions")
     }
 
     // MARK: Sheets and messages
@@ -784,9 +906,11 @@ struct NativeLibraryView: View {
     private func stopPlayback() { queuePreparation.cancel(); listening?.coordinator.stop(); listening = nil }
     private func restartPlayback() {
         guard let listening, listening.coordinator.recoveryRequired else { return }
-        let items = listening.coordinator.queue.compactMap { $0.localOccurrenceID.flatMap { listening.occurrencesByID[$0] } }
-        guard items.count == listening.coordinator.queue.count else { return }
-        beginSession(items: items, playlist: listening.playlist, index: listening.coordinator.index, autoplay: false)
+        // The same queue, suggestions included, at the same track.
+        let entries = listening.coordinator.queue.compactMap { listening.entry(for: $0) }
+        guard entries.count == listening.coordinator.queue.count else { return }
+        beginSession(entries: entries, playlist: listening.playlist, index: listening.coordinator.index, autoplay: false,
+                     inOrder: listening.inOrder)
     }
     private func resumeQueue() {
         guard let saved = library.savedQueue,
@@ -804,26 +928,43 @@ struct NativeLibraryView: View {
         Task {
             guard epoch == library.generation, selected == selectedID, listening?.id == sessionID else { return }
             let items = await queuePreparation.prepare(snapshot: source, playlist: playlist.id,
-                mode: requestedMode == 1 ? .smart : .normal, excludeWatched: requestedExclusion)
+                mode: Self.queueMode(requestedMode), excludeWatched: requestedExclusion)
             // A newer shuffle supersedes this one inside the preparation itself.
             guard let items, epoch == library.generation, selected == selectedID, listening?.id == sessionID,
                   excludeWatched == requestedExclusion else { return }
-            beginSession(items: items, playlist: playlist, index: 0, autoplay: true)
+            beginSession(items: items, playlist: playlist, index: 0, autoplay: true, inOrder: requestedMode == Self.inOrderMode)
         }
     }
+    /// Stored values of the queue mode preference: 0 Normal, 1 Smart, 2 In order.
+    private static let inOrderMode = 2
+    private static func queueMode(_ value: Int) -> LibraryQueueBuilder.Mode {
+        switch value {
+        case 1: return .smart
+        case inOrderMode: return .inOrder
+        default: return .normal
+        }
+    }
+    private var playsInOrder: Bool { mode == Self.inOrderMode }
+    private var queueSymbol: String { playsInOrder ? "list.number" : "shuffle" }
     private var shuffleButtonTitle: String {
-        if queuePreparation.busy { return "Shuffling…" }
+        if queuePreparation.busy { return playsInOrder ? "Preparing…" : "Shuffling…" }
+        if playsInOrder { return listening == nil ? "Play in order" : "Play from the start" }
         return listening == nil ? "Shuffle & listen" : "Reshuffle queue"
     }
-    private func beginSession(items: [LibraryOccurrence], playlist: LibraryPlaylist, index: Int, autoplay: Bool) {
-        guard !items.isEmpty else { library.message = "No tracks match this filter. Try turning Skip watched off."; return }
-        guard items.allSatisfy({ $0.youtubeId.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil }) else {
+    private func beginSession(items: [LibraryOccurrence], playlist: LibraryPlaylist, index: Int, autoplay: Bool, inOrder: Bool = false) {
+        beginSession(entries: items.map { NativeListeningSession.Entry.occurrence($0) }, playlist: playlist, index: index,
+                     autoplay: autoplay, inOrder: inOrder)
+    }
+    private func beginSession(entries: [NativeListeningSession.Entry], playlist: LibraryPlaylist, index: Int, autoplay: Bool, inOrder: Bool) {
+        guard !entries.isEmpty else { library.message = "No tracks match this filter. Try turning Skip watched off."; return }
+        guard entries.allSatisfy({ $0.youtubeId.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil }) else {
             library.message = "This queue contains an ID that cannot be played. No occurrences were silently skipped."; return
         }
         // A new queue keeps the volume chosen in the one it replaces.
         let volume = listening?.coordinator.volume ?? 1
         stopPlayback()
-        listening = NativeListeningSession(items: items, playlist: playlist, library: library, index: index, autoplay: autoplay, volume: volume)
+        listening = NativeListeningSession(entries: entries, playlist: playlist, library: library, index: index, autoplay: autoplay,
+                                           volume: volume, inOrder: inOrder)
     }
 
     private func loadSuggestions() {
@@ -836,7 +977,7 @@ struct NativeLibraryView: View {
             suggestionsBusy = false
             guard epoch == library.generation, selectedID == selected else { return }
             suggestions = result?.suggestions ?? []
-            suggestionsMessage = result == nil ? account.message : "Suggestions open on YouTube. Their listening events are not recorded in this library or included in its export."
+            suggestionsMessage = result == nil ? account.message : "No suggestions today. Try again tomorrow."
         }
     }
 }

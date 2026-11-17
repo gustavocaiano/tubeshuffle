@@ -174,6 +174,20 @@ final class PlaylistRefreshTests: XCTestCase {
         XCTAssertNil(library.message)
     }
 
+    func testSavedQueueLeavesOutSuggestions() {
+        let library = NativeLibraryModel()
+        library.openDemo()
+        let fixture = NativeLibraryFixture.snapshot
+        var items = fixture.occurrences.prefix(3).enumerated().map {
+            PlayerCoordinator.Item(id: $0.offset, videoID: $0.element.youtubeId, localOccurrenceID: $0.element.id)
+        }
+        items.insert(PlayerCoordinator.Item(id: 9, videoID: "AAAAAAAAAAA", title: "Suggested"), at: 1)
+        library.saveQueue(items: items, index: 1, playlist: fixture.playlists[0].id, epoch: library.generation)
+        XCTAssertEqual(library.savedQueue?.occurrenceIDs, fixture.occurrences.prefix(3).map(\.id.rawValue))
+        XCTAssertEqual(library.savedQueue?.index, 1, "A suggestion playing now saves the next library track")
+        XCTAssertNil(library.message)
+    }
+
     // MARK: Live queue
 
     func testLiveQueueKeepsTheCurrentTrackAndAddsNewOnes() {
@@ -204,6 +218,145 @@ final class PlaylistRefreshTests: XCTestCase {
         // The demo library itself was not refreshed, so its saved queue only
         // names tracks the library still has.
         XCTAssertEqual(library.savedQueue?.occurrenceIDs, [occurrences[1].id, occurrences[2].id, occurrences[4].id, occurrences[5].id].map(\.rawValue))
+    }
+
+    func testPlayNextPutsASuggestionAfterTheCurrentTrackWithoutReloadingOrSavingIt() throws {
+        let library = NativeLibraryModel()
+        library.openDemo()
+        let fixture = NativeLibraryFixture.snapshot
+        let occurrences = fixture.occurrences
+        let session = NativeListeningSession(items: occurrences, playlist: fixture.playlists[0], library: library, index: 1,
+            testHooks: .init(load: { _, _ in XCTFail("Play next must not reload the current track") }, progress: { _ in (0, 100) }, draw: { 0 }))
+        let window = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
+        defer { session.coordinator.stop(); withExtendedLifetime(window) {} }
+        let first = try syntheticSuggestion("AAAAAAAAAAA", title: "First suggestion")
+        let second = try syntheticSuggestion("BBBBBBBBBBB", title: "Second suggestion")
+        XCTAssertFalse(session.playNext(first), "Not before the player is ready")
+        XCTAssertTrue(session.suggestionsByItem.isEmpty)
+        session.coordinator.attach(window: window)
+        session.coordinator.player.onEvent?(.ready(1))
+        let saved = try XCTUnwrap(library.savedQueue)
+        let current = session.coordinator.queue[1]
+
+        XCTAssertTrue(session.playNext(first))
+        let queue = session.coordinator.queue
+        XCTAssertEqual(session.coordinator.index, 1)
+        XCTAssertEqual(queue[1].id, current.id, "The current track keeps playing")
+        XCTAssertEqual(queue[2].videoID, first.youtubeId)
+        XCTAssertNil(queue[2].localOccurrenceID, "A suggestion is not a library occurrence")
+        XCTAssertTrue(session.isSuggestion(queue[2]))
+        XCTAssertEqual(queue.compactMap(\.localOccurrenceID), occurrences.map(\.id), "Library tracks keep their order")
+        XCTAssertEqual(session.coordinator.queueState.requested, 0, "No load was requested")
+        XCTAssertEqual(library.savedQueue, saved, "The saved queue holds library tracks only")
+        let row = try XCTUnwrap(session.displayOccurrence(for: queue[2]))
+        XCTAssertEqual(row.title, "First suggestion")
+        XCTAssertFalse(library.snapshot.occurrences.contains { $0.id == row.id }, "The row stand-in is not a library record")
+
+        XCTAssertTrue(session.playNext(second))
+        XCTAssertTrue(session.playNext(first), "Asking again moves the suggestion up instead of adding it twice")
+        XCTAssertEqual(session.coordinator.queue.map(\.videoID),
+                       [occurrences[0].youtubeId, occurrences[1].youtubeId, first.youtubeId, second.youtubeId] + occurrences[2...].map(\.youtubeId))
+        XCTAssertEqual(session.suggestionsByItem.count, 2)
+        XCTAssertEqual(library.savedQueue, saved)
+
+        // Restart player rebuilds the same queue, suggestions included, at the same track.
+        let entries = session.coordinator.queue.compactMap { session.entry(for: $0) }
+        XCTAssertEqual(entries.count, session.coordinator.queue.count)
+        let restarted = NativeListeningSession(entries: entries, playlist: fixture.playlists[0], library: library, index: 1,
+            testHooks: .init(load: { _, _ in XCTFail("A restart waits for Play") }, progress: { _ in (0, 100) }, draw: { 0 }))
+        defer { restarted.coordinator.stop() }
+        XCTAssertEqual(restarted.coordinator.queue.map(\.videoID), session.coordinator.queue.map(\.videoID))
+        XCTAssertTrue(restarted.isSuggestion(restarted.coordinator.queue[2]))
+        XCTAssertEqual(library.savedQueue, saved)
+    }
+
+    func testPlayNextIsRefusedWhileATrackLoads() throws {
+        let library = NativeLibraryModel()
+        library.openDemo()
+        let fixture = NativeLibraryFixture.snapshot
+        let session = NativeListeningSession(items: fixture.occurrences, playlist: fixture.playlists[0], library: library,
+            testHooks: .init(load: { _, _ in try await Task.sleep(nanoseconds: 2_000_000_000) }, progress: { _ in (0, 100) }, draw: { 0 }))
+        let window = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
+        defer { session.coordinator.stop(); withExtendedLifetime(window) {} }
+        session.coordinator.attach(window: window)
+        session.coordinator.player.onEvent?(.ready(1))
+        XCTAssertTrue(session.coordinator.canReplaceQueue)
+        session.coordinator.select(3)
+        XCTAssertFalse(session.coordinator.canReplaceQueue)
+        let before = session.coordinator.queue.map(\.id)
+        XCTAssertFalse(session.playNext(try syntheticSuggestion("AAAAAAAAAAA", title: "Suggested")), "A pending load refers to the current order")
+        XCTAssertEqual(session.coordinator.queue.map(\.id), before)
+        XCTAssertTrue(session.suggestionsByItem.isEmpty)
+    }
+
+    func testASuggestionPlaysInTurnWithoutListeningHistory() async throws {
+        let library = NativeLibraryModel()
+        library.openDemo()
+        let fixture = NativeLibraryFixture.snapshot
+        let loads = LoadLog()
+        let session = NativeListeningSession(items: fixture.occurrences, playlist: fixture.playlists[0], library: library,
+            testHooks: .init(load: { video, _ in loads.videos.append(video) }, progress: { _ in (0, 100) }, draw: { 0 },
+                             onLoadFinished: { loads.finished?.fulfill(); loads.finished = nil }))
+        let window = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
+        defer { session.coordinator.stop(); withExtendedLifetime(window) {} }
+        let player = session.coordinator.player
+        session.coordinator.attach(window: window)
+        player.onEvent?(.ready(1))
+        let suggested = try syntheticSuggestion("AAAAAAAAAAA", title: "Suggested")
+        XCTAssertTrue(session.playNext(suggested))
+        let history = library.snapshot.history.count
+
+        // The first track ends: it is recorded and the suggestion plays next.
+        let suggestionLoaded = expectation(description: "suggestion loaded")
+        loads.finished = suggestionLoaded
+        player.onEvent?(.state(1, 1))
+        player.onEvent?(.state(1, 0))
+        await fulfillment(of: [suggestionLoaded], timeout: 2)
+        XCTAssertEqual(loads.videos, [suggested.youtubeId])
+        XCTAssertEqual(session.coordinator.index, 1)
+        XCTAssertEqual(library.snapshot.history.count, history + 1)
+        XCTAssertEqual(library.snapshot.history.last?.videoId, fixture.occurrences[0].id)
+
+        // The suggestion ends: playback continues with the playlist, nothing is recorded.
+        let nextLoaded = expectation(description: "next track loaded")
+        loads.finished = nextLoaded
+        player.onEvent?(.ready(2))
+        player.onEvent?(.state(2, 1))
+        player.onEvent?(.state(2, 0))
+        await fulfillment(of: [nextLoaded], timeout: 2)
+        XCTAssertEqual(loads.videos, [suggested.youtubeId, fixture.occurrences[1].youtubeId])
+        XCTAssertEqual(session.coordinator.index, 2)
+        XCTAssertEqual(library.snapshot.history.count, history + 1, "A suggestion has no listening history")
+    }
+
+    func testRefreshKeepsSuggestionsAndAnInOrderQueuePlacesNewTracksByPosition() throws {
+        let library = NativeLibraryModel()
+        library.openDemo()
+        let fixture = NativeLibraryFixture.snapshot
+        let occurrences = fixture.occurrences
+        let session = NativeListeningSession(items: occurrences, playlist: fixture.playlists[0], library: library, index: 1, inOrder: true,
+            testHooks: .init(load: { _, _ in XCTFail("A queue update must not reload the current track") }, progress: { _ in (0, 100) }, draw: { 0 }))
+        let window = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
+        defer { session.coordinator.stop(); withExtendedLifetime(window) {} }
+        session.coordinator.attach(window: window)
+        session.coordinator.player.onEvent?(.ready(1))
+        XCTAssertTrue(session.playNext(try syntheticSuggestion("AAAAAAAAAAA", title: "Suggested")))
+        // A new track took the place of occurrences[3] on YouTube and another was added at the end.
+        func track(_ id: String, position: Int) -> LibraryOccurrence {
+            LibraryOccurrence(id: OccurrenceID(id), playlistId: fixture.playlists[0].id, youtubeId: "dQw4w9WgXcQ", title: id,
+                              channelTitle: "Synthetic", thumbnail: "", duration: 0, position: position, viewCount: nil, likeCount: nil,
+                              description: nil, tags: nil, categoryId: nil, publishedAt: nil)
+        }
+        let replacement = track("demo-replacement", position: 3), appended = track("demo-appended", position: 6)
+        let refreshed = occurrences.filter { $0.id != occurrences[3].id } + [replacement, appended]
+        XCTAssertTrue(session.applyRefresh(playlist: fixture.playlists[0], occurrences: refreshed, added: [replacement, appended],
+                                           draw: { XCTFail("In order places new tracks without drawing"); return 0 }))
+        let queue = session.coordinator.queue
+        XCTAssertEqual(session.coordinator.index, 1)
+        XCTAssertTrue(session.isSuggestion(queue[2]), "The suggestion still plays next")
+        XCTAssertEqual(queue.compactMap(\.localOccurrenceID),
+                       [occurrences[0].id, occurrences[1].id, occurrences[2].id, replacement.id, occurrences[4].id, occurrences[5].id, appended.id])
+        XCTAssertEqual(session.coordinator.queueState.requested, 0)
     }
 
     func testQueueReplacementIsRefusedForAnotherCurrentItemOrDuringALoad() {
@@ -331,6 +484,11 @@ final class PlaylistRefreshTests: XCTestCase {
         ], history: [history("h-a", "a"), history("h-b", "b")])
     }
 
+    private final class LoadLog {
+        var videos: [String] = []
+        var finished: XCTestExpectation?
+    }
+
     private func item(_ id: Int, _ occurrence: String) -> PlayerCoordinator.Item {
         PlayerCoordinator.Item(id: id, videoID: "AAAAAAAAAAA", localOccurrenceID: OccurrenceID(occurrence))
     }
@@ -360,4 +518,12 @@ final class PlaylistRefreshTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         return directory
     }
+}
+
+/// A daily suggestion as the service sends it (the DTO only decodes).
+func syntheticSuggestion(_ video: String, title: String) throws -> SuggestedVideoDTO {
+    let fields: [String: Any] = ["id": "suggestion-\(video)", "youtubeId": video, "title": title, "channelTitle": "Suggested channel",
+                                 "thumbnail": "", "duration": 200, "url": "https://www.youtube.com/watch?v=\(video)",
+                                 "reason": "synthetic", "query": "synthetic"]
+    return try JSONDecoder().decode(SuggestedVideoDTO.self, from: JSONSerialization.data(withJSONObject: fields))
 }

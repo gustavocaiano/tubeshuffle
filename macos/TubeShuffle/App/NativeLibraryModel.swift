@@ -359,14 +359,14 @@ final class NativeLibraryModel: ObservableObject {
     func saveQueue(items: [PlayerCoordinator.Item], index: Int, playlist: PlaylistID, epoch: UUID) {
         guard generation == epoch, items.indices.contains(index) else { return }
         // A refresh can remove tracks that are still in a live queue, even the
-        // one playing. Save only tracks the playlist still has; the saved
-        // position then moves to the next remaining track.
+        // one playing, and suggestions played next are not library tracks at
+        // all. Save only tracks the playlist has; the saved position then moves
+        // to the next of those.
         let present = Set(snapshot.occurrences.lazy.filter { $0.playlistId == playlist }.map(\.id))
         var ids: [String] = []
         var position = 0
         for (offset, item) in items.enumerated() {
-            guard let id = item.localOccurrenceID else { return }
-            guard present.contains(id) else { continue }
+            guard let id = item.localOccurrenceID, present.contains(id) else { continue }
             if offset < index { position += 1 }
             ids.append(id.rawValue)
         }

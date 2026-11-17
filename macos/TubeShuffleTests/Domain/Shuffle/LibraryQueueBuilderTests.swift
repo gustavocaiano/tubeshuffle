@@ -10,10 +10,10 @@ final class LibraryQueueBuilderTests: XCTestCase {
     private func occurrence(_ id: String, playlist: String = "p", title: String = "Title",
                             channel: String = "Channel", description: String? = nil,
                             tags: [String]? = nil, category: String? = nil,
-                            duration: Double = 0) -> LibraryOccurrence {
+                            duration: Double = 0, position: Int = 42) -> LibraryOccurrence {
         LibraryOccurrence(id: OccurrenceID(id), playlistId: PlaylistID(playlist), youtubeId: "same-video",
                           title: title, channelTitle: channel, thumbnail: "thumb", duration: duration,
-                          position: 42, viewCount: 123, likeCount: 45, description: description,
+                          position: position, viewCount: 123, likeCount: 45, description: description,
                           tags: tags, categoryId: category, publishedAt: "date")
     }
 
@@ -110,13 +110,32 @@ final class LibraryQueueBuilderTests: XCTestCase {
         XCTAssertEqual(actualDraws, expectedDraws)
     }
 
+    func testInOrderFollowsPlaylistPositionsWithoutDrawing() {
+        // Library order differs from playlist order, as after a refresh adds tracks.
+        let first = occurrence("first", position: 0), second = occurrence("second", position: 1)
+        let third = occurrence("third", position: 2), tiedA = occurrence("tied-a", position: 3)
+        let tiedB = occurrence("tied-b", position: 3), other = occurrence("other", playlist: "other", position: 0)
+        let snapshot = LibrarySnapshot(playlists: [playlist(), playlist("other")],
+                                       occurrences: [third, tiedB, other, first, tiedA, second],
+                                       history: [watched("second"), watched("third", completed: false)])
+        let before = snapshot
+        let failDraw: () -> Double = { XCTFail("In order must not shuffle"); return 0 }
+        XCTAssertEqual(LibraryQueueBuilder.build(snapshot: snapshot, playlistId: PlaylistID("p"), mode: .inOrder,
+                                                 excludeWatched: false, draw: failDraw),
+                       [first, second, third, tiedB, tiedA], "Equal positions keep their library order")
+        XCTAssertEqual(LibraryQueueBuilder.build(snapshot: snapshot, playlistId: PlaylistID("p"), mode: .inOrder,
+                                                 excludeWatched: true, draw: failDraw),
+                       [first, third, tiedB, tiedA], "Skip watched leaves out completed tracks only")
+        XCTAssertEqual(snapshot, before)
+    }
+
     func testNoSelectionMissingPlaylistEmptyAndAllWatchedConsumeNoDraws() {
         let a = occurrence("a")
         let snapshot = LibrarySnapshot(playlists: [playlist()], occurrences: [a], history: [watched("a")])
         let emptyPlaylist = LibrarySnapshot(playlists: [playlist()], occurrences: [], history: [])
         let orphan = LibrarySnapshot(playlists: [], occurrences: [a], history: [])
         let failDraw: () -> Double = { XCTFail("Unexpected draw"); return 0 }
-        for mode in [LibraryQueueBuilder.Mode.normal, .smart] {
+        for mode in [LibraryQueueBuilder.Mode.normal, .smart, .inOrder] {
             XCTAssertTrue(LibraryQueueBuilder.build(snapshot: snapshot, playlistId: nil, mode: mode, excludeWatched: false, draw: failDraw).isEmpty)
             XCTAssertTrue(LibraryQueueBuilder.build(snapshot: snapshot, playlistId: PlaylistID("missing"), mode: mode, excludeWatched: false, draw: failDraw).isEmpty)
             XCTAssertTrue(LibraryQueueBuilder.build(snapshot: .empty, playlistId: PlaylistID("p"), mode: mode, excludeWatched: false, draw: failDraw).isEmpty)
@@ -133,7 +152,7 @@ final class LibraryQueueBuilderTests: XCTestCase {
         let c = occurrence(composed, playlist: decomposed)
         let snapshot = LibrarySnapshot(playlists: [playlist(composed), playlist(decomposed)], occurrences: [a, b, c],
                                        history: [watched(composed, playlist: composed)])
-        for mode in [LibraryQueueBuilder.Mode.normal, .smart] {
+        for mode in [LibraryQueueBuilder.Mode.normal, .smart, .inOrder] {
             XCTAssertEqual(LibraryQueueBuilder.build(snapshot: snapshot, playlistId: PlaylistID(composed), mode: mode, excludeWatched: true) { 0 }, [b])
             XCTAssertEqual(LibraryQueueBuilder.build(snapshot: snapshot, playlistId: PlaylistID(decomposed), mode: mode, excludeWatched: true) { 0 }, [c])
         }

@@ -281,6 +281,62 @@ final class NativeUIRenderingTests: XCTestCase {
         print("NATIVE_UI_CAPTURE_DIR=\(output.path)")
     }
 
+    // Real views with static bundled artwork and no media: the three queue
+    // modes and suggestion cards fit, and a suggestion played next is queued.
+    func testQueueModesAndSuggestionsWithPlayNextFitAndRender() async throws {
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent("tubeshuffle-ui-play-next-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: false)
+        let suggestions = try ["jNQXAC9IVRw", "dQw4w9WgXcQ", "aqz-KE-bpKQ"].enumerated().map {
+            try syntheticSuggestion($0.element, title: "Suggestion \($0.offset + 1) with a synthetic title long enough to wrap")
+        }
+        for (name, size, mode) in [("play-next-1280x860", NSSize(width: 1280, height: 860), 0),
+                                   ("play-next-in-order-480x680", NSSize(width: 480, height: 680), 2)] {
+            let library = NativeLibraryModel()
+            library.openDemo()
+            let fixture = NativeLibraryFixture.snapshot
+            let preferences = try XCTUnwrap(UserDefaults(suiteName: "tubeshuffle-ui-play-next-\(UUID().uuidString)"))
+            preferences.set(mode, forKey: "native.shuffleMode")
+            let session = NativeListeningSession(items: fixture.occurrences, playlist: fixture.playlists[0], library: library,
+                testHooks: .init(load: { _, _ in XCTFail("Rendering must not load media") }, progress: { _ in (0, 100) }, draw: { 0.5 }))
+            var bounds: [String: CGRect] = [:]
+            let root = NativeLibraryView(library: library, preferences: preferences, session: session,
+                                         suggestionsForTesting: suggestions) { bounds = $0 }
+            let host = NSHostingView(rootView: root)
+            let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = host
+            window.setContentSize(size)
+            window.orderBack(nil)
+            defer { session.coordinator.stop(); window.close(); library.closeLibrary() }
+            try await Task.sleep(nanoseconds: 250_000_000)
+            host.layoutSubtreeIfNeeded()
+            session.coordinator.player.onEvent?(.ready(1))
+            XCTAssertTrue(session.coordinator.canReplaceQueue, name)
+            XCTAssertTrue(session.playNext(suggestions[1]), name)
+            XCTAssertEqual(session.coordinator.queue[1].videoID, suggestions[1].youtubeId, name)
+            try await Task.sleep(nanoseconds: 250_000_000)
+            host.layoutSubtreeIfNeeded()
+            let modes = try XCTUnwrap(bounds["queueModes"], name)
+            let panel = try XCTUnwrap(bounds["suggestions"], name)
+            for (key, rect) in [("queueModes", modes), ("suggestions", panel)] {
+                XCTAssertGreaterThanOrEqual(rect.minX, -1, "\(name) \(key) overflows left")
+                XCTAssertLessThanOrEqual(rect.maxX, size.width + 1, "\(name) \(key) overflows right")
+            }
+            XCTAssertGreaterThan(modes.height, 40, name)
+            if let scroll = firstScrollView(host), let document = scroll.documentView {
+                scroll.contentView.scroll(to: NSPoint(x: 0, y: max(0, document.frame.height - scroll.contentView.bounds.height)))
+                scroll.reflectScrolledClipView(scroll.contentView)
+            }
+            try await Task.sleep(nanoseconds: 300_000_000)
+            host.layoutSubtreeIfNeeded()
+            window.displayIfNeeded()
+            let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: output.appendingPathComponent(name + ".png"))
+        }
+        print("NATIVE_PLAY_NEXT_CAPTURE_DIR=\(output.path)")
+    }
+
     private func firstScrollView(_ view: NSView) -> NSScrollView? {
         if let scroll = view as? NSScrollView { return scroll }
         return view.subviews.lazy.compactMap { self.firstScrollView($0) }.first

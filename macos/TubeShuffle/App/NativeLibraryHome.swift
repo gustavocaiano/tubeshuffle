@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// One saved playlist on the home grid. The whole card opens the playlist,
-/// which shuffles it and starts listening; refreshing lives in its menu.
+/// which shuffles it (or plays it in order) and starts listening; refreshing
+/// lives in its menu.
 struct NativePlaylistCard: View {
     let playlist: LibraryPlaylist
     let count: Int
@@ -12,6 +13,8 @@ struct NativePlaylistCard: View {
     let session: PlayerCoordinator?
     let refreshing: Bool
     let canRefresh: Bool
+    /// The chosen queue mode is In order, so opening plays instead of shuffling.
+    var inOrder = false
     let open: () -> Void
     let refresh: () -> Void
     private var playing: Bool { session != nil }
@@ -30,10 +33,12 @@ struct NativePlaylistCard: View {
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
                 .accessibilityLabel("\(playlist.title), \(count) videos")
-                .accessibilityHint(playing ? "Returns to the playlist that is playing." : "Shuffles this playlist and starts listening.")
+                .accessibilityHint(playing ? "Returns to the playlist that is playing."
+                    : inOrder ? "Plays this playlist in order from its first track." : "Shuffles this playlist and starts listening.")
             HStack(spacing: 6) {
                 Button(action: open) {
-                    Label(playing ? "Now playing" : "Shuffle & Play", systemImage: playing ? "waveform" : "shuffle")
+                    Label(playing ? "Now playing" : inOrder ? "Play in order" : "Shuffle & Play",
+                          systemImage: playing ? "waveform" : inOrder ? "list.number" : "shuffle")
                         .frame(maxWidth: .infinity)
                 }.buttonStyle(NativeActionStyle(prominent: !playing)).disabled(count == 0 && !playing)
                 Menu {
@@ -98,7 +103,7 @@ struct NativeMiniPlayer: View {
 
     var body: some View {
         let current = coordinator.queue[coordinator.index]
-        let occurrence = current.localOccurrenceID.flatMap { session.occurrencesByID[$0] }
+        let occurrence = session.displayOccurrence(for: current)
         HStack(spacing: 12) {
             Button(action: open) {
                 HStack(spacing: 12) {

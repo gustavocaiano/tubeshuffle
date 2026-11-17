@@ -134,7 +134,7 @@ struct NativeLiveDeck: View {
                     .background(focus ? Color.clear : Color.black).clipShape(RoundedRectangle(cornerRadius: 14))
                     .accessibilityIdentifier("player.viewport").accessibilityHidden(focus).nativeBounds("video")
                 if focus && showArtwork {
-                    NativeFocusArtwork(item: current.localOccurrenceID.flatMap { session.occurrencesByID[$0] }, demo: demo)
+                    NativeFocusArtwork(item: session.displayOccurrence(for: current), demo: demo)
                 }
             }.frame(height: metrics.mediaHeight).frame(maxWidth: .infinity).clipped().nativeBounds("media")
             NativeNowPlaying(caption: "Now playing · Track \(coordinator.index + 1) of \(coordinator.queue.count)",
@@ -220,9 +220,64 @@ struct NativeLiveQueue: View {
     let height: CGFloat
     var revealPlayer: () -> Void
     var body: some View {
-        NativeQueueCard(items: coordinator.queue.compactMap { $0.localOccurrenceID.flatMap { session.occurrencesByID[$0] } },
+        NativeQueueCard(items: coordinator.queue.compactMap { session.displayOccurrence(for: $0) },
             currentIndex: coordinator.index, showArtwork: showArtwork, demo: demo, height: height,
-            canSelect: coordinator.canTransport, status: coordinator.status, select: { revealPlayer(); coordinator.select($0) })
+            canSelect: coordinator.canTransport, status: coordinator.status,
+            suggested: Set(session.suggestionsByItem.keys.map { NativeListeningSession.displayID(forItem: $0) }),
+            select: { revealPlayer(); coordinator.select($0) })
+    }
+}
+
+/// Puts a daily suggestion right after the track that is playing, like the
+/// website's Next. Without a queue playing there is nothing to put it after.
+struct NativeSuggestionPlayNext: View {
+    let suggestion: SuggestedVideoDTO
+    let session: NativeListeningSession?
+    /// The player was busy, so the queue did not change.
+    let refused: () -> Void
+    fileprivate static let symbol = "text.line.first.and.arrowtriangle.forward"
+
+    var body: some View {
+        if let session {
+            Live(suggestion: suggestion, session: session, coordinator: session.coordinator, refused: refused)
+        } else {
+            Button {} label: { Label("Play next", systemImage: Self.symbol).frame(maxWidth: .infinity) }
+                .buttonStyle(NativeActionStyle(prominent: true)).disabled(true)
+                .help("Start listening to this playlist to add suggestions to its queue")
+        }
+    }
+
+    private struct Live: View {
+        let suggestion: SuggestedVideoDTO
+        let session: NativeListeningSession
+        @ObservedObject var coordinator: PlayerCoordinator
+        let refused: () -> Void
+
+        private enum Placement { case available, upNext, current }
+
+        // Where this suggestion is in the queue, as far as Play next is concerned.
+        private var placement: Placement {
+            func isThis(_ offset: Int) -> Bool {
+                coordinator.queue.indices.contains(offset) && session.isSuggestion(coordinator.queue[offset])
+                    && coordinator.queue[offset].videoID == suggestion.youtubeId
+            }
+            if isThis(coordinator.index) { return .current }
+            return isThis(coordinator.index + 1) ? .upNext : .available
+        }
+
+        var body: some View {
+            let placement = self.placement
+            Button { if !session.playNext(suggestion) { refused() } } label: {
+                switch placement {
+                case .available: Label("Play next", systemImage: NativeSuggestionPlayNext.symbol).frame(maxWidth: .infinity)
+                case .upNext: Label("Up next", systemImage: "checkmark").frame(maxWidth: .infinity)
+                case .current: Label("Now playing", systemImage: "waveform").frame(maxWidth: .infinity)
+                }
+            }.buttonStyle(NativeActionStyle(prominent: placement == .available))
+                .disabled(placement != .available || !coordinator.canReplaceQueue || !NativeListeningSession.isPlayable(suggestion))
+                .help(placement == .available ? "Play after the current track" : "Already in the queue that is playing")
+                .accessibilityLabel(placement == .available ? "Play \(suggestion.title) next" : "\(suggestion.title) is in the queue")
+        }
     }
 }
 
@@ -234,6 +289,8 @@ struct NativeQueueCard: View {
     let height: CGFloat
     let canSelect: Bool
     var status: String? = nil
+    /// Rows that are suggestions played next rather than playlist tracks.
+    var suggested: Set<OccurrenceID> = []
     let select: (Int) -> Void
 
     var body: some View {
@@ -252,7 +309,7 @@ struct NativeQueueCard: View {
                 ScrollView(.vertical) {
                     LazyVStack(spacing: 6) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            NativeQueueRow(item: item, index: index, active: currentIndex == index,
+                            NativeQueueRow(item: item, index: index, active: currentIndex == index, suggested: suggested.contains(item.id),
                                            showArtwork: showArtwork, demo: demo, canSelect: canSelect, select: select).id(item.id)
                         }
                     }
@@ -274,6 +331,7 @@ private struct NativeQueueRow: View {
     let item: LibraryOccurrence
     let index: Int
     let active: Bool
+    let suggested: Bool
     let showArtwork: Bool
     let demo: Bool
     let canSelect: Bool
@@ -291,12 +349,12 @@ private struct NativeQueueRow: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(item.title).font(.system(size: 12, weight: active ? .semibold : .regular)).lineLimit(2)
                             .foregroundStyle(.white.opacity(active ? 1 : 0.72)).frame(maxWidth: .infinity, alignment: .leading)
-                        Text("\(index + 1) · \(item.channelTitle)\(item.duration > 0 ? " · " + nativeTimeLabel(item.duration) : "")")
+                        Text("\(index + 1) · \(suggested ? "Suggestion · " : "")\(item.channelTitle)\(item.duration > 0 ? " · " + nativeTimeLabel(item.duration) : "")")
                             .font(.system(size: 10)).foregroundStyle(.white.opacity(0.42)).lineLimit(1)
                     }
                 }.padding(.leading, 10).padding(.vertical, 10).contentShape(Rectangle())
             }.buttonStyle(.plain).disabled(!canSelect)
-                .accessibilityLabel("\(index + 1). \(item.title), \(item.channelTitle)")
+                .accessibilityLabel("\(index + 1). \(item.title), \(suggested ? "suggestion, " : "")\(item.channelTitle)")
                 .accessibilityAddTraits(active ? .isSelected : [])
             Menu {
                 Button("Play this track") { select(index) }.disabled(!canSelect)
