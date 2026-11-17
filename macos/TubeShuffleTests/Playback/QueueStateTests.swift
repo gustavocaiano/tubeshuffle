@@ -26,6 +26,20 @@ enum QueueStateTests {
         assert(shuffledUpcoming([0], after: 0) { assertionFailure(); return 0 } == [0])
         assert(shuffledUpcoming([0, 1], after: 0) { assertionFailure(); return 0 } == [0, 1])
 
+        // Play next lands right after the current occurrence; only upcoming
+        // copies are replaced, never the current or an already played one.
+        let suggestion = Occurrence(id: 9, videoID: "same")
+        let isSame: (Occurrence) -> Bool = { $0.videoID == "same" }
+        assert(queueWithNext(items, after: 1, item: suggestion, replacing: isSame).map(\.id) == [0, 1, 9, 3])
+        assert(queueWithNext(items, after: 0, item: suggestion) { _ in false }.map(\.id) == [0, 9, 1, 2, 3, 4])
+        assert(queueWithNext(items, after: 4, item: suggestion, replacing: isSame).map(\.id) == [0, 1, 2, 3, 4, 9])
+        let twice = queueWithNext(queueWithNext(items, after: 0, item: suggestion) { _ in false }, after: 0,
+                                  item: Occurrence(id: 10, videoID: "same")) { $0.id == 9 }
+        assert(twice.map(\.id) == [0, 10, 1, 2, 3, 4], "asking again moves the copy up instead of adding another")
+        assert(queueWithNext(items, after: 5, item: suggestion, replacing: isSame) == items)
+        assert(queueWithNext(items, after: -1, item: suggestion, replacing: isSame) == items)
+        assert(queueWithNext([Occurrence](), after: 0, item: suggestion, replacing: isSame).isEmpty)
+
         // Full shuffle includes the current and already played occurrences, and
         // preserves distinct identities even for repeated YouTube IDs.
         let six = items + [Occurrence(id: 5, videoID: "old")]
