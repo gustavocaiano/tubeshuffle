@@ -15,6 +15,10 @@ struct NativePersonalImportServices {
     let client: (URL) throws -> APIClient
 
     static var live: Self {
+        live(allowKeychainInteraction: true)
+    }
+
+    static func live(allowKeychainInteraction: Bool) -> Self {
         .init(configuration: {
             guard let url = Bundle.main.url(forResource: "TubeShuffle-account-setup", withExtension: "json") else {
                 throw NativeAccountSetupDocument.Failure.invalidDocument
@@ -22,10 +26,18 @@ struct NativePersonalImportServices {
             return try NativeAccountSetupDocument.decode(Data(contentsOf: url))
         }, token: { configuration in
             try await NativePersonalCredentialRead.perform {
-                try NativePersonalImportCredential(configuration: configuration).retrieve()
+                try NativePersonalImportCredential(configuration: configuration, allowInteraction: allowKeychainInteraction).retrieve()
             }
         },
               client: { try APIClient(origin: $0, transport: URLSessionAPITransport()) })
+    }
+
+    func playlistFetcher() async throws -> ((String) async throws -> YouTubePlaylistDTO)? {
+        let config = try configuration()
+        guard let token = try await token(config) else { return nil }
+        try Task.checkCancellation()
+        let client = try client(config.applicationAPIOrigin)
+        return { id in try await client.personalPlaylist(id: id, token: token) }
     }
 }
 
@@ -292,15 +304,13 @@ final class NativeAccountModel: ObservableObject, NativePlaylistSource {
         do {
             // The origin and credential namespace come from the same bundled
             // public setup; a custom account origin never receives this token.
-            let configuration = try personalImport.configuration()
-            let storedToken = try await personalImport.token(configuration)
+            let fetch = try await personalImport.playlistFetcher()
             guard generation == epoch, !Task.isCancelled else { return nil }
-            guard let token = storedToken else {
+            guard let fetch else {
                 message = "This Mac is not set up for personal imports yet. Sign in under Library → Account or finish personal setup."
                 return nil
             }
-            let client = try personalImport.client(configuration.applicationAPIOrigin)
-            let result = try await client.personalPlaylist(id: id, token: token)
+            let result = try await fetch(id)
             guard generation == epoch, !Task.isCancelled else { return nil }
             return result
         } catch is CancellationError { return nil }

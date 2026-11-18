@@ -1,6 +1,7 @@
 import Auth
 import CryptoKit
 import Foundation
+import LocalAuthentication
 import Security
 
 // Reserved for new installations only. This does not migrate any prior service.
@@ -14,6 +15,8 @@ protocol NativeCredentialBackend {
 }
 
 private struct NativeSecurityCredentialBackend: NativeCredentialBackend {
+    var allowInteraction = true
+
     private func query(_ service: String, _ key: String) -> [CFString: Any] {
         [kSecClass: kSecClassGenericPassword,
          kSecAttrService: service, kSecAttrAccount: key]
@@ -32,6 +35,21 @@ private struct NativeSecurityCredentialBackend: NativeCredentialBackend {
         var item = query(service, key)
         item[kSecReturnData] = true
         item[kSecMatchLimit] = kSecMatchLimitOne
+        var previousInteraction = DarwinBoolean(false)
+        if !allowInteraction {
+            // Existing credentials can be in the file-based Mac Keychain,
+            // whose unlock and access dialogs use the legacy setting.
+            guard SecKeychainGetUserInteractionAllowed(&previousInteraction) == errSecSuccess,
+                  SecKeychainSetUserInteractionAllowed(false) == errSecSuccess else {
+                return (errSecInteractionNotAllowed, nil)
+            }
+            let context = LAContext()
+            context.interactionNotAllowed = true
+            item[kSecUseAuthenticationContext] = context
+        }
+        defer {
+            if !allowInteraction { _ = SecKeychainSetUserInteractionAllowed(previousInteraction.boolValue) }
+        }
         var result: CFTypeRef?
         let status = SecItemCopyMatching(item as CFDictionary, &result)
         return (status, result as? Data)
@@ -146,11 +164,11 @@ final class NativePersonalImportCredential {
     private let lock = NSLock()
     let service: String
 
-    init(configuration: NativeAccountConfiguration, backend: (any NativeCredentialBackend)? = nil) {
+    init(configuration: NativeAccountConfiguration, backend: (any NativeCredentialBackend)? = nil, allowInteraction: Bool = true) {
         let origin = configuration.applicationAPIOrigin.absoluteString
         let digest = SHA256.hash(data: Data(origin.utf8)).map { String(format: "%02x", $0) }.joined()
         service = "com.tubeshuffle.native.personal-import.v1." + digest
-        self.backend = backend ?? NativeSecurityCredentialBackend()
+        self.backend = backend ?? NativeSecurityCredentialBackend(allowInteraction: allowInteraction)
     }
 
     private func readOwned() throws -> String? {
