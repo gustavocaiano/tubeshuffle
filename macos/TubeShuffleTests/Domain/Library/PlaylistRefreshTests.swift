@@ -160,6 +160,58 @@ final class PlaylistRefreshTests: XCTestCase {
         XCTAssertEqual(demo.snapshot, NativeLibraryFixture.snapshot)
     }
 
+    func testStartupRefreshContinuesPastAnUnavailablePlaylist() async throws {
+        let directory = try temporaryLibraryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = try NativeLocalLibraryStore.createNew(at: directory)
+        try store.importIntoEmpty(seed())
+        let otherID = PlaylistID("other-playlist")
+        let otherYouTubeID = "PLSyntheticRefresh02"
+        let other = localPlaylist(id: otherID, youtubeID: otherYouTubeID)
+        try store.addNewPlaylist(other, occurrences: [occurrence("other", video: "CCCCCCCCCCC", position: 0, playlist: otherID)])
+        let library = try NativeLibraryModel(store: store, at: directory)
+        defer { library.closeLibrary() }
+        let first = try XCTUnwrap(library.snapshot.playlists.first)
+        let second = try XCTUnwrap(library.snapshot.playlists.last)
+        let response = try dto(["EEEEEEEEEEE"], youtubeID: second.youtubeId)
+        var requests: [String] = []
+        var outcomes: [PlaylistID] = []
+
+        await library.refreshPlaylistsOnStartup(fetchPlaylist: { id in
+            XCTAssertFalse(library.busy, "The library is usable during startup requests")
+            requests.append(id)
+            if id == first.youtubeId { throw APIClientError.http(status: 404, retryAfter: nil, kind: .legacy) }
+            return response
+        }, didRefresh: { outcomes.append($0.playlist.id) })
+
+        XCTAssertEqual(requests, [first.youtubeId, second.youtubeId])
+        XCTAssertEqual(outcomes, [second.id])
+        XCTAssertTrue(library.snapshot.playlists.contains(first))
+        XCTAssertEqual(try store.snapshot().occurrences.filter { $0.playlistId == second.id }.map(\.youtubeId), ["EEEEEEEEEEE"])
+        XCTAssertNil(library.message)
+    }
+
+    func testStartupRefreshIgnoresPartialRemovalsAndDiscardsResultsAfterClose() async throws {
+        let directory = try temporaryLibraryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = try NativeLocalLibraryStore.createNew(at: directory)
+        try store.importIntoEmpty(seed())
+        let library = try NativeLibraryModel(store: store, at: directory)
+        let original = library.snapshot
+        let partial = try dto(["AAAAAAAAAAA"], reportedCount: 2)
+        await library.refreshPlaylistsOnStartup(fetchPlaylist: { _ in partial },
+            didRefresh: { _ in XCTFail("A partial response cannot remove tracks or history") })
+        XCTAssertEqual(try store.snapshot(), original)
+
+        let complete = try dto(["AAAAAAAAAAA", "DDDDDDDDDDD"])
+        await library.refreshPlaylistsOnStartup(fetchPlaylist: { _ in
+            library.closeLibrary()
+            return complete
+        }, didRefresh: { _ in XCTFail("A closed library must discard late responses") })
+        XCTAssertFalse(library.isOpen)
+        XCTAssertEqual(try store.snapshot(), original)
+    }
+
     func testSavedQueueSkipsTracksTheLibraryNoLongerHas() {
         let library = NativeLibraryModel()
         library.openDemo()
@@ -467,8 +519,8 @@ final class PlaylistRefreshTests: XCTestCase {
                           likeCount: nil, description: nil, tags: nil, categoryId: nil, publishedAt: nil)
     }
 
-    private func localPlaylist() -> LibraryPlaylist {
-        LibraryPlaylist(id: playlistID, youtubeId: youtubePlaylist, title: "Local title", description: nil, thumbnail: nil,
+    private func localPlaylist(id: PlaylistID? = nil, youtubeID: String? = nil) -> LibraryPlaylist {
+        LibraryPlaylist(id: id ?? playlistID, youtubeId: youtubeID ?? youtubePlaylist, title: "Local title", description: nil, thumbnail: nil,
                         channelTitle: "Synthetic channel", videoCount: 2, createdAt: "2026-01-01T00:00:00.000Z",
                         updatedAt: "2026-01-01T00:00:00.000Z")
     }
@@ -504,12 +556,12 @@ final class PlaylistRefreshTests: XCTestCase {
         return LibrarySnapshot(playlists: [playlist], occurrences: items, history: [])
     }
 
-    private func dto(_ videos: [String]) throws -> YouTubePlaylistDTO {
+    private func dto(_ videos: [String], youtubeID: String? = nil, reportedCount: Int? = nil) throws -> YouTubePlaylistDTO {
         let items: [[String: Any]] = videos.enumerated().map { position, video in
             ["id": video, "title": "Remote \(video)", "channelTitle": "Remote channel", "thumbnail": "", "duration": 94, "position": position]
         }
-        let data = try JSONSerialization.data(withJSONObject: ["id": youtubePlaylist, "title": "Remote title", "description": NSNull(),
-            "thumbnail": NSNull(), "channelTitle": "Remote channel", "videoCount": videos.count, "videos": items])
+        let data = try JSONSerialization.data(withJSONObject: ["id": youtubeID ?? youtubePlaylist, "title": "Remote title", "description": NSNull(),
+            "thumbnail": NSNull(), "channelTitle": "Remote channel", "videoCount": reportedCount ?? videos.count, "videos": items])
         return try JSONDecoder().decode(YouTubePlaylistDTO.self, from: data)
     }
 

@@ -267,23 +267,63 @@ final class NativeLibraryModel: ObservableObject {
             message = account.message ?? "The playlist could not be refreshed. Check your connection and try again; nothing was changed."
             return nil
         }
-        do {
-            let stamp = Self.timestamp(), convert = calculations.convertPlaylist, source = snapshot, youtubeID = current.youtubeId
-            let plan = try await calculate {
-                let fetched = try convert(youtubeID, dto, stamp)
-                return try PlaylistRefreshPlan.make(existing: source, playlistId: id, fetched: fetched.snapshot, refreshedAt: stamp)
+        return await applyPlaylistRefresh(current, dto: dto, operation: operation)
+    }
+
+    /// A launch pass uses one request at a time and yields to foreground library
+    /// work. A failure that affects access to the service ends the pass.
+    func refreshPlaylistsOnStartup(fetchPlaylist: (String) async throws -> YouTubePlaylistDTO,
+                                   didRefresh: (NativePlaylistRefreshOutcome) -> Void) async {
+        guard isOpen, !isDemo else { return }
+        let epoch = generation
+        for playlist in snapshot.playlists {
+            guard generation == epoch, !Task.isCancelled else { return }
+            guard !busy, snapshot.playlists.contains(playlist) else { continue }
+            let dto: YouTubePlaylistDTO
+            do {
+                dto = try await fetchPlaylist(playlist.youtubeId)
+            } catch APIClientError.http(let status, _, _) where status == 400 || status == 404 || status == 422 {
+                continue
+            } catch {
+                return
             }
-            guard generation == epoch, activeOperation == operation, !Task.isCancelled, let store else { return nil }
+            guard generation == epoch, !Task.isCancelled else { return }
+            guard !busy, snapshot.playlists.contains(playlist) else { continue }
+            if let outcome = await applyPlaylistRefresh(playlist, dto: dto, operation: nil) {
+                didRefresh(outcome)
+            }
+        }
+    }
+
+    private func applyPlaylistRefresh(_ playlist: LibraryPlaylist, dto: YouTubePlaylistDTO,
+                                      operation: UUID?) async -> NativePlaylistRefreshOutcome? {
+        let epoch = generation
+        let isManual = operation != nil
+        do {
+            let stamp = Self.timestamp(), convert = calculations.convertPlaylist, source = snapshot
+            let plan: PlaylistRefreshPlan? = try await calculate(trackOperation: isManual) {
+                let fetched = try convert(playlist.youtubeId, dto, stamp)
+                let plan = try PlaylistRefreshPlan.make(existing: source, playlistId: playlist.id,
+                                                        fetched: fetched.snapshot, refreshedAt: stamp)
+                // A count mismatch can indicate a partial response. Automatic
+                // refresh must not delete tracks or history based on it.
+                guard isManual || plan.removed.isEmpty || fetched.warnings.isEmpty else { return nil }
+                return plan
+            }
+            guard let plan, generation == epoch, activeOperation == operation, !Task.isCancelled,
+                  snapshot.playlists.contains(playlist), let store else { return nil }
             try store.applyRefresh(plan)
             snapshot = try store.snapshot()
             let queueKept = reconcileSavedQueue(after: plan, store: store)
-            message = Self.refreshSummary(plan) + (queueKept ? "" : " The saved queue could not be updated; start a new shuffle.")
+            if isManual || !queueKept {
+                message = Self.refreshSummary(plan) + (queueKept ? "" : " The saved queue could not be updated; start a new shuffle.")
+            }
             return NativePlaylistRefreshOutcome(playlist: plan.playlist, added: plan.added, removed: plan.removed)
         } catch PlaylistRefreshPlan.Failure.emptyResult {
-            guard generation == epoch, activeOperation == operation, !Task.isCancelled else { return nil }
+            guard isManual, generation == epoch, activeOperation == operation, !Task.isCancelled else { return nil }
             message = "YouTube returned no playable tracks for this playlist, so nothing was changed."
         } catch {
-            guard generation == epoch, activeOperation == operation, !Task.isCancelled else { return nil }
+            guard isManual, generation == epoch, activeOperation == operation, !Task.isCancelled else { return nil }
             message = "The playlist could not be refreshed safely. Nothing was changed."
         }
         return nil
@@ -333,14 +373,14 @@ final class NativeLibraryModel: ObservableObject {
         activeOperation = nil; cancelCalculation = nil; busy = false
     }
 
-    private func calculate<T>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
-        let task = Task.detached(priority: .userInitiated) {
+    private func calculate<T>(trackOperation: Bool = true, _ work: @escaping @Sendable () throws -> T) async throws -> T {
+        let task = Task.detached(priority: trackOperation ? .userInitiated : .utility) {
             try Task.checkCancellation()
             let value = try work()
             try Task.checkCancellation()
             return value
         }
-        cancelCalculation = { task.cancel() }
+        if trackOperation { cancelCalculation = { task.cancel() } }
         return try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
     }
 

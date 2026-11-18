@@ -297,6 +297,7 @@ struct NativeLibraryView: View {
     @AppStorage private var focus: Bool
     @AppStorage private var zoom: Double
     @State private var windowWidth: CGFloat = 1280
+    @State private var startupLibraryGeneration: UUID?
     private let restoresRecentLibrary: Bool
     private var observeBounds: (([String: CGRect]) -> Void)?
     private enum ImportNextStep { case createLibrary, openLibrary, ordinaryApp }
@@ -336,6 +337,7 @@ struct NativeLibraryView: View {
     private func sheetWidth(_ maximum: CGFloat) -> CGFloat { min(maximum, max(320, windowWidth - 32)) }
 
     var body: some View {
+        let libraryGeneration = library.generation
         GeometryReader { geometry in
             let scale = CGFloat(NativeInterfaceZoom.clamped(zoom))
             let size = CGSize(width: geometry.size.width / scale, height: geometry.size.height / scale)
@@ -377,13 +379,24 @@ struct NativeLibraryView: View {
         .sheet(isPresented: $showingShortcuts) { shortcuts }
         .sheet(isPresented: Binding(get: { library.pendingImport != nil }, set: { if !$0 { library.pendingImport = nil } })) { transferPreview }
         // A different (or closed) library invalidates the session and the page.
-        .onChange(of: library.generation) { stopPlayback(); selectPage(nil); showingHome = false; stage = false }
+        .onChange(of: libraryGeneration) { stopPlayback(); selectPage(nil); showingHome = false; stage = false }
         .onChange(of: excludeWatched) { queuePreparation.cancel() }
         .onExitCommand { if stage { stage = false } }
         .onDisappear { stopPlayback() }
         .onAppear {
             if NativeUIEnvironment.isFixture, !library.isOpen { library.openDemo() }
-            else if restoresRecentLibrary { library.reopenRecentLibrary() }
+            else if restoresRecentLibrary, !library.isOpen {
+                library.reopenRecentLibrary()
+                if library.isOpen { startupLibraryGeneration = library.generation }
+            }
+        }
+        .task(id: libraryGeneration, priority: .utility) {
+            guard !Task.isCancelled, startupLibraryGeneration == libraryGeneration, libraryGeneration == library.generation else { return }
+            startupLibraryGeneration = nil
+            guard !library.snapshot.playlists.isEmpty else { return }
+            let services = NativePersonalImportServices.live(allowKeychainInteraction: false)
+            guard let fetch = try? await services.playlistFetcher(), libraryGeneration == library.generation, !Task.isCancelled else { return }
+            await library.refreshPlaylistsOnStartup(fetchPlaylist: fetch, didRefresh: updateListeningQueue)
         }
         .task(id: library.message) { await dismissMessageLater() }
     }
@@ -894,12 +907,16 @@ struct NativeLibraryView: View {
         guard !library.busy, !library.isDemo else { return }
         let source = NativeImportPlaylistSource(account: account)
         Task {
-            guard let outcome = await library.refreshPlaylist(id, account: source), outcome.changesTracks else { return }
-            guard let listening, listening.playlist.id == id else { return }
-            let current = library.snapshot.occurrences.filter { $0.playlistId == id }
-            if !listening.applyRefresh(playlist: outcome.playlist, occurrences: current, added: outcome.added) {
-                library.message = (library.message.map { $0 + " " } ?? "") + "Shuffle again to bring the changes into the queue that is playing."
-            }
+            if let outcome = await library.refreshPlaylist(id, account: source) { updateListeningQueue(outcome) }
+        }
+    }
+
+    private func updateListeningQueue(_ outcome: NativePlaylistRefreshOutcome) {
+        let id = outcome.playlist.id
+        guard outcome.changesTracks, let listening, listening.playlist.id == id else { return }
+        let current = library.snapshot.occurrences.filter { $0.playlistId == id }
+        if !listening.applyRefresh(playlist: outcome.playlist, occurrences: current, added: outcome.added) {
+            library.message = (library.message.map { $0 + " " } ?? "") + "Shuffle again to bring the changes into the queue that is playing."
         }
     }
 
@@ -923,16 +940,21 @@ struct NativeLibraryView: View {
         } catch { library.message = "The saved queue no longer matches this library. No occurrence identities were inferred." }
     }
     private func startQueue(_ playlist: LibraryPlaylist, mode requested: Int? = nil) {
-        let source = library.snapshot, epoch = library.generation, selectedID = selected
+        let epoch = library.generation, selectedID = selected
         let requestedMode = requested ?? mode, requestedExclusion = excludeWatched, sessionID = listening?.id
         Task {
             guard epoch == library.generation, selected == selectedID, listening?.id == sessionID else { return }
-            let items = await queuePreparation.prepare(snapshot: source, playlist: playlist.id,
-                mode: Self.queueMode(requestedMode), excludeWatched: requestedExclusion)
-            // A newer shuffle supersedes this one inside the preparation itself.
-            guard let items, epoch == library.generation, selected == selectedID, listening?.id == sessionID,
-                  excludeWatched == requestedExclusion else { return }
-            beginSession(items: items, playlist: playlist, index: 0, autoplay: true, inOrder: requestedMode == Self.inOrderMode)
+            while let current = library.snapshot.playlists.first(where: { $0.id == playlist.id }) {
+                let items = await queuePreparation.prepare(snapshot: library.snapshot, playlist: current.id,
+                    mode: Self.queueMode(requestedMode), excludeWatched: requestedExclusion)
+                // A newer shuffle supersedes this one inside the preparation itself.
+                guard let items, epoch == library.generation, selected == selectedID, listening?.id == sessionID,
+                      excludeWatched == requestedExclusion else { return }
+                // A refresh can finish while the queue is being prepared.
+                guard library.snapshot.playlists.contains(current) else { continue }
+                beginSession(items: items, playlist: current, index: 0, autoplay: true, inOrder: requestedMode == Self.inOrderMode)
+                return
+            }
         }
     }
     /// Stored values of the queue mode preference: 0 Normal, 1 Smart, 2 In order.
