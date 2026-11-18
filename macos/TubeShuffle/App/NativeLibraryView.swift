@@ -11,13 +11,6 @@ final class NativeListeningSession: Identifiable {
     enum Entry {
         case occurrence(LibraryOccurrence)
         case suggestion(SuggestedVideoDTO)
-
-        var youtubeId: String {
-            switch self {
-            case .occurrence(let value): return value.youtubeId
-            case .suggestion(let value): return value.youtubeId
-            }
-        }
     }
 
     let id = UUID()
@@ -29,6 +22,10 @@ final class NativeListeningSession: Identifiable {
     private(set) var occurrencesByID: [OccurrenceID: LibraryOccurrence]
     /// Suggestions in the queue, by queue item ID.
     private(set) var suggestionsByItem: [Int: SuggestedVideoDTO] = [:]
+    private let libraryGeneration: UUID
+    private let hasRestarted: Bool
+    private let testHooks: PlayerCoordinator.TestHooks?
+    private var initialPlayRequested = false
     private var readySubscription: AnyCancellable?
 
     convenience init(items: [LibraryOccurrence], playlist: LibraryPlaylist, library: NativeLibraryModel, index: Int = 0,
@@ -38,9 +35,12 @@ final class NativeListeningSession: Identifiable {
     }
 
     init(entries: [Entry], playlist: LibraryPlaylist, library: NativeLibraryModel, index: Int = 0, autoplay: Bool = false,
-         volume: Double = 1, inOrder: Bool = false, testHooks: PlayerCoordinator.TestHooks? = nil) {
+         volume: Double = 1, inOrder: Bool = false, testHooks: PlayerCoordinator.TestHooks? = nil, hasRestarted: Bool = false) {
         self.playlist = playlist
         self.inOrder = inOrder
+        self.hasRestarted = hasRestarted
+        self.testHooks = testHooks
+        libraryGeneration = library.generation
         var occurrences: [OccurrenceID: LibraryOccurrence] = [:]
         var suggestions: [Int: SuggestedVideoDTO] = [:]
         var items: [PlayerCoordinator.Item] = []
@@ -59,7 +59,7 @@ final class NativeListeningSession: Identifiable {
         occurrencesByID = occurrences
         suggestionsByItem = suggestions
         coordinator = PlayerCoordinator(initialItems: items, initialIndex: index, volume: volume, testHooks: testHooks)
-        let epoch = library.generation
+        let epoch = libraryGeneration
         coordinator.onNaturalCompletion = { [weak library] item in
             library?.recordNaturalCompletion(item, playlist: playlist.id, epoch: epoch)
         }
@@ -70,10 +70,34 @@ final class NativeListeningSession: Identifiable {
         if autoplay {
             // Only an explicit Play/Shuffle/row action requests this one-shot play.
             // Resume, launch and view/size changes never request playback.
-            readySubscription = coordinator.$ready.filter { $0 }.first().sink { [weak coordinator] _ in
-                Task { @MainActor in coordinator?.play() }
+            initialPlayRequested = true
+            readySubscription = coordinator.$ready.filter { $0 }.first().sink { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, self.coordinator.canTransport else { return }
+                    self.initialPlayRequested = false
+                    self.coordinator.play()
+                }
             }
         }
+    }
+
+    var canRestartAutomatically: Bool {
+        !hasRestarted && coordinator.recovery?.allowsAutomaticReload == true
+    }
+
+    func restarted(in library: NativeLibraryModel, automatically: Bool) -> NativeListeningSession? {
+        guard library.generation == libraryGeneration, coordinator.recoveryRequired,
+              !automatically || canRestartAutomatically else { return nil }
+        let items = coordinator.queue
+        let entries = items.compactMap { entry(for: $0) }
+        guard entries.count == items.count else { return nil }
+
+        // Retire the old bridge before starting another. Keep the last accepted
+        // selection and only carry over an explicit Play that never ran.
+        coordinator.stop()
+        return NativeListeningSession(entries: entries, playlist: playlist, library: library,
+            index: coordinator.index, autoplay: automatically && initialPlayRequested, volume: coordinator.volume,
+            inOrder: inOrder, testHooks: testHooks, hasRestarted: true)
     }
 
     /// Brings the live queue up to date after its playlist was refreshed without
@@ -639,7 +663,8 @@ struct NativeLibraryView: View {
             Group {
                 if let listening {
                     NativeLiveDeck(coordinator: listening.coordinator, session: listening, showArtwork: $showArtwork, focus: $focus,
-                        stage: $stage, metrics: metrics, demo: library.isDemo, restart: restartPlayback, covered: showsHome)
+                        stage: $stage, metrics: metrics, demo: library.isDemo, restart: { restartPlayback(listening, automatically: $0) },
+                        covered: showsHome)
                         .id(listening.id)
                 } else {
                     NativeIdleDeck(item: occurrences.first, count: occurrences.count, showArtwork: $showArtwork, focus: $focus,
@@ -921,13 +946,11 @@ struct NativeLibraryView: View {
     }
 
     private func stopPlayback() { queuePreparation.cancel(); listening?.coordinator.stop(); listening = nil }
-    private func restartPlayback() {
-        guard let listening, listening.coordinator.recoveryRequired else { return }
-        // The same queue, suggestions included, at the same track.
-        let entries = listening.coordinator.queue.compactMap { listening.entry(for: $0) }
-        guard entries.count == listening.coordinator.queue.count else { return }
-        beginSession(entries: entries, playlist: listening.playlist, index: listening.coordinator.index, autoplay: false,
-                     inOrder: listening.inOrder)
+    private func restartPlayback(_ failedSession: NativeListeningSession, automatically: Bool) {
+        guard listening === failedSession, !automatically || !queuePreparation.busy,
+              let replacement = failedSession.restarted(in: library, automatically: automatically) else { return }
+        queuePreparation.cancel()
+        listening = replacement
     }
     private func resumeQueue() {
         guard let saved = library.savedQueue,
@@ -974,18 +997,14 @@ struct NativeLibraryView: View {
         return listening == nil ? "Shuffle & listen" : "Reshuffle queue"
     }
     private func beginSession(items: [LibraryOccurrence], playlist: LibraryPlaylist, index: Int, autoplay: Bool, inOrder: Bool = false) {
-        beginSession(entries: items.map { NativeListeningSession.Entry.occurrence($0) }, playlist: playlist, index: index,
-                     autoplay: autoplay, inOrder: inOrder)
-    }
-    private func beginSession(entries: [NativeListeningSession.Entry], playlist: LibraryPlaylist, index: Int, autoplay: Bool, inOrder: Bool) {
-        guard !entries.isEmpty else { library.message = "No tracks match this filter. Try turning Skip watched off."; return }
-        guard entries.allSatisfy({ $0.youtubeId.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil }) else {
+        guard !items.isEmpty else { library.message = "No tracks match this filter. Try turning Skip watched off."; return }
+        guard items.allSatisfy({ $0.youtubeId.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil }) else {
             library.message = "This queue contains an ID that cannot be played. No occurrences were silently skipped."; return
         }
         // A new queue keeps the volume chosen in the one it replaces.
         let volume = listening?.coordinator.volume ?? 1
         stopPlayback()
-        listening = NativeListeningSession(entries: entries, playlist: playlist, library: library, index: index, autoplay: autoplay,
+        listening = NativeListeningSession(items: items, playlist: playlist, library: library, index: index, autoplay: autoplay,
                                            volume: volume, inOrder: inOrder)
     }
 

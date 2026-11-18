@@ -74,6 +74,20 @@ final class PlayerCoordinator: ObservableObject {
         var channel: String? = nil
     }
 
+    enum Recovery {
+        case webContentTerminated, startupTimedOut, stalled
+
+        var allowsAutomaticReload: Bool { self != .stalled }
+
+        var message: String {
+            switch self {
+            case .webContentTerminated: return "The macOS web player closed unexpectedly."
+            case .startupTimedOut: return "The YouTube player didn't start in time."
+            case .stalled: return "The YouTube player stopped responding."
+            }
+        }
+    }
+
     // Queue and accepted state share one publication, so a replacement cannot
     // expose a new order paired with the old index (or vice versa).
     private struct PlaybackQueue {
@@ -127,7 +141,8 @@ final class PlayerCoordinator: ObservableObject {
     private var readinessGate = ReadinessGate()
     @Published private var mutationInFlight = false
     private var mutationGate = MutationGate()
-    @Published private(set) var recoveryRequired = false
+    @Published private(set) var recovery: Recovery?
+    var recoveryRequired: Bool { recovery != nil }
     private let remoteEligibility = RemoteEligibility()
     @Published private(set) var occurrence = 0
     @Published private var progressAdmission = ProgressAdmission()
@@ -233,6 +248,9 @@ final class PlayerCoordinator: ObservableObject {
                 guard !self.playerError else { return }
                 self.status = "Playback blocked; press Play"
                 self.record(self.status)
+            case .webContentTerminated:
+                guard self.startupGate.fail() else { return }
+                self.failOccurrence("WebKit content process terminated", recovery: .webContentTerminated)
             case .failure:
                 guard self.startupGate.fail() else { return }
                 self.failOccurrence("player bridge or navigation failed")
@@ -242,8 +260,8 @@ final class PlayerCoordinator: ObservableObject {
             player.start(videoID: queue[index].videoID)
             Task { [weak self] in
                 do { try await Task.sleep(nanoseconds: 15_000_000_000) } catch { return }
-                guard let self, self.startupGate.timeout() else { return }
-                self.failOccurrence("player startup timed out")
+                guard let self, !self.recoveryRequired, !self.playerError, self.startupGate.timeout() else { return }
+                self.failOccurrence("player startup timed out", recovery: .startupTimedOut)
             }
         }
         let app = NotificationCenter.default
@@ -332,17 +350,17 @@ final class PlayerCoordinator: ObservableObject {
 
     private var mutationContext: MutationGate.Context { .init(occurrence: occurrence, lifecycle: windowGeneration) }
 
-    private func requireRestart(_ reason: String) {
-        recoveryRequired = true
-        status = "Player stalled. Quit and reopen the app to recover safely."
-        record("\(reason); app restart required")
+    private func requireRestart(_ reason: String, recovery cause: Recovery = .stalled) {
+        recovery = cause
+        status = cause.message
+        record("\(reason); player reload required")
         publishNowPlaying()
     }
 
     // Terminal occurrence failure: the session cannot continue safely, so every
     // in-flight effect is invalidated and a restart is required. Late command
     // completions are rejected by their generation and lifecycle guards.
-    private func failOccurrence(_ reason: String) {
+    private func failOccurrence(_ reason: String, recovery: Recovery = .stalled) {
         failStagedShuffledQueueIfNeeded()
         mutationGate.invalidate()
         readinessGate.abandon()
@@ -352,7 +370,7 @@ final class PlayerCoordinator: ObservableObject {
         queueState.invalidatePlayback()
         invalidateSeek()
         resetProgress()
-        requireRestart(reason)
+        requireRestart(reason, recovery: recovery)
     }
 
     // Readiness is re-derived whenever the pending or active generation changes;
@@ -584,10 +602,7 @@ final class PlayerCoordinator: ObservableObject {
         let watchdog = Task {
             do { try await Task.sleep(nanoseconds: 10_000_000_000) } catch { return }
             guard seekGate.isActive(token) else { return }
-            recoveryRequired = true
-            status = "Seek stalled. Quit and reopen to recover safely."
-            record("seek stalled; restart required to avoid a late seek on another item")
-            publishNowPlaying()
+            requireRestart("seek stalled; a late seek could affect another item")
         }
         Task {
             defer {
@@ -613,7 +628,7 @@ final class PlayerCoordinator: ObservableObject {
         // The bridge cannot cancel an already issued seek. Release the UI gate,
         // but do not issue more mutations on a player that may complete it late.
         if seekGate.seeking {
-            recoveryRequired = true
+            recovery = .stalled
             record("seek invalidated; restart required because the player operation may still complete")
         }
         seekGate.invalidate()
@@ -760,7 +775,7 @@ final class PlayerCoordinator: ObservableObject {
     /// A closed listening surface cannot retain media, remote controls or callbacks.
     func stop() {
         windowOpen = false
-        recoveryRequired = true
+        if recovery == nil { recovery = .stalled }
         onNaturalCompletion = nil
         onQueueChanged = nil
         subscriptions.removeAll()
