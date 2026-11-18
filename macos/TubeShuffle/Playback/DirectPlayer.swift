@@ -15,7 +15,7 @@ final class CoverableWebView: WKWebView {
 // script can still forge messages. Main-frame/origin checks remain essential.
 @MainActor
 final class DirectPlayer: NSObject, WKNavigationDelegate {
-    enum Event { case iframeReady, ready(Int), state(Int, Int), error(Int, Int), autoplayBlocked(Int), failure }
+    enum Event { case iframeReady, ready(Int), state(Int, Int), error(Int, Int), autoplayBlocked(Int), webContentTerminated, failure }
     var onEvent: ((Event) -> Void)?
     let webView: CoverableWebView
     /// Volume (0...1) the first instance starts at; later instances keep the last one set.
@@ -98,9 +98,13 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
 
     private func evaluate(_ script: String) async throws -> Any? {
         try await withCheckedThrowingContinuation { continuation in
-            webView.evaluateJavaScript(script) { value, error in
-                if let error { continuation.resume(throwing: error) }
-                else { continuation.resume(returning: value) }
+            webView.evaluateJavaScript(script) { [weak self] value, error in
+                if let error {
+                    if DirectPlayer.isProcessTermination(error) { self?.onEvent?(.webContentTerminated) }
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: value)
+                }
             }
         }
     }
@@ -179,9 +183,17 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
         } else { decisionHandler(url.scheme == "https" || url.absoluteString == "about:blank" ? .allow : .cancel) }
     }
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) { initialNavigation = false }
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { onEvent?(.failure) }
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { onEvent?(.failure) }
-    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { onEvent?(.failure) }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { navigationFailed(error) }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { navigationFailed(error) }
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { onEvent?(.webContentTerminated) }
+
+    private func navigationFailed(_ error: Error) {
+        onEvent?(Self.isProcessTermination(error) ? .webContentTerminated : .failure)
+    }
+
+    private static func isProcessTermination(_ error: Error) -> Bool {
+        (error as? WKError)?.code == .webContentProcessTerminated
+    }
 
     deinit { webView.configuration.userContentController.removeScriptMessageHandler(forName: "events") }
 }

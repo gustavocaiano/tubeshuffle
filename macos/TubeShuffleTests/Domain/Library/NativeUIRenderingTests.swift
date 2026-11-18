@@ -413,6 +413,68 @@ final class NativeUIRenderingTests: XCTestCase {
         XCTAssertLessThan(elapsed, 4, "Repeated queue updates must not block the UI for multiple seconds")
     }
 
+    func testWebKitTerminationReplacesPlayerOnceAndOffersBrowserFallback() async throws {
+        let library = NativeLibraryModel()
+        library.openDemo()
+        let fixture = NativeLibraryFixture.snapshot
+        let preferenceName = "tubeshuffle-ui-recovery-\(UUID().uuidString)"
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: preferenceName))
+        let session = NativeListeningSession(items: fixture.occurrences, playlist: fixture.playlists[0], library: library,
+            index: 1, volume: 0.4, testHooks: .init(load: { _, _ in XCTFail("Recovery should keep the selected occurrence") },
+                progress: { _ in (0, 100) }, draw: { 0.5 }))
+        let savedQueue = try XCTUnwrap(library.savedQueue)
+        var bounds: [String: CGRect] = [:]
+        var openedURL: URL?
+        let root = NativeLibraryView(library: library, preferences: preferences, session: session) { bounds = $0 }
+            .environment(\.openURL, OpenURLAction { url in
+                openedURL = url
+                return .handled
+            })
+        let host = NSHostingView(rootView: root)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 680),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        window.orderBack(nil)
+        defer {
+            window.close()
+            library.closeLibrary()
+            preferences.removePersistentDomain(forName: preferenceName)
+        }
+        let original = session.coordinator.player.webView
+        original.navigationDelegate?.webViewWebContentProcessDidTerminate?(original)
+        for _ in 0..<50 {
+            if let player = webViews(in: host).first, player !== original { break }
+            try await Task.sleep(for: .milliseconds(30))
+        }
+        let replacement = try XCTUnwrap(webViews(in: host).first)
+        XCTAssertFalse(replacement === original)
+        XCTAssertNil(original.navigationDelegate)
+        XCTAssertNil(session.coordinator.player.onEvent)
+        XCTAssertEqual(library.savedQueue, savedQueue)
+
+        replacement.navigationDelegate?.webViewWebContentProcessDidTerminate?(replacement)
+        for _ in 0..<50 where bounds["playback.openYouTube"] == nil {
+            try await Task.sleep(for: .milliseconds(30))
+        }
+        host.layoutSubtreeIfNeeded()
+        XCTAssertTrue(webViews(in: host).first === replacement, "A second failure must stop automatic reloads")
+        let fallback = try XCTUnwrap(bounds["playback.openYouTube"])
+        XCTAssertLessThanOrEqual(fallback.maxX, 480)
+        XCTAssertLessThanOrEqual(fallback.maxY, 680)
+        XCTAssertNotNil(bounds["playback.tryAgain"])
+        let position = NSPoint(x: fallback.midX, y: host.isFlipped ? fallback.midY : host.bounds.height - fallback.midY)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            let event = try XCTUnwrap(NSEvent.mouseEvent(with: type, location: host.convert(position, to: nil), modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                eventNumber: 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+            window.sendEvent(event)
+        }
+        XCTAssertEqual(openedURL?.absoluteString, "https://www.youtube.com/watch?v=\(fixture.occurrences[1].youtubeId)")
+        XCTAssertEqual(library.savedQueue, savedQueue)
+        XCTAssertEqual(library.snapshot.history, fixture.history)
+    }
+
     func testResizeFocusAndZoomKeepTheExistingPlayerAndOccurrence() async throws {
         let library = NativeLibraryModel()
         library.openDemo()

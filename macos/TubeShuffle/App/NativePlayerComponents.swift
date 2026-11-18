@@ -119,7 +119,7 @@ struct NativeLiveDeck: View {
     @Binding var stage: Bool
     let metrics: NativePlayerLayout
     let demo: Bool
-    let restart: () -> Void
+    let restart: (_ automatically: Bool) -> Void
     var covered = false
 
     private var current: PlayerCoordinator.Item { coordinator.queue[coordinator.index] }
@@ -139,16 +139,27 @@ struct NativeLiveDeck: View {
             }.frame(height: metrics.mediaHeight).frame(maxWidth: .infinity).clipped().nativeBounds("media")
             NativeNowPlaying(caption: "Now playing · Track \(coordinator.index + 1) of \(coordinator.queue.count)",
                 title: current.title ?? current.videoID, channel: current.channel ?? session.playlist.title, compact: metrics.compactChrome)
-            NativeTransport(coordinator: coordinator, compact: metrics.compactChrome, stackedVolume: metrics.stackedVolume).frame(height: metrics.transportHeight).nativeBounds("transport")
-            if coordinator.recoveryRequired {
-                HStack {
-                    Text("Playback needs a fresh start. Your library and queue are safe.").font(.system(size: 12))
-                    Spacer()
-                    Button("Restart player", action: restart).buttonStyle(NativeActionStyle())
-                }.foregroundStyle(.yellow)
+            if let recovery = coordinator.recovery {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(recovery.message).font(.system(size: 12)).foregroundStyle(NativeUIStyle.secondary)
+                    HStack(spacing: 12) {
+                        Button("Restart player") { restart(false) }
+                            .buttonStyle(NativeActionStyle()).nativeBounds("playback.tryAgain")
+                        if let url = youtubeWatchURL(current.videoID) {
+                            Link("Open on YouTube", destination: url)
+                                .font(.system(size: 13)).nativeBounds("playback.openYouTube")
+                        }
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                NativeTransport(coordinator: coordinator, compact: metrics.compactChrome, stackedVolume: metrics.stackedVolume)
+                    .frame(height: metrics.transportHeight).nativeBounds("transport")
             }
         }.padding(metrics.cardInset).modifier(NativeCard())
             .background(NativeWindowAttachment { coordinator.attach(window: $0) })
+            .onChange(of: !covered && session.canRestartAutomatically, initial: true) { _, canRestart in
+                if canRestart { restart(true) }
+            }
     }
 }
 
@@ -222,7 +233,7 @@ struct NativeLiveQueue: View {
     var body: some View {
         NativeQueueCard(items: coordinator.queue.compactMap { session.displayOccurrence(for: $0) },
             currentIndex: coordinator.index, showArtwork: showArtwork, demo: demo, height: height,
-            canSelect: coordinator.canTransport, status: coordinator.status,
+            canSelect: coordinator.canTransport, status: coordinator.recoveryRequired ? nil : coordinator.status,
             suggested: Set(session.suggestionsByItem.keys.map { NativeListeningSession.displayID(forItem: $0) }),
             select: { revealPlayer(); coordinator.select($0) })
     }
@@ -358,7 +369,7 @@ private struct NativeQueueRow: View {
                 .accessibilityAddTraits(active ? .isSelected : [])
             Menu {
                 Button("Play this track") { select(index) }.disabled(!canSelect)
-                if let url = URL(string: "https://www.youtube.com/watch?v=\(item.youtubeId)"), item.youtubeId.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil {
+                if let url = youtubeWatchURL(item.youtubeId) {
                     Link("Open on YouTube", destination: url)
                 }
             } label: { Image(systemName: "ellipsis").frame(width: 32, height: 40) }
@@ -368,6 +379,11 @@ private struct NativeQueueRow: View {
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(active ? Color.white.opacity(0.14) : .clear))
         .overlay(alignment: .leading) { if active { Capsule().fill(.white).frame(width: 3).padding(.vertical, 12) } }
     }
+}
+
+private func youtubeWatchURL(_ videoID: String) -> URL? {
+    guard videoID.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil else { return nil }
+    return URL(string: "https://www.youtube.com/watch?v=\(videoID)")
 }
 
 struct NativePlayerWebView: NSViewRepresentable {
