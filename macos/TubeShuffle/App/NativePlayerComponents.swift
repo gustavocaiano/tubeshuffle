@@ -113,6 +113,7 @@ struct NativeIdleDeck: View {
 
 struct NativeLiveDeck: View {
     @ObservedObject var coordinator: PlayerCoordinator
+    @Environment(\.openURL) private var openURL
     let session: NativeListeningSession
     @Binding var showArtwork: Bool
     @Binding var focus: Bool
@@ -137,17 +138,19 @@ struct NativeLiveDeck: View {
                     NativeFocusArtwork(item: session.displayOccurrence(for: current), demo: demo)
                 }
             }.frame(height: metrics.mediaHeight).frame(maxWidth: .infinity).clipped().nativeBounds("media")
-            NativeNowPlaying(caption: "Now playing · Track \(coordinator.index + 1) of \(coordinator.queue.count)",
+            let position = "Track \(coordinator.index + 1) of \(coordinator.queue.count)"
+            NativeNowPlaying(caption: coordinator.recoveryRequired ? position : "Now playing · \(position)",
                 title: current.title ?? current.videoID, channel: current.channel ?? session.playlist.title, compact: metrics.compactChrome)
             if let recovery = coordinator.recovery {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(recovery.message).font(.system(size: 12)).foregroundStyle(NativeUIStyle.secondary)
                     HStack(spacing: 12) {
-                        Button("Restart player") { restart(false) }
+                        Button("Retry playback") { restart(false) }
                             .buttonStyle(NativeActionStyle()).nativeBounds("playback.tryAgain")
-                        if let url = youtubeWatchURL(current.videoID) {
-                            Link("Open on YouTube", destination: url)
-                                .font(.system(size: 13)).nativeBounds("playback.openYouTube")
+                        if youtubeWatchURL(current.videoID) != nil {
+                            Button("Play in browser") {
+                                if let url = browserPlaybackURL(coordinator, index: coordinator.index) { openURL(url) }
+                            }.buttonStyle(NativeActionStyle()).nativeBounds("playback.openYouTube")
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
@@ -225,17 +228,27 @@ struct NativeTransport: View {
 
 struct NativeLiveQueue: View {
     @ObservedObject var coordinator: PlayerCoordinator
+    @Environment(\.openURL) private var openURL
     let session: NativeListeningSession
     let showArtwork: Bool
     let demo: Bool
     let height: CGFloat
     var revealPlayer: () -> Void
     var body: some View {
+        let playsInBrowser = coordinator.canSelectForBrowser && !session.canRestartAutomatically
         NativeQueueCard(items: coordinator.queue.compactMap { session.displayOccurrence(for: $0) },
             currentIndex: coordinator.index, showArtwork: showArtwork, demo: demo, height: height,
-            canSelect: coordinator.canTransport, status: coordinator.recoveryRequired ? nil : coordinator.status,
+            canSelect: coordinator.canTransport || playsInBrowser, playsInBrowser: playsInBrowser,
+            status: coordinator.recoveryRequired ? nil : coordinator.status,
             suggested: Set(session.suggestionsByItem.keys.map { NativeListeningSession.displayID(forItem: $0) }),
-            select: { revealPlayer(); coordinator.select($0) })
+            select: { index in
+                if playsInBrowser {
+                    if let url = browserPlaybackURL(coordinator, index: index) { openURL(url) }
+                } else {
+                    revealPlayer()
+                    coordinator.select(index)
+                }
+            })
     }
 }
 
@@ -299,6 +312,7 @@ struct NativeQueueCard: View {
     let demo: Bool
     let height: CGFloat
     let canSelect: Bool
+    var playsInBrowser = false
     var status: String? = nil
     /// Rows that are suggestions played next rather than playlist tracks.
     var suggested: Set<OccurrenceID> = []
@@ -311,6 +325,10 @@ struct NativeQueueCard: View {
                     Text("Queue").font(.system(size: 14, weight: .semibold))
                     Text(currentIndex.map { "Track \($0 + 1) of \(items.count)" } ?? "Pick a track or shuffle to start")
                         .font(.system(size: 10)).foregroundStyle(NativeUIStyle.secondary)
+                    if playsInBrowser {
+                        Text("Choose a track to play in your browser.")
+                            .font(.system(size: 10)).foregroundStyle(NativeUIStyle.secondary)
+                    }
                 }
                 Spacer(minLength: 8)
                 Text("\(items.count) videos").font(.system(size: 10, weight: .medium)).padding(.horizontal, 8).padding(.vertical, 4)
@@ -321,7 +339,8 @@ struct NativeQueueCard: View {
                     LazyVStack(spacing: 6) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                             NativeQueueRow(item: item, index: index, active: currentIndex == index, suggested: suggested.contains(item.id),
-                                           showArtwork: showArtwork, demo: demo, canSelect: canSelect, select: select).id(item.id)
+                                           showArtwork: showArtwork, demo: demo, canSelect: canSelect, playsInBrowser: playsInBrowser,
+                                           select: select).id(item.id)
                         }
                     }
                 }.onChange(of: currentIndex) { index in
@@ -346,6 +365,7 @@ private struct NativeQueueRow: View {
     let showArtwork: Bool
     let demo: Bool
     let canSelect: Bool
+    let playsInBrowser: Bool
     let select: (Int) -> Void
 
     var body: some View {
@@ -366,10 +386,14 @@ private struct NativeQueueRow: View {
                 }.padding(.leading, 10).padding(.vertical, 10).contentShape(Rectangle())
             }.buttonStyle(.plain).disabled(!canSelect)
                 .accessibilityLabel("\(index + 1). \(item.title), \(suggested ? "suggestion, " : "")\(item.channelTitle)")
+                .accessibilityHint(playsInBrowser ? "Plays in your browser" : "")
                 .accessibilityAddTraits(active ? .isSelected : [])
+                #if DEBUG
+                .nativeBounds("queue.track.\(index)")
+                #endif
             Menu {
-                Button("Play this track") { select(index) }.disabled(!canSelect)
-                if let url = youtubeWatchURL(item.youtubeId) {
+                Button(playsInBrowser ? "Play in browser" : "Play this track") { select(index) }.disabled(!canSelect)
+                if !playsInBrowser, let url = youtubeWatchURL(item.youtubeId) {
                     Link("Open on YouTube", destination: url)
                 }
             } label: { Image(systemName: "ellipsis").frame(width: 32, height: 40) }
@@ -379,6 +403,14 @@ private struct NativeQueueRow: View {
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(active ? Color.white.opacity(0.14) : .clear))
         .overlay(alignment: .leading) { if active { Capsule().fill(.white).frame(width: 3).padding(.vertical, 12) } }
     }
+}
+
+@MainActor
+private func browserPlaybackURL(_ coordinator: PlayerCoordinator, index: Int) -> URL? {
+    guard coordinator.queue.indices.contains(index),
+          let url = youtubeWatchURL(coordinator.queue[index].videoID),
+          coordinator.selectForBrowser(index) else { return nil }
+    return url
 }
 
 private func youtubeWatchURL(_ videoID: String) -> URL? {

@@ -424,10 +424,10 @@ final class NativeUIRenderingTests: XCTestCase {
                 progress: { _ in (0, 100) }, draw: { 0.5 }))
         let savedQueue = try XCTUnwrap(library.savedQueue)
         var bounds: [String: CGRect] = [:]
-        var openedURL: URL?
+        var openedURLs: [URL] = []
         let root = NativeLibraryView(library: library, preferences: preferences, session: session) { bounds = $0 }
             .environment(\.openURL, OpenURLAction { url in
-                openedURL = url
+                openedURLs.append(url)
                 return .handled
             })
         let host = NSHostingView(rootView: root)
@@ -463,16 +463,54 @@ final class NativeUIRenderingTests: XCTestCase {
         XCTAssertLessThanOrEqual(fallback.maxX, 480)
         XCTAssertLessThanOrEqual(fallback.maxY, 680)
         XCTAssertNotNil(bounds["playback.tryAgain"])
-        let position = NSPoint(x: fallback.midX, y: host.isFlipped ? fallback.midY : host.bounds.height - fallback.midY)
-        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-            let event = try XCTUnwrap(NSEvent.mouseEvent(with: type, location: host.convert(position, to: nil), modifierFlags: [],
-                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
-                eventNumber: 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
-            window.sendEvent(event)
+        func click(_ rect: CGRect) throws {
+            let position = NSPoint(x: rect.midX, y: host.isFlipped ? rect.midY : host.bounds.height - rect.midY)
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                let event = try XCTUnwrap(NSEvent.mouseEvent(with: type, location: host.convert(position, to: nil), modifierFlags: [],
+                    timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                    eventNumber: 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+                window.sendEvent(event)
+            }
         }
-        XCTAssertEqual(openedURL?.absoluteString, "https://www.youtube.com/watch?v=\(fixture.occurrences[1].youtubeId)")
+        XCTAssertTrue(openedURLs.isEmpty, "A failure must never open the browser without an action")
+        try click(fallback)
+        XCTAssertEqual(openedURLs.last?.absoluteString, "https://www.youtube.com/watch?v=\(fixture.occurrences[1].youtubeId)")
         XCTAssertEqual(library.savedQueue, savedQueue)
+
+        window.setContentSize(NSSize(width: 1180, height: 860))
+        for _ in 0..<50 {
+            if let row = bounds["queue.track.2"], row.minY >= 0, row.maxY <= 860, row.minX > 480 { break }
+            try await Task.sleep(for: .milliseconds(30))
+        }
+        try click(XCTUnwrap(bounds["queue.track.2"]))
+        XCTAssertEqual(openedURLs.map(\.absoluteString), [1, 2].map { "https://www.youtube.com/watch?v=\(fixture.occurrences[$0].youtubeId)" })
+        XCTAssertEqual(library.savedQueue?.index, 2)
+        XCTAssertEqual(library.savedQueue?.occurrenceIDs, savedQueue.occurrenceIDs)
         XCTAssertEqual(library.snapshot.history, fixture.history)
+    }
+
+    func testRetryPlaysTheSelectedTrackWhenTheReplacementIsReady() async throws {
+        let library = NativeLibraryModel()
+        library.openDemo()
+        let fixture = NativeLibraryFixture.snapshot
+        let played = expectation(description: "The replacement receives Play")
+        let session = NativeListeningSession(items: fixture.occurrences, playlist: fixture.playlists[0], library: library,
+            testHooks: .init(load: { _, _ in XCTFail("Retry should start at the selected track") },
+                progress: { _ in (0, 100) }, draw: { 0.5 }, play: { generation in
+                    XCTAssertEqual(generation, 1)
+                    played.fulfill()
+                }))
+        let window = NSWindow(contentRect: .zero, styleMask: [.titled], backing: .buffered, defer: false)
+        session.coordinator.attach(window: window)
+        session.coordinator.player.onEvent?(.webContentTerminated)
+        XCTAssertTrue(session.coordinator.selectForBrowser(2))
+        let retry = try XCTUnwrap(session.restarted(in: library, automatically: false))
+        defer { retry.coordinator.stop(); library.closeLibrary() }
+        XCTAssertEqual(retry.coordinator.index, 2)
+        XCTAssertFalse(retry.coordinator.ready)
+        retry.coordinator.attach(window: window)
+        retry.coordinator.player.onEvent?(.ready(1))
+        await fulfillment(of: [played], timeout: 2)
     }
 
     func testResizeFocusAndZoomKeepTheExistingPlayerAndOccurrence() async throws {

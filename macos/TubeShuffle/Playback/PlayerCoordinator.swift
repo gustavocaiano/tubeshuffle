@@ -161,6 +161,7 @@ final class PlayerCoordinator: ObservableObject {
         var onMutationWatchdogArmed: ((@escaping @MainActor () -> Void) -> Void)? = nil
         var onLoadFinished: (() -> Void)? = nil
         var volume: (@MainActor (Double, Int) async throws -> Void)? = nil
+        var play: (@MainActor (Int) async throws -> Void)? = nil
     }
     private let testHooks: TestHooks?
     private let mediaPublication: PlayerMediaPublication?
@@ -254,14 +255,6 @@ final class PlayerCoordinator: ObservableObject {
             case .failure:
                 guard self.startupGate.fail() else { return }
                 self.failOccurrence("player bridge or navigation failed")
-            }
-        }
-        if testHooks == nil {
-            player.start(videoID: queue[index].videoID)
-            Task { [weak self] in
-                do { try await Task.sleep(nanoseconds: 15_000_000_000) } catch { return }
-                guard let self, !self.recoveryRequired, !self.playerError, self.startupGate.timeout() else { return }
-                self.failOccurrence("player startup timed out", recovery: .startupTimedOut)
             }
         }
         let app = NotificationCenter.default
@@ -412,6 +405,20 @@ final class PlayerCoordinator: ObservableObject {
         beginLoad(next, reason: reason, stagedQueue: nil)
     }
 
+    var canSelectForBrowser: Bool { windowOpen && recoveryRequired }
+
+    /// Keep the queue available even when the bridge is unusable. Browser
+    /// selection only updates the saved position and cannot record playback.
+    func selectForBrowser(_ index: Int) -> Bool {
+        guard canSelectForBrowser, queue.indices.contains(index) else { return false }
+        var selectedQueue = playbackQueue
+        selectedQueue.state.invalidatePlayback()
+        guard selectedQueue.state.rebase(count: queue.count, index: index) else { return false }
+        player.stop()
+        playbackQueue = selectedQueue
+        return true
+    }
+
     private func beginLoad(_ next: Int, reason: QueueState.Reason, stagedQueue: [Item]?) {
         guard !seekGate.seeking, !mutationInFlight, !recoveryRequired,
               stagedQueue == nil || canShuffleSampleQueue,
@@ -503,7 +510,12 @@ final class PlayerCoordinator: ObservableObject {
         }
     }
 
-    func play() { command("play", wantsPlayback: true) { generation in try await self.player.play(generation: generation) } }
+    func play() {
+        command("play", wantsPlayback: true) { generation in
+            if let play = self.testHooks?.play { try await play(generation) }
+            else { try await self.player.play(generation: generation) }
+        }
+    }
     func pause() { command("pause", wantsPlayback: false) { generation in try await self.player.pause(generation: generation) } }
     func setVolume(_ value: Double) {
         guard value.isFinite else { return }
@@ -796,6 +808,15 @@ final class PlayerCoordinator: ObservableObject {
         windowOpen = true
         publishNowPlaying()
         record("player window attached: \(window.windowNumber), occlusion-visible=\(window.occlusionState.contains(.visible)); not a visibility proof")
+        // The initial ready callback can now service a pending Play because
+        // the window is attached. Start the watchdog with the actual load.
+        if testHooks == nil, !recoveryRequired, player.start(videoID: queue[index].videoID) {
+            Task { [weak self] in
+                do { try await Task.sleep(for: .seconds(15)) } catch { return }
+                guard let self, windowOpen, !recoveryRequired, !playerError, startupGate.timeout() else { return }
+                failOccurrence("player startup timed out", recovery: .startupTimedOut)
+            }
+        }
     }
 
     private func command(_ name: String, wantsPlayback: Bool?, action: @escaping @MainActor (Int) async throws -> Void) {

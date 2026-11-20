@@ -92,11 +92,11 @@ final class NativeListeningSession: Identifiable {
         let entries = items.compactMap { entry(for: $0) }
         guard entries.count == items.count else { return nil }
 
-        // Retire the old bridge before starting another. Keep the last accepted
-        // selection and only carry over an explicit Play that never ran.
+        // Automatic recovery carries over a pending Play. An explicit retry
+        // also plays the selected track once the replacement is ready.
         coordinator.stop()
         return NativeListeningSession(entries: entries, playlist: playlist, library: library,
-            index: coordinator.index, autoplay: automatically && initialPlayRequested, volume: coordinator.volume,
+            index: coordinator.index, autoplay: !automatically || initialPlayRequested, volume: coordinator.volume,
             inOrder: inOrder, testHooks: testHooks, hasRestarted: true)
     }
 
