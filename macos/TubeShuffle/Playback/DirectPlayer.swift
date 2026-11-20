@@ -23,7 +23,8 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
     private let proxy = MessageProxy()
     private let origin = "https://com.tubeshuffle.playbacklab"
     private var initialNavigation = true
-    private var started = false
+    private enum Lifecycle { case idle, started, stopped }
+    private var lifecycle = Lifecycle.idle
     // Generation 1 is the initial fixture. The coordinator supplies strictly larger
     // generations for replacements, before issuing commands for that occurrence.
     private(set) var generation = 1
@@ -39,12 +40,12 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
         webView.navigationDelegate = self
     }
 
-    func start(videoID: String = "ScMzIvxBSi4") {
-        guard !started else { return }
-        started = true
+    func start(videoID: String) -> Bool {
+        guard lifecycle == .idle else { return false }
         guard videoID.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil,
               Bundle.main.bundleIdentifier == "com.tubeshuffle.playbacklab",
-              let base = URL(string: origin + "/") else { onEvent?(.failure); return }
+              let base = URL(string: origin + "/") else { onEvent?(.failure); return false }
+        lifecycle = .started
         let startingVolume = Int((min(1, max(0, initialVolume.isFinite ? initialVolume : 1)) * 100).rounded())
         webView.loadHTMLString("""
         <!doctype html><html><head><meta name="referrer" content="strict-origin-when-cross-origin">
@@ -86,9 +87,12 @@ final class DirectPlayer: NSObject, WKNavigationDelegate {
         }
         </script><script src="https://www.youtube.com/iframe_api" onerror="emit('failure',null,null)"></script></body></html>
         """, baseURL: base)
+        return true
     }
 
     func stop() {
+        guard lifecycle != .stopped else { return }
+        lifecycle = .stopped
         onEvent = nil
         webView.stopLoading()
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "events")
